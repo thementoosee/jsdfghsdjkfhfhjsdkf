@@ -1,0 +1,500 @@
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Quackin'' Reels', 'Relax Gaming', 'https://mediumrare.imgix.net/a95ea8d4f727664ab530dfb7753ebd0f91cc1e57ee838a33b67aaf82f013eefb', 8850, 'Medium', 96.1, 0.20, 100.00, NULL, '2024-09-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Space Wars XXXtreme Megaways', 'NetEnt', 'https://mediumrare.imgix.net/d57c0a20a559cdfe0edd8fba28f43a82350ccb32fd457dd6c99abcf3c58f14a1', 14400, 'High', 96.14, 0.20, 100.00, NULL, '2024-08-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Boo', 'Big Time Gaming', 'https://mediumrare.imgix.net/38ab67fec8b8aaf367fcaf4fafc3b29a0b991672d44aa5b790a54bf00a415b01', 47050, 'High', 96.54, 0.20, 100.00, NULL, '2024-09-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Bass Vegas Double Down Deluxe', 'Pragmatic Play', 'https://mediumrare.imgix.net/c4afdff961df33dbf99a1b9544e78659e5a58d5624a30b5017c98a947a94a5b1', 5000, 'High', 96.5, 0.20, 100.00, NULL, '2024-09-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Stockholm Syndrome', 'Nolimit City', 'https://mediumrare.imgix.net/4ab79636901ad3825afc7898462a22e895a78d93cc8207ca0502eb47b41b0210', 28873, 'High', 96.08, 0.20, 100.00, NULL, '2024-08-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mystery Mice', 'Pragmatic Play', 'https://mediumrare.imgix.net/187c31c8f73e3af26c22786a84077c674ce3ef4dc2439a5ad26a1e072363b55f', 5000, 'High', 96.49, 0.20, 100.00, NULL, '2024-09-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Living with Stan', 'Lucksome', 'https://www.bigwinboard.com/wp-content/uploads/2024/08/living-with-stan-slot-feat.jpg', 10000, 'Medium', 96.06, 0.20, 100.00, NULL, '2024-08-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Egypt Clusterbuster', 'Red Tiger', 'https://mediumrare.imgix.net/e5b1f5d485b110ebc2f9467c104a5283e9f8816a075726b10fbb5f99e9460b70', 6656, 'Medium', 95.71, 0.20, 100.00, NULL, '2024-09-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Zeus Lightning Megaways', 'Red Tiger', 'https://mediumrare.imgix.net/ba57f6e296a4ac74d750cb84166069e5548b2a34d49389d0b6eee62294a9e270', 20000, 'High', 95.69, 0.20, 100.00, NULL, '2024-10-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mine Blown', 'NetEnt', 'https://mediumrare.imgix.net/a2a20bdacd4035c69c63fc71e69910d5f91e3b47ffcbe3b8f0a9cb48d37a72d4', 2484, 'Medium', 96, 0.20, 100.00, NULL, '2024-10-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Moon Spell', 'Red Tiger', 'https://mediumrare.imgix.net/01319811978e793e78d926ee4392d1939ac70e1bdae4c853a717410c5ffcf141', 5224, 'Medium', 95.76, 0.20, 100.00, NULL, '2024-10-16', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mirror Joker', 'Play''n GO', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/mirror-joker-slot-feat.jpg', 880, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-09-04', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Snowflake Sorcery', 'Stakelogic', 'https://www.bigwinboard.com/wp-content/uploads/2024/08/Snowflake-Sorcery-slot-feat.jpg', 6000, 'Medium', 96, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Shippy D Pop', 'AvatarUX', 'https://www.bigwinboard.com/wp-content/uploads/2024/08/shippy-d-pop-slot-feat.jpg', 50000, 'Medium', 96.08, 0.20, 100.00, NULL, '2024-07-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Beastly Burglars', 'AvatarUX', 'https://mediumrare.imgix.net/c090cf654b43ae943e2e114ad2fb510111ee12d7038a430f7134e85f161848b4', 10000, 'Medium', 96, 0.20, 100.00, NULL, '2024-08-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gemix 100', 'Play''n GO', 'https://mediumrare.imgix.net/e36454cf719a00f4bedb41724730516ba3c7c3eeb60dd02fa0bd99e530ec8229', 25000, 'High', 96.2, 0.20, 100.00, NULL, '2024-08-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mustang Gold Megaways', 'Pragmatic Play', 'https://mediumrare.imgix.net/9c0e05075d90b8df3ce3c6b0f4d51d40c4949f26d460add263a161a609f6c2e2', 5000, 'High', 96.55, 0.20, 100.00, NULL, '2024-09-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Angel vs Sinner', 'Pragmatic Play', 'https://mediumrare.imgix.net/c53db31ed6d3fef176df820476615c673184ada4eddc3506442e7b779a1258e3', 15000, 'High', 96.56, 0.20, 100.00, NULL, '2024-09-04', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Outsourced', 'Nolimit City', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/outsourced-slot-feat.jpg', 5000, 'High', 96.08, 0.20, 100.00, NULL, '2024-08-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Stickermania', 'Lucksome', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/stickermania-slot-feat.jpg', 10000, 'High', 96.23, 0.20, 100.00, NULL, '2024-08-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ms Robin Hood', 'NetEnt', 'https://mediumrare.imgix.net/abaf88b6ff39f129bb521af26c54a904dd9adf1b767141a4401431f9b1171c50', 12574, 'High', 96, 0.20, 100.00, NULL, '2024-10-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ankh of Anubis Awakening', 'Play''n GO', 'https://mediumrare.imgix.net/e5ee1fb66270d27f8e4bca601649727b3a412b2f28c8d585866b9a6d8d4a3504', 15000, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jawsome Pirates', 'Bullshark Games', 'https://mediumrare.imgix.net/710e42baffc416fe6ffdd55921fde1064717f37537b6179d137833f6f22e95ac', 12000, 'Medium', 96.28, 0.20, 100.00, NULL, '2024-08-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Vikings The Saga of Fenrir', 'Foxium', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Vikings-The-Saga-of-Fenrir-slot-feat-1.jpg', , 'Medium', 96.14, 0.20, 100.00, NULL, '2024-09-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('The Tumbles', 'Relax Gaming', 'https://mediumrare.imgix.net/ca98e2800123ad3aef195ab47e8bcfd67b86752fc2da7036ab4033cdb90a8c94', 5000, 'Medium', 96.1, 0.20, 100.00, NULL, '2024-09-02', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gears of Eternia Megaways Dream Drop', 'Four Leaf Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/Gears-of-Eternia-Dream-Drop-slot-feat.jpg', , 'Medium', 94.06, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Razor Ways', 'Push Gaming', 'https://mediumrare.imgix.net/853ac4f429d64e84f65ae44c659e5d624bcf197e5158def28a56345542471fff', 25000, 'Medium', 96.36, 0.20, 100.00, NULL, '2024-08-06', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Win-O-Mart', 'Print Studios', 'https://mediumrare.imgix.net/11b11bc1bf954faabafbbcc252b55a60b9f0e776a031ba3289d29f5fe2a34cbe', 10000, 'High', 96.44, 0.20, 100.00, NULL, '2024-08-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Buzz Thrill', 'DreamSpin', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/buzz-thrill-slot-feat.jpg', 5000, 'High', 95.58, 0.20, 100.00, NULL, '2024-10-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Wanted Usual Suspects', 'Northern Lights Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/Wanted-Usual-Suspects-slot-feat.jpg', 10000, 'Medium', 96.05, 0.20, 100.00, NULL, '2024-09-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gem Elevator', 'Pragmatic Play', 'https://mediumrare.imgix.net/7fb12f45dd2f47c29b4ee2e59a3b1f9cec88a4f4193cb2ef5ab80494bb8dc248', 10000, 'High', 96.53, 0.20, 100.00, NULL, '2024-08-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Forging Wilds', 'Pragmatic Play', 'https://mediumrare.imgix.net/57e23ac2f7397fc67aee8ff792db5b60991a308c7cc8fcdf4f5edfec48e3696e', 10000, 'High', 96.52, 0.20, 100.00, NULL, '2024-08-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jellycious DoubleMax', 'Yggdrasil Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/06/Jellycious-DoubleMax-slot-feat.jpg', 25000, 'High', 94, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Donny Dough', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/d0da486c2ef84196c52198fce55b4566303ef3d73d94c675179a8f6c4c5a3781', 10000, 'Medium', 96.23, 0.20, 100.00, NULL, '2024-08-13', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Savannah Pride', 'Red Tiger', 'https://mediumrare.imgix.net/f7c776e9dc4222dfc3e67abc9aa9af0f7833224f9bebfed649efe271fef0e736', 3425, 'Medium', 95.75, 0.20, 100.00, NULL, '2024-10-02', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Joker''s Jewels Hot', 'Pragmatic Play', 'https://mediumrare.imgix.net/5befbb8621f3b529ef0a8576edc94bce337c013f8788e9fb71d8b552a0bd5f9e', 27000, 'Medium', 96.5, 0.20, 100.00, NULL, '2024-09-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Elixir of Wealth', 'Jelly', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/Elixir-of-Wealth-slot-feat.jpg', 5000, 'High', 94, 0.20, 100.00, NULL, '2024-10-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gates of Glory', 'iSoftBet', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/gates-of-glory-slot-feat.jpg', , 'High', 96, 0.20, 100.00, NULL, '2024-10-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Glow Dig', 'Max Win Gaming', 'https://mediumrare.imgix.net/a2f10c58798bb4189269bd358907f24412bd4961473b6d470b6b97f0b184d6e7', 5000, 'High', 96.04, 0.20, 100.00, NULL, '2024-08-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Scourge of Rome', 'Play''n GO', 'https://mediumrare.imgix.net/b87132d27652e3e1904d89cdecf0b7ec1a56f1f4eb3c50e59b74681dbc164401', 40000, 'High', 96.2, 0.20, 100.00, NULL, '2024-08-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Bone Raiders', 'Relax Gaming', 'https://mediumrare.imgix.net/bde5db7d4c7f33984fb83bf4d812c1ac3e8ae308ffc604626ce54835fb37697a', 10000, 'Medium', 96.1, 0.20, 100.00, NULL, '2024-08-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Aztec Treasure Hunt', 'Pragmatic Play', 'https://mediumrare.imgix.net/236ddc22e3873187d82afdd3ecd8f0b05cb7ec5753cdc8df2520fdc8154af2b8', 5000, 'High', 96.03, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Old Gun', 'Backseat Gaming', 'https://mediumrare.imgix.net/651407a0e2f495f40a4437b70e2cd22251030892709d8941577dc4d56042c042', 12500, 'High', 96.29, 0.20, 100.00, NULL, '2024-08-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Apocalypse', 'Nolimit City', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/apocalypse-slot-feat.jpg', 20000, 'High', 96.03, 0.20, 100.00, NULL, '2024-07-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dragons Playground', 'NetEnt', 'https://mediumrare.imgix.net/3ba62f8e526d3706552a9d856a8e3dd2ce6d69cf6ef395f45016ffabf987975a', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-09-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Raging Riches', 'Slotmill', 'https://mediumrare.imgix.net/46c60712d22962b76d61166a635a86a62a717901b72e0944a9b9ee31991108a4', 9607, 'Medium', 96.08, 0.20, 100.00, NULL, '2024-08-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Roman Emperors', 'Red Tiger', 'https://mediumrare.imgix.net/caeb714f8145af0209ba7e89967a93e8af50b45f38a1a5573ef01e59a8d0b019', 9999, 'Medium', 95.76, 0.20, 100.00, NULL, '2024-09-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hot to Burn 7 Deadly Free Spins', 'Pragmatic Play', 'https://mediumrare.imgix.net/7fac3c96f1111c6bf7a5a51c03215bd65d8f6ddcbaf657cfe4a3bf61163f3add', 4000, 'High', 96.54, 0.20, 100.00, NULL, '2024-08-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dragon’s Domain', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/b32ecba95ce52b451ff09fba9f89246ef4051abac52d250094627f0c5ef6c3e5', 10000, 'Medium', 96.31, 0.20, 100.00, NULL, '2024-07-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Depths of Fortune', 'AvatarUX', 'https://mediumrare.imgix.net/d68c963a6c04cab533a4f6d7148ef7ad5827ee5e38dcf54c6acdccd2c62dde3a', 20000, 'Medium', 96, 0.20, 100.00, NULL, '2024-07-30', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sumo Supreme Megaways', 'Pragmatic Play', 'https://mediumrare.imgix.net/0dc300a891eb9deaef323039bab9cccfc22484bdb6930b42ace73b194105c1e3', 12500, 'High', 96.55, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Yeti Quest', 'Pragmatic Play', 'https://mediumrare.imgix.net/902e803087ddd5eb671b7004972a971d7feae60c2f20c0db6e1f279c2504674f', 5000, 'High', 96.06, 0.20, 100.00, NULL, '2024-08-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Slurpy', 'ELK Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/slurpy-slot-feat.jpg', 5000, 'High', 94, 0.20, 100.00, NULL, '2024-09-02', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Sugar Bonanza', 'Stakelogic', 'https://www.bigwinboard.com/wp-content/uploads/2024/06/big-sugar-bonanza-slot-feat-1.jpg', 10000, 'High', 96.01, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Monster Catch', 'Light & Wonder', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/monster-catch-slot-feat.jpg', 736, 'Low', 96.17, 0.20, 100.00, NULL, '2024-06-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('777 Volt GigaBlox', 'Yggdrasil Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/777-volt-slot-feat.jpg', 5000, 'Medium', 94, 0.20, 100.00, NULL, '2024-07-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mafia Gold', 'Play''n GO', 'https://mediumrare.imgix.net/07dafe00b067603966a07b9b9501bb2723ef1c8b762f7b3d1927881d5fd6fec4', 6000, 'High', 96.2, 0.20, 100.00, NULL, '2024-07-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Space Attacks Dream Drop', 'Relax Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/space-attacks-slot-feat.jpg', 8000, 'Medium', 96.1, 0.20, 100.00, NULL, '2024-08-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('7x7 Zeus', '4ThePlayer', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/7x7-Zeus-slot-feat-1.jpg', 10149, 'Medium', 94, 0.20, 100.00, NULL, '2024-08-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Eldritch Dungeon', 'Print Studios', 'https://mediumrare.imgix.net/2740cf8880e283cacaf6a6e7bd8795df9aa2c16fd093d4ff63bbbc28befa4b24', 20000, 'High', 96.1, 0.20, 100.00, NULL, '2024-07-30', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('5 Rings of Darkness', 'Octoplay', 'https://mediumrare.imgix.net/a13bd4ce7feae593db285b450caa2cb9825f72c8739e162cfc630f0a9bb085a1', 6666, 'Low', 95.76, 0.20, 100.00, NULL, '2024-08-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dragon Gold 88', 'Pragmatic Play', 'https://mediumrare.imgix.net/1d45936fdb454c8e8a0517e08258bbc0f61a7285766e9f28d1a3a8597b2c93da', 5000, 'High', 96.71, 0.20, 100.00, NULL, '2024-08-04', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Bison Wilds DoubleMax', 'Reflex Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/07/Bison-Wilds-DoubleMax-slot-feat.jpg', 19996, 'High', 94, 0.20, 100.00, NULL, '2024-09-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Punk Rocker 2', 'Nolimit City', 'https://mediumrare.imgix.net/ddbc0b14390ecf1945621881aa24a47f6669149b9bd9bd6ee7fa7f83ba93a534', 30144, 'High', 96.06, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Eager Beavers', 'Thunderkick', 'https://mediumrare.imgix.net/27abb7633258359e383d80ea87553cda10005897b95f9f2ce6181fb8715e437f', 10000, 'High', 94.29, 0.20, 100.00, NULL, '2024-08-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pickle Bandits', 'Bullshark Games', 'https://mediumrare.imgix.net/d54bbbb94f757e9f3f06a0e54311904e81073f7430265329b0e7c37d15cc2a38', 12000, 'Medium', 96.27, 0.20, 100.00, NULL, '2024-07-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Squeeze', 'ELK Studios', 'https://mediumrare.imgix.net/e5699934c36bd28ca56a90f2ce2d8b477e97a828f777d6df3777775322f3fade', 10000, 'High', 94, 0.20, 100.00, NULL, '2024-08-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('SixSixSix', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/30be38fdc2b4d9a6c76194314dfb7814a66d6905287ade354a0e5f2a79b1ab27', 16666, 'High', 96.15, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('The Lost Boys', 'Blueprint Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/the-lost-boys-slot-feat.jpg', 1000, 'Medium', 95, 0.20, 100.00, NULL, '2024-08-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rise of Olympus Origins', 'Play''n GO', 'https://mediumrare.imgix.net/522a6c8be085bacc761390d2f09601b8ff51733dd266e37d6569e3ad6b66a2cb', 20000, 'High', 96.24, 0.20, 100.00, NULL, '2024-07-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Bow of Artemis', 'Pragmatic Play', 'https://mediumrare.imgix.net/facbe9d341f6c13c6d9ec40210ed5ac17e0afe1b87942561e2fb099c720970c9', 10000, 'High', 96.05, 0.20, 100.00, NULL, '2024-07-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pirate Bonanza', 'Backseat Gaming', 'https://mediumrare.imgix.net/244b354fb208171182c265b5635795f2e9ee22bd832d47cee67ccdb48f3864a8', 10000, 'High', 96.31, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Turtle Paradise', 'Red Tiger', 'https://mediumrare.imgix.net/304a3f7a8ea97b40c79d6456796026ef24184a075a0f7dae8dd746bee2bf68dc', 4602, 'Medium', 95.68, 0.20, 100.00, NULL, '2024-08-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('King''s Mask Eclipse of Gods', 'Play''n GO', 'https://mediumrare.imgix.net/a935e9d702c764dea258224de870d0861ff06d48e83e2254e9b08c4c61d91ba4', 20000, 'High', 96.29, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Legends Battle Of Earth', 'Octoplay', 'https://mediumrare.imgix.net/5ba6ae70374b7d5f262b2c8a74a255332416cb05c7a563c1b53d54a552332192', 6000, 'Medium', 95.7, 0.20, 100.00, NULL, '2024-07-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Tai The Toad', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/715d1e5694973e27bac8deb3fd4c375135ca01517822bf3ab7a31888f7646119', 7500, 'Medium', 96.3, 0.20, 100.00, NULL, '2024-07-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Royal Nuts', 'NetEnt', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/royal-nuts-slot-feat.jpg', 5774, 'Medium', 96.05, 0.20, 100.00, NULL, '2024-06-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jackpot Hunter', 'Pragmatic Play', 'https://mediumrare.imgix.net/28758241dc37505c094f446af08c7985c907eedbfb6ad466607dfc03e3223981', 5000, 'High', 96, 0.20, 100.00, NULL, '2024-07-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Nitropolis 5', 'ELK Studios', 'https://mediumrare.imgix.net/05ded2431bacbc392569426d9e76fd2042864d594f2365ececd0c4308ce55a59', 50000, 'High', 94, 0.20, 100.00, NULL, '2024-07-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('The Grand Show', 'Push Gaming', 'https://mediumrare.imgix.net/2c8a990a498da97951c01e7678e0523c56606b09c1aa454f69b50c5d8efd7296', 10000, 'Medium', 96.28, 0.20, 100.00, NULL, '2024-07-16', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('St Louis 1904', 'Blue Guru Games', 'https://mediumrare.imgix.net/7d086589250990addfd6bd720df4db8af21154a327c1692c57381efedbf868c5', 10000, 'High', 95.95, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Atlantis Crush', 'Relax Gaming', 'https://mediumrare.imgix.net/ecd8b501e8d7e1479f726bef9210c6fe3754b6057f2ca599741bd2d1e5413c89', 10000, 'High', 96.09, 0.20, 100.00, NULL, '2024-07-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Top Terror', 'Hungry Bear', 'https://www.bigwinboard.com/wp-content/uploads/2024/06/big-top-terror-slot-feat.jpg', 50000, 'High', 94, 0.20, 100.00, NULL, '2024-07-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Whispering Winds', 'Play''n GO', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/Whispering-Winds-slot-feat.jpg', 2000, 'Medium', 96.23, 0.20, 100.00, NULL, '2024-07-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Doom''s Digging Machine', 'Octoplay', 'https://mediumrare.imgix.net/280a135e2f18cf9247e2a0b398cf92af0e6ec84169eaddaba36b325177252148', 5000, 'Low', 95.7, 0.20, 100.00, NULL, '2024-07-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dansband På Turné', 'Play''n GO', 'https://mediumrare.imgix.net/b3953a51377cc73565febf9405e63aa018d1381e17501b0918f245bbda471888', 10000, 'High', 96.24, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Beheaded', 'Nolimit City', 'https://mediumrare.imgix.net/33b171ebc96cc101ff0b775339d24418d845d692d62264c025a425c50751c4b4', 15950, 'High', 96.03, 0.20, 100.00, NULL, '2024-06-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ticket To Wild', 'NetEnt', 'https://mediumrare.imgix.net/b9b617ecead0d7755b488df045c3d8b1745c551b6292e3d59075f7dbcbee18c2', 3110, 'Medium', 96.13, 0.20, 100.00, NULL, '2024-08-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Casino Night', 'NetEnt', 'https://mediumrare.imgix.net/027003badf4bc50499fba82d5f0267d9385d99a97030c7411ee1fb97ca27ff91', 10000, 'Medium', 96.04, 0.20, 100.00, NULL, '2024-08-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Oasis of Dead', 'Play''n GO', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Oasis-of-Dead-slot-feat.jpg', 5000, 'High', 96.58, 0.20, 100.00, NULL, '2024-07-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Twisted Lab RotoGrid', 'Hacksaw Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Twisted-Lab-RotoGrid-slot-feat.jpg', 15000, 'High', 96.3, 0.20, 100.00, NULL, '2024-06-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Joker Flip', 'Play''n GO', 'https://mediumrare.imgix.net/98e73a58153b41840829cbc3a1bc0a30977c84ca97e6209a13a0e02ec4903449', 2500, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-08-07', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sands of Destiny', 'Peter & Sons', 'https://mediumrare.imgix.net/37764f63d90397493d0b33053035b1caca5120e37a874d8a74aa5bd9bf13b613', 10000, 'High', 96.3, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Man vs Gator', 'ELK Studios', 'https://mediumrare.imgix.net/4757034354e7790b0723d6852af7d02e6424708c10381a53323ec539b3ab5c84', 10000, 'High', 94, 0.20, 100.00, NULL, '2024-07-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dynamite Diggin Doug', 'Pragmatic Play', 'https://mediumrare.imgix.net/1e79f6fb17f5413a677f40afa25076db60fe91e02bc0204e41292a78e2ed9ecc', 3000, 'High', 96.52, 0.20, 100.00, NULL, '2024-07-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('6 Jokers', 'Pragmatic Play', 'https://mediumrare.imgix.net/55bf00d30d120bdd58fb9a195327b19323b193a350f395dc928d56fe5b7ba557', 5000, 'High', 96.55, 0.20, 100.00, NULL, '2024-07-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Diamond Blitz 2', 'Red Tiger', 'https://www.bigwinboard.com/wp-content/uploads/2024/06/diamond-blitz-2-slot-feat.jpg', 4055, 'Medium', 95.75, 0.20, 100.00, NULL, '2024-08-13', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mutagenes', 'Peter & Sons', 'https://mediumrare.imgix.net/7050542384a5c27f0cc61fcc260c729171fc5e493c14508b5d4192508ed91fea', 12000, 'High', 96.3, 0.20, 100.00, NULL, '2024-08-07', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pineapple Crush', 'Quickspin', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/Pineapple-Crush-slot-feat.jpg', 7333, 'High', 96.01, 0.20, 100.00, NULL, '2024-08-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sands of Eternity 2', 'Slotmill', 'https://mediumrare.imgix.net/988d0b2d7667d9ecc02f6fc3e55ccd3af4c81c843d1283bcd8201dfd90e663d7', 15000, 'Medium', 96.1, 0.20, 100.00, NULL, '2024-06-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('ArcanaPop', 'AvatarUX', 'https://mediumrare.imgix.net/b59321c291d4208f9ece8ce6a7d4699a3e2e1a56e53da9a58ac00f1b8a11e97b', 20000, 'Medium', 96, 0.20, 100.00, NULL, '2024-06-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ze Zeus', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/e20cf100fe7b8cc8f19a428ca222abd4f85c46679f876aa08fa2521248360b54', 10000, 'Medium', 96.34, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fa Fa Babies 2', 'Red Tiger', 'https://mediumrare.imgix.net/a56c5dcf62cd1e19503e0f3cc1d52a1209efdc67c524cd2db8d0a1ea23aebb63', 1223, 'medium', 95.73, 0.20, 100.00, NULL, '2024-07-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Journey to Paris', 'Play''n GO', 'https://mediumrare.imgix.net/019dcbf334ef94b38600f10eb7dd03b51fdd819b970f8a9cb6b8bfdf1c7aca98', 18566, 'Medium', 96.37, 0.20, 100.00, NULL, '2024-04-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Vikings Go To Egypt Wild Fight', 'Yggdrasil Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Vikings-Go-To-Egypt-Wild-Fight-slot-feat.jpg', 3756, 'Medium', 94, 0.20, 100.00, NULL, '2024-06-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sidekick Jack', 'Wicked Games', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/sidekick-jack-slot-feat-1.jpg', , 'Low', 96.5, 0.20, 100.00, NULL, '2024-05-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fang''s Inferno Dream Drop', 'Relax Gaming', 'https://mediumrare.imgix.net/0b150a95751fdc143f79363744fb506ef40f9e3a607255524b5c6c0752ebe197', 5000, 'High', 94, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Crank It Up', 'Pragmatic Play', 'https://mediumrare.imgix.net/78513c35f29a700089c9d913d30a7961d31bbe4e4df9c69aee2bbf1c02812830', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-07-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Deadwood RIP', 'Nolimit City', 'https://mediumrare.imgix.net/bc8a92c97ae8bbea76ce0f0fae158903f9a134a40fec321dfd8db0b1af66d34c', 100000, 'High', 96.09, 0.20, 100.00, NULL, '2024-06-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sweet Kingdom', 'Pragmatic Play', 'https://mediumrare.imgix.net/be8b9d3bb6565afd24db1b5418a3d235297dbaca52fc64c6affdbe98e5ae02e2', 10000, 'High', 96.53, 0.20, 100.00, NULL, '2024-06-30', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Holy Heist', 'Bullshark Games', 'https://mediumrare.imgix.net/f09c765b8acfdb998103754713463f47ee32207e92359ccdc8eb71d68822eb69', 20000, 'Medium', 96.24, 0.20, 100.00, NULL, '2024-06-02', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cats of Olympuss', 'Push Gaming', 'https://mediumrare.imgix.net/eefb6b665511cd3a028a5f348d0a6493fdb94699c04f187018417c2cd6372d05', 23442, 'Medium', 96.31, 0.20, 100.00, NULL, '2024-09-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('4 Fantastic Fish Gold Dream Drop', '4ThePlayer', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/4-Fantastic-Fish-Gold-Dream-Drop-slot-feat.jpg', 2298, 'High', 94, 0.20, 100.00, NULL, '2024-06-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ancient Tumble', 'Relax Gaming', 'https://mediumrare.imgix.net/3b78d06cf00e9259a5b9fbb8d596e08f470f1de22bcf117d5524f90e7aaa91c4', 10000, 'High', 96.1, 0.20, 100.00, NULL, '2024-06-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Temple of Tollan', 'Play''n GO', 'https://mediumrare.imgix.net/74745b9eedeaeb7c858c2e7e35b9850016fd88fa1c8b76755b581d819a14482c', 15000, 'High', 96.2, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Buffalo Collector', 'Red Tiger', 'https://mediumrare.imgix.net/6c56bf1730fcaa0074bf3dd472e6966ecac77070c34a9a7ef682ee7e84b4e64f', 10000, 'Medium', 95.75, 0.20, 100.00, NULL, '2024-07-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hand of Midas 2', 'Pragmatic Play', 'https://mediumrare.imgix.net/3ae0cb707dd63ad5ff0618d8a38ddf31cc74c371fc35a3644d0122b116252504', 8000, 'High', 96.07, 0.20, 100.00, NULL, '2024-06-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Buffalo King Untamed Megaways', 'Pragmatic Play', 'https://mediumrare.imgix.net/00fa6cb52fa341ab548c3bd27f21aa793b935417caff9ab18e345eec1af33db1', 10000, 'High', 96.02, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pirots 3', 'ELK Studios', 'https://mediumrare.imgix.net/d46ede4d6eb909cfc93819adb6c7ab16c20fa1a0bacfb3a8de787f8518b0e100', 10000, 'High', 94, 0.20, 100.00, NULL, '2024-06-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Shadow Strike', 'Backseat Gaming', 'https://mediumrare.imgix.net/0b32676b6b1e880d50bb553b0a7bbe3004f506a36be35aaaeca87a22c09daaee', 15000, 'High', 96.36, 0.20, 100.00, NULL, '2024-06-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sword of Arthur', 'Thunderkick', 'https://mediumrare.imgix.net/2678b8931ad265bf357a1bfc6cdd37b2b2ca6a381871fe303a4f63704ebd264d', 10000, 'High', 94.34, 0.20, 100.00, NULL, '2024-06-11', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Money Wheel', 'NetEnt', 'https://mediumrare.imgix.net/125bfe18dbe0a23dd57c161da2f0418919dcfbe4c49884590d47805d8eb196fd', 12026, 'High', 96.07, 0.20, 100.00, NULL, '2024-06-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Lock And Pop', 'NetEnt', 'https://mediumrare.imgix.net/eb2caf8ae4c605b5e234868d4f6210a900d7e13627640230de5b89803c997233', 4046, 'Low', 96.09, 0.20, 100.00, NULL, '2024-05-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dragons vs GigaBlox', 'Hot Rise Games', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/dragons-vs-gigablox-slot-feat.jpg', 13770, 'High', 96, 0.20, 100.00, NULL, '2024-08-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ted 2 Afterparty', 'Lucksome', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/ted-2-slot-feat.jpg', 2500, 'Medium', 95.04, 0.20, 100.00, NULL, '2024-06-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Babylon Riches', 'NetEnt', 'https://mediumrare.imgix.net/32bb19580fa5579882b1de450638dd474ee2b9ad68cb42c3774694f5f27d6a2a', 7250, 'Medium', 96.13, 0.20, 100.00, NULL, '2024-07-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ultra Rich', 'Red Tiger', 'https://mediumrare.imgix.net/bc914efcebd61e9ed2518b69f3324a28f0867ad57c77b94e6010d6296ae8d1d3', 10000, 'Medium', 96, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Lions GigaBlox', 'ReelPlay', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/lions-gigablox-slot-feat.jpg', 8622, 'Medium', 96, 0.20, 100.00, NULL, '2024-07-31', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Merlin Realm of Charm', 'Play''n GO', 'https://mediumrare.imgix.net/9252d920ab35f4e810c23705ff2b790e09dd5dccfddb2b5143d92aa4f909237a', 10000, 'High', 96.2, 0.20, 100.00, NULL, '2024-06-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Bass Fishing Mission', 'Pragmatic Play', 'https://mediumrare.imgix.net/6eba0e3bad33c83a24477372960f6abdcb7087e42a8fd35423beb4e083c33060', 5000, 'High', 96.5, 0.20, 100.00, NULL, '2024-06-16', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Mermaids', 'NetEnt', 'https://mediumrare.imgix.net/95f72aa14d39b739313bed8216b6d576286b6c842540c32c5932104d4eaa9de5', 1974, 'High', 96.09, 0.20, 100.00, NULL, '2024-07-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Loner', 'Nolimit City', 'https://mediumrare.imgix.net/23d121bc4c0c5744c0cee04abad47251d65e9e9086a0c6c88c55dea0206dfe0d', 14999, 'High', 96.06, 0.20, 100.00, NULL, '2024-05-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Devilicious', 'Pragmatic Play', 'https://mediumrare.imgix.net/13f6a2360f77e2c50d111128b93c2d6c54c73aacd8b761b1b6bc552f0bdf16bc', 10000, 'High', 96.46, 0.20, 100.00, NULL, '2024-06-09', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Emperor''s Rise', 'Slotmill', 'https://mediumrare.imgix.net/292be8cb2be1e2ca4f2a41f317458800f5d9ab4e325608de62db1ca41aed0f14', 6000, 'Medium', 96.08, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Purr Power', 'Max Win Gaming', 'https://mediumrare.imgix.net/7bc9623fb4acb887333b705128f21247f1f63b3039c06e83ffd5487871e261fc', 5000, 'High', 95.68, 0.20, 100.00, NULL, '2024-06-18', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('10', '000 Wonders MultiMax', NULL, 96, '34213', ReelPlay, 0.20, 100.00, NULL, NULL, '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Vikings Fight For Honour', 'Foxium', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Vikings-Fight-For-Honour-slot-feat.jpg', 20000, 'Medium', 96.37, 0.20, 100.00, NULL, '2024-07-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Emperor of India', 'Red Tiger', 'https://mediumrare.imgix.net/d34f4dce7b6e365fa622be5f243eed353c256f9200f5d6aa9339cb67086ff149', 20000, 'High', 95.72, 0.20, 100.00, NULL, '2024-06-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gold of Fortune God', 'Play''n GO', 'https://mediumrare.imgix.net/24d24e9e1fa43aae0d36c71b48f7d9eab48593f0315125a38007953cc45e08ea', 6000, 'Medium', 96.18, 0.20, 100.00, NULL, '2024-06-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Junkyard Kings', 'Bullshark Games', 'https://mediumrare.imgix.net/290cfb54fac293b6098898e6ea5e4f123522b6bc9eb306df26556fe033655f50', 12000, 'Medium', 96.26, 0.20, 100.00, NULL, '2024-05-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('3 Cherry Frenzy', 'Pear Fiction Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/3-cherry-frenzy-slot-feat.jpg', 5000, 'High', 96, 0.20, 100.00, NULL, '2024-06-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Reel Nightmare', 'Quickspin', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/reel-nightmare-slot-feat.jpg', 17279, 'High', 96.23, 0.20, 100.00, NULL, '2024-07-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hot to Burn Multiplier', 'Pragmatic Play', 'https://mediumrare.imgix.net/28f5d3243b3ae1e65651fb2d0018d3a3a8af8920b172e5bcfefcab1ed991f678', 3000, 'High', 96.51, 0.20, 100.00, NULL, '2024-06-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gold Boom', 'Slingshot Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/gold-boom-slot-feat.jpg', 5650, 'High', 96.14, 0.20, 100.00, NULL, '2024-06-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Day Of The Dinero', 'Gameburger Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/day-of-the-dinero-slot-feat.jpg', 5000, 'Low', 96, 0.20, 100.00, NULL, '2024-06-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Stallion Kingdom', 'Just For The Win', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/stallion-kingdom-slot-feat.jpg', 5000, 'High', 96.13, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Lucky Lemons', 'Snowborn Games', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/lucky-lemons-slot-feat.jpg', 5000, 'Medium', 96, 0.20, 100.00, NULL, '2024-06-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Panda Bonanza', 'Northern Lights Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/panda-bonanza-slot-feat.jpg', 5000, 'Medium', 96.01, 0.20, 100.00, NULL, '2024-07-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sky Raiders Power Combo', 'All For One Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/05/sky-raiders-slot-feat.jpg', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-06-16', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jungle Spirit Megaways', 'NetEnt', 'https://mediumrare.imgix.net/4a7d0a2476aff1cb966914e235f7535c00361bab05c07ffcf0a949296cec5319', 6547, 'High', 96.2, 0.20, 100.00, NULL, '2024-05-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Medusa''s Stone', 'Pragmatic Play', 'https://mediumrare.imgix.net/853eae0984a0201935f6d41932c7ddf9e6b90bc1873e362d894443214ceb3920', 7000, 'High', 96.46, 0.20, 100.00, NULL, '2024-06-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Slayers Inc', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/f08dd3c03232627f508e0b4f458651947e13e46f6d8a53be08507672256d3be2', 15000, 'High', 96.28, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rich Wilde and the Tome of Insanity', 'Play''n GO', 'https://mediumrare.imgix.net/274d55ea0d7b72c6d0b31fed6424d63b10800fec30807bbf2e5ee566adc4f406', 5000, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cursed Crypt', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/b33ca28ef4338dad58eebe59144382a98874a8731f43e8eb761470de767d172f', 10000, 'High', 96.22, 0.20, 100.00, NULL, '2024-06-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sweet Bonanza 1000', 'Pragmatic Play', 'https://mediumrare.imgix.net/73754d4bf421b78fbd3895bbc7890d379797588cb699d6cbe47f3656aa93613b', 25000, 'High', 96.53, 0.20, 100.00, NULL, '2024-06-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Ashoka Eternal', 'ELK Studios', 'https://mediumrare.imgix.net/6d8e8f18a9b9cac1ba26a074674580cbb6eaa0f584a9ea6246d24ee71713a3d1', 25000, 'High', 94, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fizzy Pennyslot', 'Big Time Gaming', 'https://mediumrare.imgix.net/ad87ba212260a6f2b59527e6c728263129b7d1595f3f7456c84b845491505578', 10170, 'High', 96.44, 0.20, 100.00, NULL, '2024-06-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Kenneth Must Die', 'Nolimit City', 'https://mediumrare.imgix.net/dc14fcd394e1e2c1cdb0bd8f3cf09fb36e4f21a73fc3da0ad7dc76e0b092bef5', 69000, 'High', 96.04, 0.20, 100.00, NULL, '2024-05-06', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Wildies', 'Pragmatic Play', 'https://mediumrare.imgix.net/3b64c5fa393b69424ac869cb7443ca31fc58a31e0820a29ac5cdb17b53288009', 7500, 'High', 96.01, 0.20, 100.00, NULL, '2024-06-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('10', '000 Big Bass Lightning Spins', NULL, 96.11, '4660', ReelPlay, 0.20, 100.00, NULL, NULL, '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('FloridaMan', 'AvatarUX', 'https://mediumrare.imgix.net/72e3d3426e3939eb15b231705814dc267e2ca287ac0c700f13ed16bfefd0eff1', 20000, 'Medium', 96, 0.20, 100.00, NULL, '2024-05-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gemstone Mine', 'Stakelogic', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/gemstone-mine-slot-feat.jpg', 7500, 'Medium', 96.11, 0.20, 100.00, NULL, '2024-05-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jawbreaker', 'iSoftBet', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/jawbreaker-slot-feat.jpg', , 'Medium', 96, 0.20, 100.00, NULL, '2024-07-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Jelly Slice', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/9bcfcbf49d9b6184dec0dddd43d88e4ff7cacffd1c65c4202b03178bb4ae43ad', 10000, 'Medium', 96.24, 0.20, 100.00, NULL, '2024-05-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Oink Farm 2', 'Foxium', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/oink-farm-2-slot-feat.jpg', 1000, 'Medium', 96.37, 0.20, 100.00, NULL, '2024-06-18', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gladiator Clash', 'NetEnt', 'https://mediumrare.imgix.net/91d4958a2eeaa6cd4af7ba234b6cc2af025340675e7f60a735e4c90e8e2e5a79', 1006, 'High', 96.16, 0.20, 100.00, NULL, '2024-06-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Piggy Riches 2 Megaways', 'Red Tiger', 'https://mediumrare.imgix.net/d8fefca53627c6c21b498bcd8e93af884bc2138a2a08d59ba0c092a6c9094b1a', 20000, 'High', 95.71, 0.20, 100.00, NULL, '2024-06-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Colt Lightning Firestorm', 'Play''n GO', 'https://mediumrare.imgix.net/9db9e2fb6a8bd6b8640900057e398583f8171a8ea143d333b77314811442e792', 50000, 'High', 96.2, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Revenge of Loki Megaways', 'Pragmatic Play', 'https://mediumrare.imgix.net/10e1af6860b846bcb7a4130d7b47b28ec183b044ec53e858b7369c33b746df4e', 10000, 'High', 96.51, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Bass Bonanza Reel Action', 'Pragmatic Play', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/Big-Bass-Bonanza-Reel-Action-slot-feat.jpg', 2100, 'Medium', 96.5, 0.20, 100.00, NULL, '2024-05-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Space Zoo', 'Backseat Gaming', 'https://mediumrare.imgix.net/4fdf32072acf6ecd98372517a9a5edb5ea07b7853e4f764cb44df0de7915d7c6', 10000, 'Medium', 96.22, 0.20, 100.00, NULL, '2024-05-06', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pizza Fiesta', 'Hammertime', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/pizza-fiesta-slot-feat.jpg', 5000, 'High', 96.08, 0.20, 100.00, NULL, '2024-06-18', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Shields of Lambda', 'Quickspin', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/shields-of-lambda-slot-feat.jpg', , 'High', 96.13, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Temple of Paw', 'Quickspin', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/temple-of-paw-slot-feat-1.jpg', 7333, 'High', 96.01, 0.20, 100.00, NULL, '2024-06-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Circle of Sylvan', 'Fantasma Games', 'https://mediumrare.imgix.net/e13ec40a43bd4b14beca815c373d5df6912780fcaad28dee80c724c5e5e0f0e6', 5072, 'Medium', 96.38, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Honey Hunters', 'Print Studios', 'https://mediumrare.imgix.net/76dcfe5f96b942647f6fae92f9b5e6e5154380283636671a29e193465ff392c7', 10000, 'High', 96.55, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Immortal Romance 2', 'Stormcraft Studios', 'https://mediumrare.imgix.net/5821978aac2d9408df7a0743e4aa04a005ef0da8052038160c57acc4f347abdd', 15000, 'High', 96.3, 0.20, 100.00, NULL, '2024-05-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Heroic Spins', 'Pragmatic Play', 'https://mediumrare.imgix.net/d11b9dd9874c96d37cd16f7e0cedfac07fd5985891a8973eca80715991da9dd8', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Starlight Princess Pachi', 'Pragmatic Play', 'https://mediumrare.imgix.net/b5e8b647424bb8960eb480cd8d0015fc2a5e6af496255608a6ce6149521a1dfa', 5000, 'High', 96.04, 0.20, 100.00, NULL, '2024-05-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('5 Wild Buffalo', '4ThePlayer', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/5-wild-buffalo-slot-feat.jpg', 7500, 'High', 96.01, 0.20, 100.00, NULL, '2024-05-27', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Willy Wonka Pure Imagination', 'Playzido', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/Willy-Wonka-Pure-Imagination-slot-feat.jpg', 5000, 'Medium', 94.03, 0.20, 100.00, NULL, '2024-06-25', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('The Flintstones', 'Blueprint Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2023/11/the-flintstones-slot-feat.jpg', 10000, 'Medium', 95, 0.20, 100.00, NULL, '2024-05-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dystopia Rebel Road', 'Octoplay', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/dystopia-slot-feat.jpg', 5000, 'Low', 95.76, 0.20, 100.00, NULL, '2024-05-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Wild Storm Legionnaire', 'Boomerang', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/Wild-Storm-Legionnaire-slot-feat.jpg', 1840, 'Medium', 96, 0.20, 100.00, NULL, '2024-07-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Stone Gaze of Medusa', 'Stakelogic', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/stone-gaze-medusa-slot-feat.jpg', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('King of the Party', 'Thunderkick', 'https://mediumrare.imgix.net/4c0c0f56e0a9935e2ff2efa45a22d5892a9b6eac6b353ac249fd584bd52c79cb', 5000, 'High', 94.32, 0.20, 100.00, NULL, '2024-05-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Spark of Genius', 'Play''n GO', 'https://mediumrare.imgix.net/694bee08dc07684161345a0ff1cc8dab4ba2681796a694b84f7880aa469ad163', 10000, 'High', 96.3, 0.20, 100.00, NULL, '2024-05-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hyper Gold All In', 'Gameburger Studios', 'https://mediumrare.imgix.net/31003dfa31d97bc0af82d413a654d3236ebe87924f21b7d7e4b5d689344c33cf', 4000, 'High', 96, 0.20, 100.00, NULL, '2024-05-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Lady Luxe Joker', 'Just For The Win', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/lady-luxe-joker-slot-feat.jpg', 5000, 'Medium', 96.05, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Keep ''Em', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/1af323f101ff978169265472584fd1f56ef3f1be11640ae12a470e02a613ba76', 10000, 'Medium', 96.27, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hell''s Hogs 2 Squelin'' Wheels', 'Reflex Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/04/Hells-Hogs-2-Squelin-Wheels-slot-feat.jpg', 2500, 'Medium', 96, 0.20, 100.00, NULL, '2024-07-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('PopNoir', 'AvatarUX', 'https://mediumrare.imgix.net/c27a3844ab202024188520f2caee8327ba004c25219db8be1a679b56d52b759f', 20000, 'High', 96, 0.20, 100.00, NULL, '2024-04-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Joker''s Jewels Wild', 'Pragmatic Play', 'https://mediumrare.imgix.net/b2e1d649b7ff80738f410e78eeaf6b781b98aa667960d72e043a0b1f3d4c766a', 1420, 'Medium', 96.58, 0.20, 100.00, NULL, '2024-07-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rise of Pyramids', 'Pragmatic Play', 'https://mediumrare.imgix.net/ee99e45d53c03bc4d87148207afa74864c2feccbd6370492e37b1481cea4bc55', 5000, 'Medium', 95.97, 0.20, 100.00, NULL, '2024-05-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Dwarf & Dragon', 'Pragmatic Play', 'https://mediumrare.imgix.net/d7aa86e5732681f588e89ef61e829345aba4600ce8854cc2268e7a5965acbdab', 14000, 'High', 96.59, 0.20, 100.00, NULL, '2024-05-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pug Thugs of Nitropolis', 'ELK Studios', 'https://mediumrare.imgix.net/2ec0d934cbf4dc6373696637a2a1e18e64f71f371a5210550622c904af8e03f8', 25000, 'High', 94, 0.20, 100.00, NULL, '2024-05-06', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Line Busters Dream Drop', 'Relax Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/line-busters-slot-feat-1.jpg', 5000, 'High', 96.1, 0.20, 100.00, NULL, '2024-05-20', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rainbow Jackpots Megaways', 'Red Tiger', 'https://mediumrare.imgix.net/1ef22e98cc3ff4274565294d39e72a4d3c79fcb7bf8040a4277f630ce1323954', 20000, 'High', 95.77, 0.20, 100.00, NULL, '2024-05-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Respin Mania Megaways', 'Skywind Group', 'https://mediumrare.imgix.net/5c64235e0822d32e7ea22df072cb4450f930c980aaf3c7227d947662fdabf48e', 10000, 'Medium', 96.5, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Divine Drop', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/847d7fe54606877ae3903a3c7529119b6060bf2b2e9992659a3c34a24726d23f', 10000, 'Medium', 96.25, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fulong 88', 'Play''n GO', 'https://mediumrare.imgix.net/36e72485714ae7a0fd8759abc574e68ac7a32c95f33b1570d2ad74506c023c46', 5000, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Tombstone No Mercy', 'Nolimit City', 'https://mediumrare.imgix.net/a8d6291dc467a3b9d33e3a0d85e6a364d1dcc777daaba11cd8c1a4289e177ca3', 16480, 'High', 96.05, 0.20, 100.00, NULL, '2024-04-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Heart of Cleopatra', 'Pragmatic Play', 'https://mediumrare.imgix.net/9809d4a282365bb9c5c5e539329a284277320d149f83bec9e1885e93f71efd86', 10000, 'High', 96.48, 0.20, 100.00, NULL, '2024-05-05', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Front Runner', 'Pragmatic Play', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/Front-Runner-slot-feat.jpg', 3000, 'High', 96.51, 0.20, 100.00, NULL, '2024-05-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cannonball Cash', 'Red Tiger', 'https://mediumrare.imgix.net/7aa0ff2d7a46ceab165f51aea64ffe952e8d583b3e89537bf7061cf66b45ed0c', 7465, 'Medium', 95.72, 0.20, 100.00, NULL, '2024-05-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Monkeys Go Bananas MultiMax', 'Yggdrasil Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2023/12/monkeys-go-bananas-multimax-slot-feat-1.jpg', 10000, 'High', 94, 0.20, 100.00, NULL, '2024-03-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Curse of Ra', 'Four Leaf Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/curse-of-ra-slot-feat.jpg', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-05-13', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('The Sword and the Grail Excalibur', 'Play''n GO', 'https://mediumrare.imgix.net/b642b88eca189541ed5a4ad47de19f1d645992a557f23115e1f9c1d0dd0486cc', 25000, 'High', 96.2, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Orb of Destiny', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/418875586b5eff8ffb828a35d90ee81e8a23b6ff69735adfa6f1ca9f67cd90db', 10000, 'Medium', 96.23, 0.20, 100.00, NULL, '2024-04-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Wild Survivor', 'Play''n GO', 'https://mediumrare.imgix.net/9da04e39f1d79940c344125e5db838a63c702f818fcd6e34c277611f2c873805', 3000, 'Medium', 96.2, 0.20, 100.00, NULL, '2024-05-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Trigger Happy', 'Big Time Gaming', 'https://mediumrare.imgix.net/c1109e256c35aeda4ce6f8d271a2872d60653a8a48a509219942b7444ed8ddb8', 50000, 'High', 96.58, 0.20, 100.00, NULL, '2024-05-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Tyrant''s Fall', 'Slotmill', 'https://mediumrare.imgix.net/98e507ad7aebffab6c4dd7f19cc9a83630938b96a8193826f8d0ec1582e41b39', 10000, 'High', 96.03, 0.20, 100.00, NULL, '2024-04-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Golden Realms', 'NetEnt', 'https://mediumrare.imgix.net/bd9089770d1c8546dc4194d82d3ce65a65176a8b290c406ab9f8387ceb6d5dd4', 2241, 'High', 96.05, 0.20, 100.00, NULL, '2024-04-22', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Golden Wheels of Egypt', 'NetEnt', 'https://mediumrare.imgix.net/6503574e9a677047f985f8d06544288b54abe65dcac850e43a9296617297daca', 5000, 'Medium', 96.05, 0.20, 100.00, NULL, '2024-04-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fruity Treats', 'Pragmatic Play', 'https://mediumrare.imgix.net/4a8189d01a67420e900099fd309b101d65a9de8da57be37cf4be7bb1d91d2ca5', 5000, 'High', 96.05, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Wild Dojo Strike', 'Bullshark Games', 'https://mediumrare.imgix.net/9c204c09cc4a6f9487f8783967f97d7f164f0467d35010e1529f5540db55d536', 12000, 'Medium', 96.27, 0.20, 100.00, NULL, '2024-04-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cursed Treasure', 'NetEnt', 'https://mediumrare.imgix.net/69d4dbf77dbede820d814df7569a303fe0885a7a7a33fb9c6ec48cc7ed5cb774', 5064, 'Low', 95.99, 0.20, 100.00, NULL, '2024-03-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Candy Blitz Bombs', 'Pragmatic Play', 'https://mediumrare.imgix.net/cfebef2374ce1a2ba5d359fbe4a1c9b960a76e5c4d428b5d8f061b6bda7cca0e', 5000, 'Medium', 96.49, 0.20, 100.00, NULL, '2024-04-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Chickenville Power Combo', 'All For One Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Chickenville-Power-Combo-slot-feat.jpg', 15000, 'High', 96.2, 0.20, 100.00, NULL, '2024-05-19', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sparkling Joker X UP', 'Alchemy Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Sparkling-Joker-X-UP-slot-feat.jpg', 5000, 'High', 96.05, 0.20, 100.00, NULL, '2024-05-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cash Carts Western Wagons', 'Snowborn Games', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Cash-Carts-Western-Wagons-slot-feat.jpg', 4000, 'Medium', 96, 0.20, 100.00, NULL, '2024-05-13', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Secret Riches of the Irish', 'Jelly', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Secret-Riches-of-the-Irish-slot-feat.jpg', 2500, 'Medium', 94, 0.20, 100.00, NULL, '2024-06-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fintastic Fishing', 'Foxium', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Fintastic-Fish-slot-feat.jpg', 10000, 'Medium', 96.16, 0.20, 100.00, NULL, '2024-05-12', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Viking''s Legacy Everyway', 'Red Tiger', 'https://mediumrare.imgix.net/cf33259a6cec198b48c8f618bbdc75c1daa51e528f96275dd7265b50524b4613', 27483, 'High', 95.74, 0.20, 100.00, NULL, '2024-05-06', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Unusual Catch', 'Northern Lights Gaming', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/unusual-catch-slot-feat.jpg', 8000, 'Medium', 96.04, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pirate Multi Coins', 'Fantasma Games', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/pirate-multi-coins-slot-feat.jpg', , 'Medium', 96.08, 0.20, 100.00, NULL, '2024-04-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Release the Bison', 'Pragmatic Play', 'https://mediumrare.imgix.net/c6a0af4b584614fbf3b744075616474fcec6cbf971a5a9b2844647638ecf1d1b', 3000, 'High', 97.49, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Lobster Bob''s Sea Food and Win It', 'Pragmatic Play', 'https://mediumrare.imgix.net/11aacbf3c19f2b16357e5c64ba5c020d3dcf99ffb5eb14698ad3153b5e8c743f', 3000, 'High', 96.04, 0.20, 100.00, NULL, '2024-04-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Barnyard Megahays Megaways', 'Pragmatic Play', 'https://mediumrare.imgix.net/2d9e361e4dbe3376252123c7f0bbdd7f68d33d4dc429a8d85469221bd0ea8477', 10000, 'High', 97.5, 0.20, 100.00, NULL, '2024-04-17', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Sword Stomp', 'Max Win Gaming', 'https://mediumrare.imgix.net/5c11f85af035ee5484c0ae5bc85d588a73765e0c0913e7e4fb1dd88f6e612378', 10000, 'High', 96, 0.20, 100.00, NULL, '2024-05-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Banker''s Gold Epic X', 'Lucksome', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Bankers-Gold-Epic-X-slot-feat.jpg', 5000, 'Medium', 94.03, 0.20, 100.00, NULL, '2024-05-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Pandora’s Treasure', 'NetEnt', 'https://mediumrare.imgix.net/e41404c263daec765623c0a3028914155fc548f56fae688464aedc75c72c2f72', 10368, 'Medium', 96.09, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fugly Pets', 'Stakelogic', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/fugly-pets-slot-feat.jpg', 5000, 'Medium', 96, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Cash Crew', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/3cdc0cff23a819eba749db438f15b81357d8bf6f96d8025cf531bbf93a8fdb9c', 10000, 'High', 96.26, 0.20, 100.00, NULL, '2024-04-03', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Brick Snake 2000', 'Nolimit City', 'https://mediumrare.imgix.net/5537a119af58b36f01b72bbf23bf27976fdb383e448e7245541b05cc9d86abdb', 8110, 'High', 96.03, 0.20, 100.00, NULL, '2024-03-21', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Bounty Hunt Reloaded', 'ReelPlay', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Bounty-Hunt-Reloaded-slot-feat.jpg', 4637, 'Medium', 96.04, 0.20, 100.00, NULL, '2024-05-01', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Robopocalypse', 'Light & Wonder', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Robopocalypse-slot-feat.jpg', 7680, 'Medium', 96, 0.20, 100.00, NULL, '2024-04-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('DJ Cat', 'Push Gaming', 'https://mediumrare.imgix.net/db635fa21b59ed0e0367b1cd09a128ed7cc8d5e82446b8b312a5ab41848f6fab', 10000, 'High', 96.32, 0.20, 100.00, NULL, '2024-04-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Hockey Fever Penny Roller', 'Games Global', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Hockey-Fever-Penny-Roller-slot-feat.jpg', 1111, 'Medium', 95.94, 0.20, 100.00, NULL, '2024-04-14', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Armageddon 10k Ways', 'ReelPlay', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/Armageddon-10k-Ways-slot-feat.jpg', 10338, 'Medium', 96, 0.20, 100.00, NULL, '2024-06-10', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rabbit Fields', 'Just For The Win', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/rabbit-fields-slot-feat.jpg', 5000, 'High', 96.13, 0.20, 100.00, NULL, '2024-03-26', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('333 Fat Frogs Power Combo', 'Fortune Factory Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/03/333-fat-frogs-slot-feat.jpg', 12500, 'High', 96, 0.20, 100.00, NULL, '2024-04-29', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Genie''s Link&Win 4Tune', 'All For One Studios', 'https://www.bigwinboard.com/wp-content/uploads/2024/02/genies-link-win-slot-feat.jpg', 15000, 'High', 96.24, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Midas Golden Touch 2', 'Thunderkick', 'https://mediumrare.imgix.net/3cbcdcf119059d3a6c340be5720c382104d2eb3af4f998c6d513c782ab67710e', 15000, 'High', 94.27, 0.20, 100.00, NULL, '2024-04-23', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Tropicool 3', 'ELK Studios', 'https://mediumrare.imgix.net/99de3661f1fe5bef416e490067db9025b66552a6ece190a1a6109801f203d1ae', 25000, 'High', 94, 0.20, 100.00, NULL, '2024-04-24', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Gunpowder', 'Peter & Sons', 'https://mediumrare.imgix.net/c451df6cd14b926678fda4b46fca5ff0746ed745423c9a3ab84625155d6a19bc', 10000, 'High', 96.2, 0.20, 100.00, NULL, '2024-05-08', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Rusty & Curly', 'Hacksaw Gaming', 'https://mediumrare.imgix.net/3c00491db9f09d1a2a20ff5d2e90b5668942839bd6b64eb6a6b95726a3e7538b', 10000, 'Medium', 96.29, 0.20, 100.00, NULL, '2024-03-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('80sPop', 'AvatarUX', 'https://mediumrare.imgix.net/36e2807615f84a5f869ee7777b2dac16f85ffbca31806f21819adc2297f02f42', 20000, 'High', 96.01, 0.20, 100.00, NULL, '2024-03-28', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Fruit Flash', 'Red Tiger', 'https://mediumrare.imgix.net/5af60fe46abbffc8c4e1a66d0b3e7619202caf5a43b7f1ed207a874dfd78a773', 10632, 'High', 95.71, 0.20, 100.00, NULL, '2024-05-15', '{}');
+INSERT INTO slots (name, provider, image_url, max_win, volatility, rtp, min_bet, max_bet, theme, release_date, features)
+VALUES ('Big Bass Secrets of the Golden Lake', 'Pragmatic Play', 'https://mediumrare.imgix.net/516dd23e24bc643b9f6d77362b11b8b077ccea882a4dffb2913e023d7131fbef', 5000, 'High', 96.07, 0.20, 100.00, NULL, '2024-04-07', '{}');
