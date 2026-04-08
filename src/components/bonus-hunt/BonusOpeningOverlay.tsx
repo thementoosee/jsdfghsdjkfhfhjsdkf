@@ -636,14 +636,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
             <div className="px-3 pt-3 pb-2 flex-shrink-0">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#38bdf8' }}></div>
-                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#38bdf8' }}>
-                  LIVE CAROUSEL
-                </span>
-              </div>
-
-              <div className="relative h-[118px] rounded-xl overflow-hidden" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+              <div className="relative h-[175px] rounded-xl overflow-hidden mx-auto" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)', maxWidth: '232px' }}>
                 {carouselItems.length > 0 ? (
                   <div
                     className="absolute inset-0 overflow-hidden"
@@ -671,7 +664,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                         return (
                           <div
                             key={`carousel-${item.id}-${index}`}
-                            className="w-[120px] h-full flex-shrink-0 rounded-lg overflow-hidden relative"
+                            className="w-[72px] h-full flex-shrink-0 rounded-lg overflow-hidden relative"
                             style={{
                               border: item.super_bonus === true
                                 ? '2px solid rgba(255, 215, 0, 0.95)'
@@ -702,7 +695,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                               <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
                             </div>
 
-                            <div className="relative z-10 h-[70px] overflow-hidden">
+                            <div className="relative z-10 h-[115px] overflow-hidden">
                               <img
                                 src={item.slot_image || '/image.png'}
                                 alt={item.slot_name}
