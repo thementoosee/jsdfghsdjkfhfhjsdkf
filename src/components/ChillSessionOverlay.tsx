@@ -316,8 +316,14 @@ export function ChillSessionOverlay({ sessionId, embedded = false, frozen = fals
               <div className="relative w-full h-[320px] overflow-hidden flex items-center justify-center bg-black/10">
                 <img
                   src={slotImageUrl}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 w-full h-full object-cover blur-sm scale-105 opacity-50"
+                />
+                <img
+                  src={slotImageUrl}
                   alt={session?.slot_name}
-                  className="w-full h-full object-contain object-top animate-pulse-zoom"
+                  className="relative z-10 w-full h-full object-contain object-top animate-pulse-zoom"
                 />
               </div>
             ) : (
