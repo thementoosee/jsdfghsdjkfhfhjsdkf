@@ -429,19 +429,73 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
         }
         @keyframes openingCarouselSlide {
           from {
-            transform: translateX(0);
+            transform: translate3d(0, 0, 0);
           }
           to {
-            transform: translateX(-50%);
+            transform: translate3d(-50%, 0, 0);
           }
         }
-        @keyframes openingCardFloat3d {
+        /* Position-synced depth cycle: cards pass right -> center -> left with smooth depth shifts. */
+        @keyframes openingCardDepthCycle {
           0%, 100% {
-            transform: translateY(0) rotateY(-15deg) rotateX(3deg) scale(0.97);
+            transform: translate3d(0, 0, 58px) rotateY(0deg) scale(1.12);
+            filter: blur(0px) saturate(1.1);
+            opacity: 1;
           }
-          50% {
-            transform: translateY(-6px) rotateY(15deg) rotateX(-2deg) scale(1.03);
+          18% {
+            transform: translate3d(0, 0, 24px) rotateY(12deg) scale(0.96);
+            filter: blur(0.3px) saturate(1.02);
+            opacity: 0.92;
           }
+          36% {
+            transform: translate3d(0, 1px, 6px) rotateY(21deg) scale(0.82);
+            filter: blur(1.1px) saturate(0.92);
+            opacity: 0.64;
+          }
+          49% {
+            transform: translate3d(0, 1px, -2px) rotateY(24deg) scale(0.76);
+            filter: blur(1.9px) saturate(0.84);
+            opacity: 0.35;
+          }
+          50.01% {
+            transform: translate3d(0, 1px, -2px) rotateY(-24deg) scale(0.76);
+            filter: blur(1.9px) saturate(0.84);
+            opacity: 0.35;
+          }
+          64% {
+            transform: translate3d(0, 1px, 6px) rotateY(-21deg) scale(0.82);
+            filter: blur(1.1px) saturate(0.92);
+            opacity: 0.64;
+          }
+          82% {
+            transform: translate3d(0, 0, 24px) rotateY(-12deg) scale(0.96);
+            filter: blur(0.3px) saturate(1.02);
+            opacity: 0.92;
+          }
+        }
+
+        @keyframes openingCardParallax {
+          0%, 100% { transform: translate3d(0, 0, 0) scale(1.12); }
+          50% { transform: translate3d(-8px, 0, 0) scale(1.16); }
+        }
+
+        @keyframes openingCardShine {
+          0%, 100% { opacity: 0.18; transform: translateX(-28%); }
+          50% { opacity: 0.34; transform: translateX(32%); }
+        }
+
+        .opening-carousel-track,
+        .opening-carousel-card,
+        .opening-carousel-parallax,
+        .opening-carousel-shine {
+          will-change: transform, opacity, filter;
+        }
+
+        .opening-carousel-region:hover .opening-carousel-track,
+        .opening-carousel-region:hover .opening-carousel-card,
+        .opening-carousel-region:hover .opening-carousel-parallax,
+        .opening-carousel-region:hover .opening-carousel-shine {
+          animation-play-state: paused;
         }
       `}</style>
 
@@ -635,7 +689,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             className="flex-1 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
-            <div className="flex-shrink-0 relative h-[200px] overflow-hidden"
+            <div className="opening-carousel-region flex-shrink-0 relative h-[200px] overflow-hidden"
               style={{
                 perspective: '800px',
                 paddingLeft: 'calc(50% - 47.5px)',
@@ -645,7 +699,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             >
               {carouselItems.length > 0 ? (
                 <div
-                  className="flex h-full items-stretch gap-3"
+                  className="opening-carousel-track flex h-full items-stretch gap-3"
                   style={{
                     width: 'max-content',
                     animation: carouselItems.length > 1
@@ -655,6 +709,8 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                 >
                   {openingCarouselLoopItems.map((item, index) => {
                     const actualIndex = carouselItems.length > 0 ? (index % carouselItems.length) : 0;
+                    // Keep per-card phase synchronized with horizontal movement for seamless infinite depth shifts.
+                    const phaseDelay = carouselItems.length > 0 ? -(actualIndex * (openingCarouselDuration / carouselItems.length)) : 0;
                     const payment = item.payment;
                     const isOpened = item.status === 'opened';
                     const isWin = isOpened && item.payout && item.payout > payment;
@@ -662,7 +718,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                     return (
                       <div
                         key={`carousel-${item.id}-${index}`}
-                        className="w-[95px] h-full flex-shrink-0 rounded-xl relative"
+                        className="opening-carousel-card w-[95px] h-full flex-shrink-0 rounded-xl relative"
                         style={{
                           border: item.super_bonus === true
                             ? '2px solid rgba(255, 215, 0, 0.95)'
@@ -670,23 +726,35 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                             ? '2px solid rgba(239, 68, 68, 0.95)'
                             : '1px solid rgba(255,255,255,0.18)',
                           boxShadow: item.super_bonus === true
-                            ? '0 0 18px rgba(255,215,0,0.4), 0 8px 24px rgba(0,0,0,0.6)'
+                            ? '0 0 20px rgba(255,215,0,0.5), 0 12px 28px rgba(0,0,0,0.62)'
                             : item.super_bonus === false
-                            ? '0 0 18px rgba(239,68,68,0.45), 0 8px 24px rgba(0,0,0,0.6)'
-                            : '0 8px 24px rgba(0,0,0,0.6)',
+                            ? '0 0 20px rgba(239,68,68,0.5), 0 12px 28px rgba(0,0,0,0.62)'
+                            : '0 12px 28px rgba(0,0,0,0.62)',
                           transformStyle: 'preserve-3d',
-                          animation: `openingCardFloat3d 4.2s ease-in-out ${actualIndex * 0.18}s infinite`
+                          animation: carouselItems.length > 1
+                            ? `openingCardDepthCycle ${openingCarouselDuration}s cubic-bezier(0.45, 0.05, 0.2, 1) ${phaseDelay}s infinite`
+                            : 'none'
                         }}
                       >
                         <div className="absolute inset-0 overflow-hidden rounded-xl flex flex-col" style={{ background: 'rgba(8,12,28,0.75)' }}>
                           <div
-                            className="absolute inset-0"
+                            className="opening-carousel-parallax absolute inset-0"
                             style={{
                               backgroundImage: `url("${item.slot_image || '/image.png'}")`,
                               backgroundSize: 'cover',
                               backgroundPosition: 'center',
                               filter: 'blur(10px) brightness(0.35)',
-                              transform: 'scale(1.1)'
+                              transform: 'scale(1.1)',
+                              animation: `openingCardParallax 7.2s ease-in-out ${phaseDelay}s infinite`
+                            }}
+                          />
+
+                          <div
+                            className="opening-carousel-shine pointer-events-none absolute inset-0 z-[1]"
+                            style={{
+                              background: 'linear-gradient(112deg, transparent 28%, rgba(255,255,255,0.2) 47%, transparent 66%)',
+                              mixBlendMode: 'screen',
+                              animation: `openingCardShine 4.6s ease-in-out ${phaseDelay}s infinite`
                             }}
                           />
 
