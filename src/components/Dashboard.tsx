@@ -8,13 +8,11 @@ const SlotDatabase = lazy(() => import('./SlotDatabase').then((m) => ({ default:
 const ChillSessionManager = lazy(() => import('./ChillSessionManager').then((m) => ({ default: m.ChillSessionManager })));
 const Statistics = lazy(() => import('./Statistics').then((m) => ({ default: m.Statistics })));
 const FeverChampionsManager = lazy(() => import('./FeverChampionsManager').then((m) => ({ default: m.FeverChampionsManager })));
-const StreamElementsIntegration = lazy(() => import('./StreamElementsIntegration').then((m) => ({ default: m.StreamElementsIntegration })));
-const TwitchIntegration = lazy(() => import('./TwitchIntegration').then((m) => ({ default: m.TwitchIntegration })));
 const GiveawayManager = lazy(() => import('./GiveawayManager').then((m) => ({ default: m.GiveawayManager })));
 const CasinoManager = lazy(() => import('./CasinoManager'));
 
 type FullscreenView = 'bar' | 'chill' | 'bonus' | 'fever' | 'giveaway' | null;
-type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'twitch' | 'streamelements' | 'database' | 'stats' | 'live_preview' | null;
+type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'database' | 'stats' | 'live_preview' | null;
 
 export function Dashboard() {
   const [overlaysByType, setOverlaysByType] = useState<Record<string, Overlay[]>>({});
@@ -266,8 +264,6 @@ export function Dashboard() {
     fever: 'Fever Champions League',
     giveaway: 'Giveaways',
     chill: 'Chill',
-    twitch: 'Twitch Integration',
-    streamelements: 'StreamElements',
     database: 'Slots Database',
     stats: 'Statistics',
     live_preview: 'Live Preview (OBS)'
@@ -290,12 +286,6 @@ export function Dashboard() {
     }
     if (activePanelPage === 'giveaway') {
       return <Suspense fallback={sectionLoader}><GiveawayManager /></Suspense>;
-    }
-    if (activePanelPage === 'streamelements') {
-      return <Suspense fallback={sectionLoader}><StreamElementsIntegration /></Suspense>;
-    }
-    if (activePanelPage === 'twitch') {
-      return <Suspense fallback={sectionLoader}><TwitchIntegration /></Suspense>;
     }
     if (activePanelPage === 'stats') {
       return <Suspense fallback={sectionLoader}><Statistics /></Suspense>;
@@ -675,7 +665,7 @@ export function Dashboard() {
           <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>Panels</h2>
-              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>9</span>
+              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>7</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
@@ -735,36 +725,6 @@ export function Dashboard() {
                     <Coffee className="w-4 h-4" style={{ color: '#b89968' }} />
                   </div>
                   <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Chill</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('twitch')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <MessageSquare className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Twitch Integration</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('streamelements')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Zap className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>StreamElements</h3>
                 </div>
               </button>
 

@@ -5,8 +5,6 @@
     - `show_on_main_overlay` (boolean)
   
   2. Create bonus_openings table and related items table
-  
-  3. Create streamelements_config table
 */
 
 -- Add missing column to bonus_hunts
@@ -96,31 +94,4 @@ CREATE POLICY "Bonus opening items are updatable by anyone"
 
 CREATE POLICY "Bonus opening items are deletable by anyone"
   ON bonus_opening_items FOR DELETE
-  USING (true);
-
--- Create streamelements_config table if it doesn't exist
-CREATE TABLE IF NOT EXISTS streamelements_config (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  is_active BOOLEAN DEFAULT false,
-  jwt_token TEXT,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);
-
-ALTER TABLE streamelements_config ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "StreamElements config is readable by anyone"
-  ON streamelements_config FOR SELECT
-  USING (true);
-
-CREATE POLICY "StreamElements config is writable by anyone"
-  ON streamelements_config FOR INSERT
-  WITH CHECK (true);
-
-CREATE POLICY "StreamElements config is updatable by anyone"
-  ON streamelements_config FOR UPDATE
-  WITH CHECK (true);
-
-CREATE POLICY "StreamElements config is deletable by anyone"
-  ON streamelements_config FOR DELETE
   USING (true);

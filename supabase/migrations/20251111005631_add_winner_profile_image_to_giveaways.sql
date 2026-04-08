@@ -3,7 +3,7 @@
   
   1. Changes
     - Add `winner_profile_image_url` column to `giveaways` table
-    - This field stores the winner's Twitch profile image URL
+    - This field stores the winner's profile image URL
   
   2. Notes
     - Field is nullable as not all giveaways have winners yet

@@ -353,7 +353,7 @@ export function GiveawayManager() {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-white uppercase">Sorteios</h2>
-            <p className="text-slate-400 text-sm">Criar e gerir sorteios na Twitch</p>
+            <p className="text-slate-400 text-sm">Criar e gerir sorteios da comunidade</p>
           </div>
         </div>
       </div>

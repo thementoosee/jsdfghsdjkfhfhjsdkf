@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserPlus, Swords, Star, Zap, DollarSign } from 'lucide-react';
 import { GiveawayOverlay } from './GiveawayOverlay';
-import { syncStreamElementsData } from '../lib/streamelements-service';
 
 interface ChatMessage {
   id: string;
@@ -48,149 +47,9 @@ export function ChatOverlay() {
   useEffect(() => {
     console.log('🚀 ChatOverlay: Initializing...');
     loadTopSlots();
-    loadMessages();
-    loadAlerts();
     loadActiveGiveawayWinner();
-
-    syncStreamElementsData().catch((error) => {
-      console.error('Error syncing StreamElements data:', error);
-    });
-
-    // ── Twitch IRC chat connection ────────────────────────────────────────
-    let ircWs: WebSocket | null = null;
-    let ircReconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let ircPingTimer: ReturnType<typeof setInterval> | null = null;
-    let ircCancelled = false;
-
-    async function connectTwitchIRC() {
-      if (ircCancelled) return;
-
-      const { data: twitchConfig } = await supabase
-        .from('twitch_config')
-        .select('access_token, channel_name')
-        .eq('is_active', true)
-        .limit(1)
-        .maybeSingle();
-
-      if (!twitchConfig?.access_token || ircCancelled) {
-        console.log('[ChatOverlay IRC] No active Twitch config, retrying in 30s...');
-        if (!ircCancelled) {
-          ircReconnectTimer = setTimeout(connectTwitchIRC, 30000);
-        }
-        return;
-      }
-
-      const channel = twitchConfig.channel_name || 'oficialfever';
-      console.log('[ChatOverlay IRC] Connecting to', channel);
-
-      ircWs = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
-
-      ircWs.onopen = () => {
-        if (!ircWs || ircCancelled) return;
-        ircWs.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-        ircWs.send(`PASS oauth:${twitchConfig.access_token}`);
-        ircWs.send(`NICK ${channel}`);
-        ircWs.send(`JOIN #${channel}`);
-        console.log('[ChatOverlay IRC] Connected');
-      };
-
-      ircWs.onmessage = async (event) => {
-        const raw = event.data as string;
-
-        if (raw.startsWith('PING')) {
-          ircWs?.send('PONG :tmi.twitch.tv');
-          return;
-        }
-
-        if (!raw.includes('PRIVMSG')) return;
-
-        const tagEnd = raw.indexOf(' ');
-        const tagStr = raw.startsWith('@') ? raw.slice(1, tagEnd) : '';
-        const tags: Record<string, string> = {};
-        if (tagStr) {
-          for (const part of tagStr.split(';')) {
-            const eq = part.indexOf('=');
-            if (eq > 0) tags[part.slice(0, eq)] = part.slice(eq + 1);
-          }
-        }
-
-        const msgMatch = raw.match(/PRIVMSG\s+#\S+\s+:(.+)/);
-        const message = msgMatch?.[1]?.trimEnd() || '';
-        if (!message) return;
-
-        const usernameMatch = raw.match(/:(\w+)!\w+@\w+\.tmi\.twitch\.tv/);
-        const username = usernameMatch?.[1] || 'unknown';
-
-        try {
-          await supabase.from('twitch_chat_messages').insert({
-            twitch_message_id: tags['id'] || null,
-            username,
-            display_name: tags['display-name'] || username,
-            message,
-            color: tags['color'] || '#FFFFFF',
-            is_subscriber: tags['subscriber'] === '1',
-            is_moderator: tags['mod'] === '1',
-            is_vip: tags['vip'] === '1',
-          });
-        } catch (e) {
-          console.warn('[ChatOverlay IRC] Insert error:', e);
-        }
-      };
-
-      ircWs.onclose = () => {
-        console.log('[ChatOverlay IRC] Disconnected');
-        if (!ircCancelled) {
-          ircReconnectTimer = setTimeout(connectTwitchIRC, 5000);
-        }
-      };
-
-      ircWs.onerror = (e) => {
-        console.warn('[ChatOverlay IRC] Error:', e);
-        ircWs?.close();
-      };
-
-      ircPingTimer = setInterval(() => {
-        if (ircWs?.readyState === WebSocket.OPEN) {
-          ircWs.send('PING :keepalive');
-        }
-      }, 240000);
-    }
-
-    connectTwitchIRC();
-
-    const chatChannel = supabase
-      .channel(`chat-messages-${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'twitch_chat_messages' }, (payload) => {
-        console.log('💬 [REALTIME] New chat message received:', payload);
-        const newMessage = payload.new as ChatMessage;
-        console.log('💬 [REALTIME] Adding message to state:', newMessage);
-        setMessages((prev) => {
-          console.log('💬 [REALTIME] Previous messages count:', prev.length);
-          const updated = [newMessage, ...prev].slice(0, 13);
-          console.log('💬 [REALTIME] Updated messages count:', updated.length);
-          return updated;
-        });
-      })
-      .subscribe((status) => {
-        console.log('📡 Chat channel status:', status);
-        if (status === 'SUBSCRIBED') {
-          console.log('✅ Chat: Successfully subscribed to twitch_chat_messages!');
-        }
-      });
-
-    const alertsChannel = supabase
-      .channel(`chat-alerts-${Date.now()}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'streamelements_events' }, (payload) => {
-        console.log('🔔 New StreamElements event received:', payload);
-        loadAlerts();
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'twitch_alerts' }, (payload) => {
-        console.log('🔔 New Twitch alert received:', payload);
-        loadAlerts();
-      })
-      .subscribe((status) => {
-        console.log('📡 Alerts channel status:', status);
-      });
+    setMessages([]);
+    setAlerts([]);
 
     const dataChannel = supabase
       .channel(`chat-data-${Date.now()}`)
@@ -219,32 +78,9 @@ export function ChatOverlay() {
         console.log('📡 Data channel status:', status);
       });
 
-    const interval = setInterval(() => {
-      loadAlerts();
-    }, 5000);
-
-    const streamElementsSyncInterval = setInterval(() => {
-      syncStreamElementsData().catch((error) => {
-        console.error('Error syncing StreamElements data:', error);
-      });
-    }, 20000);
-
     return () => {
       console.log('🔌 ChatOverlay: Cleaning up subscriptions...');
-      supabase.removeChannel(chatChannel);
-      supabase.removeChannel(alertsChannel);
       supabase.removeChannel(dataChannel);
-      clearInterval(interval);
-      clearInterval(streamElementsSyncInterval);
-
-      // Cleanup Twitch IRC
-      ircCancelled = true;
-      if (ircReconnectTimer) clearTimeout(ircReconnectTimer);
-      if (ircPingTimer) clearInterval(ircPingTimer);
-      if (ircWs) {
-        ircWs.onclose = null;
-        ircWs.close();
-      }
     };
   }, []);
 
@@ -257,21 +93,6 @@ export function ChatOverlay() {
 
     return () => clearInterval(interval);
   }, [topSlots.length]);
-
-  const loadMessages = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('twitch_chat_messages')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(13);
-
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
 
   const loadActiveGiveawayWinner = async () => {
     try {
@@ -289,74 +110,6 @@ export function ChatOverlay() {
       setWinnerSelectedAt(data?.completed_at || null);
     } catch (error) {
       console.error('Error loading giveaway winner:', error);
-    }
-  };
-
-  const loadAlerts = async () => {
-    try {
-      const { data: seData, error: seError } = await supabase
-        .from('streamelements_events')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (seError) throw seError;
-
-      const { data: twitchData, error: twitchError } = await supabase
-        .from('twitch_alerts')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (twitchError) throw twitchError;
-
-      const streamElementsEvents: CombinedEvent[] = (seData || []).map(event => ({
-        id: `se_${event.id}`,
-        event_id: event.event_id || null,
-        event_type: (event.event_type || '').toLowerCase(),
-        username: event.username,
-        display_name: event.display_name || event.username,
-        amount: event.amount || 0,
-        months: event.months || 0,
-        created_at: event.created_at
-      }));
-
-      const twitchEvents: CombinedEvent[] = (twitchData || []).map(event => ({
-        id: `tw_${event.id}`,
-        event_id: event.event_id || null,
-        event_type: (event.alert_type || '').toLowerCase(),
-        username: event.username,
-        display_name: event.display_name || event.username,
-        amount: event.amount || 0,
-        months: event.months || 0,
-        created_at: event.created_at
-      }));
-
-      const merged = [...streamElementsEvents, ...twitchEvents]
-        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      const recentUniqueEvents: CombinedEvent[] = [];
-      const seen = new Set<string>();
-
-      for (const event of merged) {
-        const fallbackKey = `${event.event_type}|${event.username}|${event.amount}|${event.months}|${event.created_at}`;
-        const uniqueKey = event.event_id || fallbackKey;
-
-        if (seen.has(uniqueKey)) {
-          continue;
-        }
-
-        seen.add(uniqueKey);
-        recentUniqueEvents.push(event);
-
-        if (recentUniqueEvents.length === 3) {
-          break;
-        }
-      }
-
-      setAlerts(recentUniqueEvents);
-    } catch (error) {
-      console.error('Error loading alerts:', error);
     }
   };
 

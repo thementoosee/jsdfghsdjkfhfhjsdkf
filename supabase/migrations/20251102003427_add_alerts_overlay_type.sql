@@ -2,10 +2,10 @@
   # Add alerts overlay type
 
   1. Changes
-    - Add 'alerts' to the overlay type constraint to support Twitch alerts overlay
+    - Add 'alerts' to the overlay type constraint to support alerts overlay
   
   2. Notes
-    - This allows creating overlays of type 'alerts' for displaying Twitch alerts (follows, subs, raids, etc.)
+    - This allows creating overlays of type 'alerts' for displaying alerts
 */
 
 ALTER TABLE overlays DROP CONSTRAINT IF EXISTS overlays_type_check;

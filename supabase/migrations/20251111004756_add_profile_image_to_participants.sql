@@ -3,7 +3,7 @@
   
   1. Changes
     - Add `profile_image_url` column to `giveaway_participants` table
-    - This field stores the Twitch profile image URL for visual representation during rolling
+    - This field stores the profile image URL for visual representation during rolling
   
   2. Notes
     - Field is nullable to support existing participants without breaking changes

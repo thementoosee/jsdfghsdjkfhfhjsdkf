@@ -70,7 +70,7 @@ CREATE POLICY "Authenticated users can delete giveaways"
   TO authenticated
   USING (true);
 
--- Policies for giveaway_participants (public read and insert for Twitch integration)
+-- Policies for giveaway_participants (public read and insert)
 CREATE POLICY "Anyone can view participants"
   ON giveaway_participants FOR SELECT
   TO public
