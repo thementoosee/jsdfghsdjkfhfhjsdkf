@@ -181,20 +181,17 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
   }, [opening?.id, opening?.isHunt]);
 
   useEffect(() => {
-    const openedItemsList = items.filter(item => item.status === 'opened');
-    const sortedSlots = [...openedItemsList].sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0));
-    const bestSlot = sortedSlots[0] || null;
-    const worstSlot = sortedSlots[sortedSlots.length - 1] || null;
-    const slotsToShow = [bestSlot, worstSlot].filter((slot, index, arr) => slot && arr.indexOf(slot) === index);
-
-    if (slotsToShow.length > 1) {
-      const interval = setInterval(() => {
-        setCurrentSlotIndex((prev) => (prev + 1) % slotsToShow.length);
-      }, 10000);
-
-      return () => clearInterval(interval);
+    if (items.length < 2) {
+      setCurrentSlotIndex(0);
+      return;
     }
-  }, [items]);
+
+    const interval = setInterval(() => {
+      setCurrentSlotIndex((prev) => (prev + 1) % items.length);
+    }, 2600);
+
+    return () => clearInterval(interval);
+  }, [items.length]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -383,11 +380,8 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
     return `${Math.max(0, (startAmount - totalWon) / remainingPayment).toFixed(0)}x`;
   })();
 
-  const sortedSlots = [...openedItems].sort((a, b) => (b.multiplier || 0) - (a.multiplier || 0));
-  const bestSlot = sortedSlots[0] || null;
-  const worstSlot = sortedSlots[sortedSlots.length - 1] || null;
-  const slotsToShow = [bestSlot, worstSlot].filter((slot, index, arr) => slot && arr.indexOf(slot) === index);
-  const currentSlot = slotsToShow[currentSlotIndex] || null;
+  const carouselItems = items.length > 0 ? items : openedItems;
+  const scrollingItems = items.length > 4 ? [...items, ...items] : items;
 
   return (
     <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>
@@ -637,253 +631,158 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             className="flex-1 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
-            <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex items-center gap-2 mb-3 px-4 pt-4">
-              <div
-                className="w-1 h-5 rounded-full"
-                style={{ backgroundColor: '#fbbf24' }}
-              ></div>
-              <span
-                className="text-[10px] font-black uppercase tracking-wider"
-                style={{ color: '#fbbf24' }}
-              >
-                BONUS
-              </span>
-            </div>
+            <div className="px-3 pt-3 pb-2 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#38bdf8' }}></div>
+                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#38bdf8' }}>
+                  LIVE CAROUSEL
+                </span>
+              </div>
 
-            <div className="space-y-2 flex-1 overflow-hidden px-4 pb-4">
-              <div
-                className="space-y-2"
-                style={{
-                  animation: items.length > 5 ? 'scroll 30s linear infinite' : 'none'
-                }}
-              >
-              {(items.length > 5 ? [...items, ...items] : items).map((item, index) => {
-                const actualIndex = index % items.length;
-                const isLastBeforeRepeat = items.length > 5 && (index + 1) % items.length === 0;
-                const payment = item.payment;
-                const isOpened = item.status === 'opened';
-                const isWin = isOpened && item.payout && item.payout > payment;
-                const profit = isOpened && item.payout ? item.payout - payment : 0;
-                return (
-                <>
-                <div
-                  key={`${item.id}-${index}`}
-                  className="rounded-xl overflow-hidden relative"
-                  style={{
-                    background: isOpened
-                      ? (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
-                      : 'rgba(251, 191, 36, 0.15)',
-                    border: item.super_bonus === true
-                      ? '3px solid rgba(255, 215, 0, 0.95)'
-                      : item.super_bonus === false
-                      ? '3px solid rgba(239, 68, 68, 0.95)'
-                      : isOpened
-                      ? `1px solid ${isWin ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`
-                      : '1px solid rgba(251, 191, 36, 0.3)',
-                    animation: 'none',
-                    transition: 'none'
-                  }}
-                >
-                  {item.slot_image && (
-                    <div
-                      className="absolute inset-0 opacity-20"
-                      style={{
-                        backgroundImage: `url("${item.slot_image}"), url("/image.png")`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        filter: 'blur(8px)',
-                        transform: 'scale(1.1)'
-                      }}
-                    />
-                  )}
-                  <div className="flex items-center relative z-10">
-                    {item.slot_image ? (
-                      <div className="w-12 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl overflow-hidden">
+              <div className="relative h-[118px] rounded-xl overflow-hidden" style={{ perspective: '700px', background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                {carouselItems.length > 0 ? (
+                  carouselItems.map((item, index) => {
+                    const rawOffset = index - currentSlotIndex;
+                    const half = carouselItems.length / 2;
+                    const offset = rawOffset > half
+                      ? rawOffset - carouselItems.length
+                      : rawOffset < -half
+                      ? rawOffset + carouselItems.length
+                      : rawOffset;
+                    const absOffset = Math.abs(offset);
+
+                    if (absOffset > 2) return null;
+
+                    return (
+                      <div
+                        key={`carousel-${item.id}`}
+                        className="absolute top-3 left-1/2 -translate-x-1/2 rounded-lg overflow-hidden"
+                        style={{
+                          width: '82px',
+                          height: '102px',
+                          transform: `translateX(${offset * 66}px) translateY(${absOffset * 6}px) scale(${1 - absOffset * 0.14}) rotateY(${offset * -18}deg)`,
+                          transformStyle: 'preserve-3d',
+                          opacity: absOffset === 2 ? 0.35 : absOffset === 1 ? 0.7 : 1,
+                          zIndex: 20 - absOffset,
+                          border: absOffset === 0 ? '2px solid rgba(56, 189, 248, 0.9)' : '1px solid rgba(255,255,255,0.35)',
+                          boxShadow: absOffset === 0
+                            ? '0 16px 30px rgba(14, 165, 233, 0.35)'
+                            : '0 8px 18px rgba(0,0,0,0.35)',
+                          transition: 'all 700ms cubic-bezier(0.22, 1, 0.36, 1)'
+                        }}
+                      >
                         <img
-                          src={item.slot_image}
+                          src={item.slot_image || '/image.png'}
                           alt={item.slot_name}
-                          className="w-full h-full object-contain"
-                          style={{
-                            borderTopRightRadius: '0.75rem',
-                            borderBottomRightRadius: '0.75rem'
-                          }}
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             e.currentTarget.src = '/image.png';
                           }}
                         />
+                        <div className="absolute inset-x-0 bottom-0 px-1 py-1 text-[8px] font-black text-white truncate" style={{ background: 'linear-gradient(to top, rgba(2,6,23,0.9), transparent)' }}>
+                          {item.slot_name}
+                        </div>
                       </div>
-                    ) : (
-                      <div
-                        className="w-12 h-full flex-shrink-0 flex items-center justify-center text-base font-black rounded-l-xl"
-                        style={{
-                          background: isOpened
-                            ? (isWin ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)')
-                            : 'rgba(251, 191, 36, 0.3)',
-                          color: isOpened
-                            ? (isWin ? '#10b981' : '#ef4444')
-                            : '#fbbf24',
-                          borderTopRightRadius: '0.75rem',
-                          borderBottomRightRadius: '0.75rem'
-                        }}
-                      >
-                        ?
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0 p-3 pr-2">
-                      <div className="text-white text-xs font-bold truncate mb-1">
-                        {item.slot_name}
-                      </div>
-                      <div className="flex items-center gap-1.5 text-[10px]">
-                        {isOpened ? (
-                          <>
-                            <span
-                              className="font-bold px-1.5 py-0.5 rounded"
-                              style={{
-                                background: 'rgba(251, 191, 36, 0.2)',
-                                color: '#fbbf24'
-                              }}
-                            >
-                              €{payment.toFixed(2)}
-                            </span>
-                            <span
-                              className="font-bold px-1.5 py-0.5 rounded"
-                              style={{
-                                background: isWin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                color: isWin ? '#10b981' : '#ef4444'
-                              }}
-                            >
-                              €{item.payout?.toFixed(0) || '0'}
-                            </span>
-                            <span
-                              className="font-bold px-1.5 py-0.5 rounded"
-                              style={{
-                                background: 'rgba(168, 85, 247, 0.2)',
-                                color: '#a855f7'
-                              }}
-                            >
-                              {item.multiplier?.toFixed(0) || '0'}x
-                            </span>
-                          </>
-                        ) : (
-                          <span className="font-semibold" style={{ color: '#fbbf24' }}>
-                            €{payment.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="absolute right-1.5" style={{ top: '-0.4rem' }}>
-                      <span className="text-[10px] font-black text-right" style={{ color: 'rgba(251, 191, 36, 0.4)', minWidth: '20px' }}>
-                        #{actualIndex + 1}
-                      </span>
-                    </div>
+                    );
+                  })
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
+                    No bonuses yet
                   </div>
-                </div>
-                {isLastBeforeRepeat && (
-                  <div key={`spacer-${index}`} style={{ height: '8px' }} />
                 )}
-                </>
-                );
-              })}
               </div>
             </div>
-          </div>
 
-          <div className="px-4 pb-4">
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-1 h-5 rounded-full"
-                style={{ backgroundColor: '#fbbf24' }}
-              ></div>
-              <span
-                className="text-[10px] font-black uppercase tracking-wider"
-                style={{ color: '#fbbf24' }}
-              >
-                {slotsToShow.length === 1 ? 'BEST SLOT' : 'BEST AND WORST'}
+            <div className="flex items-center gap-2 mb-2 px-4 pt-1 flex-shrink-0">
+              <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#fbbf24' }}></div>
+              <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>
+                BONUS LIST
               </span>
             </div>
 
-            <div className="flex gap-3">
-                {currentSlot?.slot_image ? (
-                  <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden">
-                    <img
-                      src={currentSlot.slot_image}
-                      alt={currentSlot.slot_name}
-                      className="w-full h-full object-contain rounded-lg"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)' }}>
-                    <span className="text-4xl font-black" style={{ color: '#fbbf24' }}>?</span>
-                  </div>
-                )}
+            <div className="flex-1 overflow-hidden px-4 pb-4">
+              <div
+                className="space-y-2"
+                style={{
+                  animation: items.length > 4 ? 'scroll 28s linear infinite' : 'none'
+                }}
+              >
+                {scrollingItems.map((item, index) => {
+                  const actualIndex = items.length > 0 ? (index % items.length) : 0;
+                  const cardIsTall = actualIndex % 2 === 1;
+                  const payment = item.payment;
+                  const isOpened = item.status === 'opened';
+                  const isWin = isOpened && item.payout && item.payout > payment;
 
-                {slotsToShow.length > 1 && (
-                  <div className="flex flex-col justify-center gap-1.5">
-                    {slotsToShow.map((_, index) => (
-                      <div
-                        key={index}
-                        className="w-1.5 h-1.5 rounded-full transition-all duration-300"
-                        style={{
-                          backgroundColor: index === currentSlotIndex ? '#fbbf24' : 'rgba(255,255,255,0.3)'
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
+                  return (
+                    <div
+                      key={`${item.id}-${index}`}
+                      className="rounded-xl overflow-hidden relative"
+                      style={{
+                        minHeight: cardIsTall ? '88px' : '66px',
+                        background: isOpened
+                          ? (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
+                          : 'rgba(251, 191, 36, 0.15)',
+                        border: item.super_bonus === true
+                          ? '2px solid rgba(255, 215, 0, 0.95)'
+                          : item.super_bonus === false
+                          ? '2px solid rgba(239, 68, 68, 0.95)'
+                          : isOpened
+                          ? `1px solid ${isWin ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
+                          : '1px solid rgba(251, 191, 36, 0.35)'
+                      }}
+                    >
+                      {item.slot_image && (
+                        <div
+                          className="absolute inset-0 opacity-20"
+                          style={{
+                            backgroundImage: `url("${item.slot_image}"), url("/image.png")`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            filter: 'blur(10px)',
+                            transform: 'scale(1.08)'
+                          }}
+                        />
+                      )}
 
-                <div className="flex-1 flex flex-col justify-between py-1">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)' }}>
-                      <span className="text-xs">🏆</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-sm font-black" style={{ color: '#fbbf24' }}>
-                        €{currentSlot?.payout?.toFixed(0) || '0'}
-                      </div>
-                      <div
-                        className="text-[8px] font-bold uppercase tracking-wide leading-none"
-                        style={{ color: 'rgba(255, 255, 255, 0.5)' }}
-                      >
-                        BEST WIN
-                      </div>
-                    </div>
-                  </div>
+                      <div className="flex items-center relative z-10 h-full">
+                        <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
+                          <img
+                            src={item.slot_image || '/image.png'}
+                            alt={item.slot_name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = '/image.png';
+                            }}
+                          />
+                        </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: 'rgba(168, 85, 247, 0.2)' }}>
-                      <span className="text-xs">⚡</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-sm font-black" style={{ color: '#a855f7' }}>
-                        {(currentSlot?.multiplier || 0).toFixed(1)}x
-                      </div>
-                      <div
-                        className="text-[8px] font-bold uppercase tracking-wide leading-none"
-                        style={{ color: 'rgba(255, 255, 255, 0.5)' }}
-                      >
-                        BEST MULTI
-                      </div>
-                    </div>
-                  </div>
+                        <div className="flex-1 min-w-0 px-2.5 py-2">
+                          <div className="text-white text-xs font-black truncate mb-1">{item.slot_name}</div>
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}>
+                              €{payment.toFixed(2)}
+                            </span>
+                            {isOpened && (
+                              <>
+                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: isWin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: isWin ? '#10b981' : '#ef4444' }}>
+                                  €{item.payout?.toFixed(0) || '0'}
+                                </span>
+                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' }}>
+                                  {item.multiplier?.toFixed(1) || '0.0'}x
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
 
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: 'rgba(34, 197, 94, 0.2)' }}>
-                      <span className="text-xs">💰</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <div className="text-sm font-black" style={{ color: '#22c55e' }}>
-                        €{currentSlot?.payment?.toFixed(2) || '0.00'}
-                      </div>
-                      <div
-                        className="text-[8px] font-bold uppercase tracking-wide leading-none"
-                        style={{ color: 'rgba(255, 255, 255, 0.5)' }}
-                      >
-                        BET SIZE
+                        <div className="pr-2 text-[10px] font-black" style={{ color: 'rgba(251, 191, 36, 0.55)' }}>
+                          #{actualIndex + 1}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })}
               </div>
             </div>
           </div>
