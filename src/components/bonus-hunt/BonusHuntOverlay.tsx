@@ -198,6 +198,13 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   const superBonusCount = items.filter(item => item.is_super_bonus === true).length;
   const extremeBonusCount = items.filter(item => item.is_extreme_bonus === true).length;
   const carouselItems = items;
+  const ringItems = carouselItems.length >= 3
+    ? carouselItems
+    : carouselItems.length === 2
+    ? [carouselItems[0], carouselItems[1], carouselItems[0], carouselItems[1]]
+    : carouselItems.length === 1
+    ? [carouselItems[0], carouselItems[0], carouselItems[0]]
+    : [];
   const scrollingItems = items.length > 4 ? [...items, ...items] : items;
 
   const currentBreakEven = (() => {
@@ -400,29 +407,27 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
               </div>
 
               <div className="relative h-[118px] rounded-xl overflow-hidden" style={{ perspective: '700px', background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
-                {carouselItems.length > 0 ? (
+                {ringItems.length > 0 ? (
                   <div className="absolute inset-0 flex items-center justify-center" style={{ perspective: '900px' }}>
                     <div
                       className="relative w-[88px] h-[102px]"
                       style={{
                         transformStyle: 'preserve-3d',
-                        animation: carouselItems.length > 1
-                          ? `carouselSpin ${Math.max(12, carouselItems.length * 2.4)}s linear infinite`
+                        animation: ringItems.length > 1
+                          ? `carouselSpin ${Math.max(12, ringItems.length * 2.4)}s linear infinite`
                           : 'none'
                       }}
                     >
-                      {carouselItems.map((item, index) => {
-                        const angle = (360 / carouselItems.length) * index;
-                        const radius = Math.max(96, Math.min(128, carouselItems.length * 17));
+                      {ringItems.map((item, index) => {
+                        const angle = (360 / ringItems.length) * index;
+                        const radius = Math.max(96, Math.min(128, ringItems.length * 17));
 
                         return (
                           <div
-                            key={`hunt-carousel-${item.id}`}
+                            key={`hunt-carousel-${item.id}-${index}`}
                             className="absolute inset-0 rounded-lg overflow-hidden"
                             style={{
-                              transform: carouselItems.length === 1
-                                ? 'translateZ(0px)'
-                                : `rotateY(${angle}deg) translateZ(${radius}px)`,
+                              transform: `rotateY(${angle}deg) translateZ(${radius}px)`,
                               backfaceVisibility: 'hidden',
                               border: '1px solid rgba(255,255,255,0.35)',
                               boxShadow: '0 8px 18px rgba(0,0,0,0.35)'
