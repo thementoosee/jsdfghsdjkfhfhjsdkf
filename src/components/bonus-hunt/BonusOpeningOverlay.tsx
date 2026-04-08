@@ -635,102 +635,97 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             className="flex-1 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
-            <div className="px-3 pt-3 pb-2 flex-shrink-0">
-              <div className="relative h-[175px] rounded-xl overflow-hidden mx-auto" style={{ background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)', maxWidth: '232px' }}>
-                {carouselItems.length > 0 ? (
-                  <div
-                    className="absolute inset-0 overflow-hidden"
-                    style={{
-                      perspective: '1000px',
-                      maskImage: 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)',
-                      WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
-                    }}
-                  >
-                    <div
-                      className="flex h-full items-stretch gap-2 px-2"
-                      style={{
-                        width: 'max-content',
-                        animation: carouselItems.length > 1
-                          ? `openingCarouselSlide ${openingCarouselDuration}s linear infinite`
-                          : 'none'
-                      }}
-                    >
-                      {openingCarouselLoopItems.map((item, index) => {
-                        const actualIndex = carouselItems.length > 0 ? (index % carouselItems.length) : 0;
-                        const payment = item.payment;
-                        const isOpened = item.status === 'opened';
-                        const isWin = isOpened && item.payout && item.payout > payment;
+            <div className="flex-shrink-0 relative h-[200px] overflow-hidden"
+              style={{
+                perspective: '1200px',
+                maskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)'
+              }}
+            >
+              {carouselItems.length > 0 ? (
+                <div
+                  className="flex h-full items-stretch gap-3 px-3"
+                  style={{
+                    width: 'max-content',
+                    animation: carouselItems.length > 1
+                      ? `openingCarouselSlide ${openingCarouselDuration}s linear infinite`
+                      : 'none'
+                  }}
+                >
+                  {openingCarouselLoopItems.map((item, index) => {
+                    const actualIndex = carouselItems.length > 0 ? (index % carouselItems.length) : 0;
+                    const payment = item.payment;
+                    const isOpened = item.status === 'opened';
+                    const isWin = isOpened && item.payout && item.payout > payment;
 
-                        return (
-                          <div
-                            key={`carousel-${item.id}-${index}`}
-                            className="w-[72px] h-full flex-shrink-0 rounded-lg overflow-hidden relative"
-                            style={{
-                              border: item.super_bonus === true
-                                ? '2px solid rgba(255, 215, 0, 0.95)'
-                                : item.super_bonus === false
-                                ? '2px solid rgba(239, 68, 68, 0.95)'
-                                : '1px solid rgba(255,255,255,0.3)',
-                              boxShadow: '0 8px 18px rgba(0,0,0,0.35)',
-                              background: 'rgba(0,0,0,0.25)',
-                              transformStyle: 'preserve-3d',
-                              animation: `openingCardFloat3d 4.2s ease-in-out ${actualIndex * 0.18}s infinite`
-                            }}
-                          >
-                            {item.slot_image && (
-                              <div
-                                className="absolute inset-0 opacity-20"
-                                style={{
-                                  backgroundImage: `url("${item.slot_image}"), url("/image.png")`,
-                                  backgroundSize: 'cover',
-                                  backgroundPosition: 'center',
-                                  filter: 'blur(8px)',
-                                  transform: 'scale(1.08)'
-                                }}
-                              />
-                            )}
+                    return (
+                      <div
+                        key={`carousel-${item.id}-${index}`}
+                        className="w-[95px] h-full flex-shrink-0 rounded-xl overflow-hidden relative"
+                        style={{
+                          border: item.super_bonus === true
+                            ? '2px solid rgba(255, 215, 0, 0.95)'
+                            : item.super_bonus === false
+                            ? '2px solid rgba(239, 68, 68, 0.95)'
+                            : '1px solid rgba(255,255,255,0.18)',
+                          boxShadow: item.super_bonus === true
+                            ? '0 0 18px rgba(255,215,0,0.4), 0 8px 24px rgba(0,0,0,0.6)'
+                            : item.super_bonus === false
+                            ? '0 0 18px rgba(239,68,68,0.45), 0 8px 24px rgba(0,0,0,0.6)'
+                            : '0 8px 24px rgba(0,0,0,0.6)',
+                          background: 'rgba(8,12,28,0.75)',
+                          transformStyle: 'preserve-3d',
+                          animation: `openingCardFloat3d 4.2s ease-in-out ${actualIndex * 0.18}s infinite`
+                        }}
+                      >
+                        <div
+                          className="absolute inset-0"
+                          style={{
+                            backgroundImage: `url("${item.slot_image || '/image.png'}")`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            filter: 'blur(10px) brightness(0.35)',
+                            transform: 'scale(1.1)'
+                          }}
+                        />
 
-                            <div className="relative z-10 flex items-center justify-between gap-1 bg-black/45 px-1.5 py-1">
-                              <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
-                              <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
-                            </div>
+                        <div className="relative z-10 flex items-center justify-between gap-1 bg-black/50 px-1.5 py-1">
+                          <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
+                          <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
+                        </div>
 
-                            <div className="relative z-10 h-[115px] overflow-hidden">
-                              <img
-                                src={item.slot_image || '/image.png'}
-                                alt={item.slot_name}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = '/image.png';
-                                }}
-                              />
-                              {item.super_bonus === false && (
-                                <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white">EXTREME</span>
-                              )}
-                              {item.super_bonus === true && (
-                                <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white">SUPER</span>
-                              )}
-                            </div>
+                        <div className="relative z-10 flex-1" style={{ height: 'calc(100% - 52px)', overflow: 'hidden' }}>
+                          <img
+                            src={item.slot_image || '/image.png'}
+                            alt={item.slot_name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.src = '/image.png'; }}
+                          />
+                          {item.super_bonus === false && (
+                            <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">EXTREME</span>
+                          )}
+                          {item.super_bonus === true && (
+                            <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">SUPER</span>
+                          )}
+                        </div>
 
-                            <div className="relative z-10 flex items-center justify-between bg-black/55 px-1.5 py-1">
-                              <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
-                                {isOpened ? `€${(item.payout || 0).toFixed(0)}` : 'PENDING'}
-                              </span>
-                              <span className="rounded bg-black/40 px-1 py-0.5 text-[8px] font-black text-amber-300">
-                                {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${actualIndex + 1}`}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
-                    No bonuses yet
-                  </div>
-                )}
-              </div>
+                        <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1">
+                          <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
+                            {isOpened ? `€${(item.payout || 0).toFixed(0)}` : 'PENDING'}
+                          </span>
+                          <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
+                            {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${actualIndex + 1}`}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
+                  No bonuses yet
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 mb-2 px-4 pt-1 flex-shrink-0">
