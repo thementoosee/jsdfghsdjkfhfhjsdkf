@@ -44,7 +44,6 @@ interface BonusOpeningOverlayProps {
 export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: BonusOpeningOverlayProps = {}) {
   const [opening, setOpening] = useState<BonusOpening | null>(null);
   const [items, setItems] = useState<BonusOpeningItem[]>([]);
-  const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
   const [showInitialBE, setShowInitialBE] = useState(true);
 
   useEffect(() => {
@@ -179,19 +178,6 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
       };
     }
   }, [opening?.id, opening?.isHunt]);
-
-  useEffect(() => {
-    if (items.length < 2) {
-      setCurrentSlotIndex(0);
-      return;
-    }
-
-    const interval = setInterval(() => {
-      setCurrentSlotIndex((prev) => (prev + 1) % items.length);
-    }, 2600);
-
-    return () => clearInterval(interval);
-  }, [items.length]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -439,6 +425,14 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             transform: translateX(0);
           }
         }
+        @keyframes carouselSpin {
+          from {
+            transform: rotateY(0deg);
+          }
+          to {
+            transform: rotateY(-360deg);
+          }
+        }
       `}</style>
 
       {hasOpening && (
@@ -641,50 +635,49 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
 
               <div className="relative h-[118px] rounded-xl overflow-hidden" style={{ perspective: '700px', background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
                 {carouselItems.length > 0 ? (
-                  carouselItems.map((item, index) => {
-                    const rawOffset = index - currentSlotIndex;
-                    const half = carouselItems.length / 2;
-                    const offset = rawOffset > half
-                      ? rawOffset - carouselItems.length
-                      : rawOffset < -half
-                      ? rawOffset + carouselItems.length
-                      : rawOffset;
-                    const absOffset = Math.abs(offset);
+                  <div className="absolute inset-0 flex items-center justify-center" style={{ perspective: '900px' }}>
+                    <div
+                      className="relative w-[88px] h-[102px]"
+                      style={{
+                        transformStyle: 'preserve-3d',
+                        animation: carouselItems.length > 1
+                          ? `carouselSpin ${Math.max(12, carouselItems.length * 2.4)}s linear infinite`
+                          : 'none'
+                      }}
+                    >
+                      {carouselItems.map((item, index) => {
+                        const angle = (360 / carouselItems.length) * index;
+                        const radius = Math.max(96, Math.min(128, carouselItems.length * 17));
 
-                    if (absOffset > 2) return null;
-
-                    return (
-                      <div
-                        key={`carousel-${item.id}`}
-                        className="absolute top-3 left-1/2 -translate-x-1/2 rounded-lg overflow-hidden"
-                        style={{
-                          width: '82px',
-                          height: '102px',
-                          transform: `translateX(${offset * 66}px) translateY(${absOffset * 6}px) scale(${1 - absOffset * 0.14}) rotateY(${offset * -18}deg)`,
-                          transformStyle: 'preserve-3d',
-                          opacity: absOffset === 2 ? 0.35 : absOffset === 1 ? 0.7 : 1,
-                          zIndex: 20 - absOffset,
-                          border: absOffset === 0 ? '2px solid rgba(56, 189, 248, 0.9)' : '1px solid rgba(255,255,255,0.35)',
-                          boxShadow: absOffset === 0
-                            ? '0 16px 30px rgba(14, 165, 233, 0.35)'
-                            : '0 8px 18px rgba(0,0,0,0.35)',
-                          transition: 'all 700ms cubic-bezier(0.22, 1, 0.36, 1)'
-                        }}
-                      >
-                        <img
-                          src={item.slot_image || '/image.png'}
-                          alt={item.slot_name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = '/image.png';
-                          }}
-                        />
-                        <div className="absolute inset-x-0 bottom-0 px-1 py-1 text-[8px] font-black text-white truncate" style={{ background: 'linear-gradient(to top, rgba(2,6,23,0.9), transparent)' }}>
-                          {item.slot_name}
-                        </div>
-                      </div>
-                    );
-                  })
+                        return (
+                          <div
+                            key={`carousel-${item.id}`}
+                            className="absolute inset-0 rounded-lg overflow-hidden"
+                            style={{
+                              transform: carouselItems.length === 1
+                                ? 'translateZ(0px)'
+                                : `rotateY(${angle}deg) translateZ(${radius}px)`,
+                              backfaceVisibility: 'hidden',
+                              border: '1px solid rgba(255,255,255,0.35)',
+                              boxShadow: '0 8px 18px rgba(0,0,0,0.35)'
+                            }}
+                          >
+                            <img
+                              src={item.slot_image || '/image.png'}
+                              alt={item.slot_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.src = '/image.png';
+                              }}
+                            />
+                            <div className="absolute inset-x-0 bottom-0 px-1 py-1 text-[8px] font-black text-white truncate" style={{ background: 'linear-gradient(to top, rgba(2,6,23,0.9), transparent)' }}>
+                              {item.slot_name}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
                     No bonuses yet
