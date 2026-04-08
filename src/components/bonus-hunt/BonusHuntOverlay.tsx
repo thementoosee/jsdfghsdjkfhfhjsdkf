@@ -40,6 +40,7 @@ interface BonusHuntOverlayProps {
 export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayProps = {}) {
   const [hunt, setHunt] = useState<BonusHunt | null>(null);
   const [items, setItems] = useState<BonusHuntItem[]>([]);
+  const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
   const [newItemIds, setNewItemIds] = useState<Set<string>>(new Set());
   const [removedItemIds, setRemovedItemIds] = useState<Set<string>>(new Set());
   const previousItemIdsRef = useRef<Set<string>>(new Set());
@@ -89,6 +90,19 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
       supabase.removeChannel(huntChannel);
     };
   }, [huntId]);
+
+  useEffect(() => {
+    if (items.length < 2) {
+      setCurrentSlotIndex(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setCurrentSlotIndex((prev) => (prev + 1) % items.length);
+    }, 2600);
+
+    return () => clearInterval(interval);
+  }, [items.length]);
 
 
   const loadActiveHunt = async () => {
@@ -198,6 +212,8 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   const openedItems = items.filter(item => item.status === 'opened');
   const superBonusCount = items.filter(item => item.is_super_bonus === true).length;
   const extremeBonusCount = items.filter(item => item.is_extreme_bonus === true).length;
+  const carouselItems = items;
+  const scrollingItems = items.length > 4 ? [...items, ...items] : items;
 
   const currentBreakEven = (() => {
     if (!hunt) return '0x';
@@ -382,205 +398,168 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             className="flex-1 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
-            <div className="flex-1 overflow-hidden flex flex-col">
-              <div className="flex items-center gap-2 mb-3 px-4 pt-4">
-                <div
-                  className="w-1 h-5 rounded-full"
-                  style={{ backgroundColor: '#fbbf24' }}
-                ></div>
-                <span
-                  className="text-[10px] font-black uppercase tracking-wider"
-                  style={{ color: '#fbbf24' }}
-                >
-                  BONUS
+            <div className="px-3 pt-3 pb-2 flex-shrink-0">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#38bdf8' }}></div>
+                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#38bdf8' }}>
+                  LIVE CAROUSEL
                 </span>
               </div>
 
-              <div className="space-y-2 flex-1 overflow-hidden px-4 pb-4">
-                <div
-                  className="space-y-2"
-                  style={{
-                    animation: pendingItems.length > 5 ? 'scroll 30s linear infinite' : 'none'
-                  }}
-                >
-                {(pendingItems.length > 5 ? [...pendingItems, ...pendingItems] : pendingItems).map((item, index) => {
-                const actualIndex = index % pendingItems.length;
-                const isLastBeforeRepeat = pendingItems.length > 5 && (index + 1) % pendingItems.length === 0;
-                const isFirstOccurrence = index < pendingItems.length;
-                const isNewItem = newItemIds.has(item.id) && isFirstOccurrence;
-                const isRemovedItem = removedItemIds.has(item.id);
-                return (
-                <>
-                <div
-                  key={`${item.id}-${index}`}
-                  className="rounded-xl overflow-hidden relative"
-                  style={{
-                    background: 'rgba(251, 191, 36, 0.15)',
-                    border: item.is_super_bonus === true
-                      ? '3px solid rgba(255, 215, 0, 0.95)'
-                      : item.is_extreme_bonus === true
-                      ? '3px solid rgba(239, 68, 68, 0.95)'
-                      : '1px solid rgba(251, 191, 36, 0.3)',
-                    animation: isNewItem
-                      ? 'slideInFromLeft 0.6s ease-out'
-                      : isRemovedItem
-                      ? 'slideOutToRight 0.5s ease-in forwards'
-                      : 'none'
-                  }}
-                >
-                  {item.slot_image_url && (
-                    <div
-                      className="absolute inset-0 opacity-20"
-                      style={{
-                        backgroundImage: `url("${item.slot_image_url}"), url("/image.png")`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        filter: 'blur(8px)',
-                        transform: 'scale(1.1)'
-                      }}
-                    />
-                  )}
-                  <div className="flex items-center relative z-10">
-                    {item.slot_image_url ? (
-                      <div className="w-12 h-full flex items-center justify-center flex-shrink-0 rounded-l-xl overflow-hidden">
+              <div className="relative h-[118px] rounded-xl overflow-hidden" style={{ perspective: '700px', background: 'linear-gradient(180deg, rgba(15,23,42,0.55), rgba(2,6,23,0.85))', border: '1px solid rgba(56, 189, 248, 0.25)' }}>
+                {carouselItems.length > 0 ? (
+                  carouselItems.map((item, index) => {
+                    const rawOffset = index - currentSlotIndex;
+                    const half = carouselItems.length / 2;
+                    const offset = rawOffset > half
+                      ? rawOffset - carouselItems.length
+                      : rawOffset < -half
+                      ? rawOffset + carouselItems.length
+                      : rawOffset;
+                    const absOffset = Math.abs(offset);
+
+                    if (absOffset > 2) return null;
+
+                    return (
+                      <div
+                        key={`hunt-carousel-${item.id}`}
+                        className="absolute top-3 left-1/2 -translate-x-1/2 rounded-lg overflow-hidden"
+                        style={{
+                          width: '82px',
+                          height: '102px',
+                          transform: `translateX(${offset * 66}px) translateY(${absOffset * 6}px) scale(${1 - absOffset * 0.14}) rotateY(${offset * -18}deg)`,
+                          transformStyle: 'preserve-3d',
+                          opacity: absOffset === 2 ? 0.35 : absOffset === 1 ? 0.7 : 1,
+                          zIndex: 20 - absOffset,
+                          border: absOffset === 0 ? '2px solid rgba(56, 189, 248, 0.9)' : '1px solid rgba(255,255,255,0.35)',
+                          boxShadow: absOffset === 0
+                            ? '0 16px 30px rgba(14, 165, 233, 0.35)'
+                            : '0 8px 18px rgba(0,0,0,0.35)',
+                          transition: 'all 700ms cubic-bezier(0.22, 1, 0.36, 1)'
+                        }}
+                      >
                         <img
-                          src={item.slot_image_url}
+                          src={item.slot_image_url || '/image.png'}
                           alt={item.slot_name}
-                          className="w-full h-full object-contain"
-                          style={{
-                            borderTopRightRadius: '0.75rem',
-                            borderBottomRightRadius: '0.75rem'
-                          }}
+                          className="w-full h-full object-cover"
                           onError={(e) => {
                             e.currentTarget.src = '/image.png';
                           }}
                         />
-                      </div>
-                    ) : (
-                      <div
-                        className="w-12 h-full flex-shrink-0 flex items-center justify-center text-base font-black rounded-l-xl"
-                        style={{
-                          background: 'rgba(251, 191, 36, 0.3)',
-                          color: '#fbbf24',
-                          borderTopRightRadius: '0.75rem',
-                          borderBottomRightRadius: '0.75rem'
-                        }}
-                      >
-                        ?
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0 p-3 pr-2">
-                      <div className="text-white text-xs font-bold truncate mb-1">
-                        {item.slot_name}
-                      </div>
-                      <div className="flex items-center gap-2 text-[10px]">
-                        <span className="font-semibold" style={{ color: '#fbbf24' }}>
-                          €{item.bet_amount.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="absolute bottom-1 right-2">
-                      <span className="text-[10px] font-black" style={{ color: 'rgba(251, 191, 36, 0.4)' }}>
-                        #{actualIndex + 1}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                {isLastBeforeRepeat && (
-                  <div className="relative h-6 flex items-center justify-center my-2">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t-2 border-dashed border-purple-400/30"></div>
-                    </div>
-                  </div>
-                )}
-                </>
-                );
-              })}
-                </div>
-              </div>
-            </div>
-
-            {openedItems.length > 0 && (
-              <div
-                className="px-4 pb-4 flex-1 overflow-hidden flex flex-col"
-                style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-1 h-5 rounded-full"
-                    style={{ backgroundColor: '#a855f7' }}
-                  ></div>
-                  <span
-                    className="text-[10px] font-black uppercase tracking-wider"
-                    style={{ color: '#a855f7' }}
-                  >
-                    OPENED ({openedItems.length})
-                  </span>
-                </div>
-
-                <div className="flex-1 space-y-2 overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.3) transparent' }}>
-                  {openedItems.slice().reverse().map((item, index) => {
-                    const payment = item.payment_amount || item.bet_amount;
-                    const isWin = item.result_amount && item.result_amount > payment;
-                    const profit = item.result_amount ? item.result_amount - payment : 0;
-                    const isNewlyOpened = index === 0 && newItemIds.has(item.id);
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-xl overflow-hidden"
-                        style={{
-                          background: isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                          border: item.is_super_bonus === true
-                            ? '3px solid rgba(255, 215, 0, 0.95)'
-                            : item.is_extreme_bonus === true
-                            ? '3px solid rgba(239, 68, 68, 0.95)'
-                            : `1px solid ${isWin ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
-                          animation: isNewlyOpened ? 'slideInFromRight 0.6s ease-out' : 'none'
-                        }}
-                      >
-                        <div className="p-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            {isWin ? (
-                              <TrendingUp className="w-5 h-5 flex-shrink-0" style={{ color: '#10b981' }} />
-                            ) : (
-                              <TrendingDown className="w-5 h-5 flex-shrink-0" style={{ color: '#ef4444' }} />
-                            )}
-                            <div className="flex-1 min-w-0">
-                              <div className="text-white text-xs font-bold truncate">
-                                {item.slot_name}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-base font-black" style={{ color: isWin ? '#10b981' : '#ef4444' }}>
-                                €{item.result_amount?.toFixed(0) || '0'}
-                              </span>
-                              {item.multiplier && (
-                                <span
-                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                                  style={{
-                                    background: isWin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                                    color: isWin ? '#10b981' : '#ef4444'
-                                  }}
-                                >
-                                  {item.multiplier.toFixed(0)}x
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs font-bold" style={{ color: isWin ? '#10b981' : '#ef4444' }}>
-                              {profit >= 0 ? '+' : ''}€{profit.toFixed(0)}
-                            </span>
-                          </div>
+                        <div className="absolute inset-x-0 bottom-0 px-1 py-1 text-[8px] font-black text-white truncate" style={{ background: 'linear-gradient(to top, rgba(2,6,23,0.9), transparent)' }}>
+                          {item.slot_name}
                         </div>
                       </div>
                     );
-                  })}
-                </div>
+                  })
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
+                    No bonuses yet
+                  </div>
+                )}
               </div>
-            )}
+            </div>
+
+            <div className="flex items-center gap-2 mb-2 px-4 pt-1 flex-shrink-0">
+              <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#fbbf24' }}></div>
+              <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: '#fbbf24' }}>
+                BONUS LIST
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-hidden px-4 pb-4">
+              <div
+                className="space-y-2"
+                style={{
+                  animation: items.length > 4 ? 'scroll 28s linear infinite' : 'none'
+                }}
+              >
+                {scrollingItems.map((item, index) => {
+                  const actualIndex = items.length > 0 ? (index % items.length) : 0;
+                  const cardIsTall = actualIndex % 2 === 1;
+                  const payment = item.payment_amount || item.bet_amount;
+                  const isOpened = item.status === 'opened';
+                  const isWin = isOpened && (item.result_amount || 0) > payment;
+                  const isFirstOccurrence = index < items.length;
+                  const isNewItem = newItemIds.has(item.id) && isFirstOccurrence;
+                  const isRemovedItem = removedItemIds.has(item.id);
+
+                  return (
+                    <div
+                      key={`${item.id}-${index}`}
+                      className="rounded-xl overflow-hidden relative"
+                      style={{
+                        minHeight: cardIsTall ? '88px' : '66px',
+                        background: isOpened
+                          ? (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
+                          : 'rgba(251, 191, 36, 0.15)',
+                        border: item.is_super_bonus === true
+                          ? '2px solid rgba(255, 215, 0, 0.95)'
+                          : item.is_extreme_bonus === true
+                          ? '2px solid rgba(239, 68, 68, 0.95)'
+                          : isOpened
+                          ? `1px solid ${isWin ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
+                          : '1px solid rgba(251, 191, 36, 0.35)',
+                        animation: isNewItem
+                          ? 'slideInFromLeft 0.6s ease-out'
+                          : isRemovedItem
+                          ? 'slideOutToRight 0.5s ease-in forwards'
+                          : 'none'
+                      }}
+                    >
+                      {item.slot_image_url && (
+                        <div
+                          className="absolute inset-0 opacity-20"
+                          style={{
+                            backgroundImage: `url("${item.slot_image_url}"), url("/image.png")`,
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                            filter: 'blur(10px)',
+                            transform: 'scale(1.08)'
+                          }}
+                        />
+                      )}
+
+                      <div className="flex items-center relative z-10 h-full">
+                        <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
+                          <img
+                            src={item.slot_image_url || '/image.png'}
+                            alt={item.slot_name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.src = '/image.png';
+                            }}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0 px-2.5 py-2">
+                          <div className="text-white text-xs font-black truncate mb-1">{item.slot_name}</div>
+                          <div className="flex items-center gap-1.5 text-[10px]">
+                            <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}>
+                              €{payment.toFixed(2)}
+                            </span>
+                            {isOpened && (
+                              <>
+                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: isWin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: isWin ? '#10b981' : '#ef4444' }}>
+                                  €{item.result_amount?.toFixed(0) || '0'}
+                                </span>
+                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' }}>
+                                  {item.multiplier?.toFixed(1) || '0.0'}x
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="pr-2 text-[10px] font-black" style={{ color: 'rgba(251, 191, 36, 0.55)' }}>
+                          #{actualIndex + 1}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
