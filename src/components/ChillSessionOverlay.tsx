@@ -313,11 +313,11 @@ export function ChillSessionOverlay({ sessionId, embedded = false, frozen = fals
 
           {hasSession ? (
             slotImageUrl ? (
-              <div className="relative w-full h-[320px] overflow-hidden">
+              <div className="relative w-full h-[320px] overflow-hidden flex items-center justify-center bg-black/10">
                 <img
                   src={slotImageUrl}
                   alt={session?.slot_name}
-                  className="w-full h-full object-cover object-top animate-pulse-zoom"
+                  className="w-full h-full object-contain object-top animate-pulse-zoom"
                 />
               </div>
             ) : (
