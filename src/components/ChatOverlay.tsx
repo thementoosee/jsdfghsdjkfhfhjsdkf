@@ -200,7 +200,7 @@ export function ChatOverlay() {
   };
 
   return (
-    <div className="w-[240px] h-[720px] relative" style={{ marginTop: '0px', marginRight: '5px' }}>
+    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginRight: '5px' }}>
       <div
         className="w-full h-full overflow-hidden flex flex-col"
         style={{

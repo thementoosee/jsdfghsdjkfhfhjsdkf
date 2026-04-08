@@ -390,7 +390,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
   const currentSlot = slotsToShow[currentSlotIndex] || null;
 
   return (
-    <div className="w-[240px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '110px' }}>
+    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>
       <style>{`
         @keyframes float {
           0%, 100% { transform: translate(0, 0) scale(1); }
