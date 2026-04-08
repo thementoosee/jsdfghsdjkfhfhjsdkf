@@ -133,14 +133,14 @@ html, body {
   0% {
     transform: scale(1);
   }
-  15% {
-    transform: scale(1.05);
+  50% {
+    transform: scale(1.018);
   }
-  30%, 100% {
+  100% {
     transform: scale(1);
   }
 }
 
 .animate-pulse-zoom {
-  animation: pulse-zoom 6s ease-in-out infinite;
+  animation: pulse-zoom 7.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
