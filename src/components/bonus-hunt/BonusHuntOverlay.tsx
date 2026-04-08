@@ -257,6 +257,14 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             transform: translateX(-50%);
           }
         }
+        @keyframes huntCardFloat3d {
+          0%, 100% {
+            transform: translateY(0) rotateY(-7deg) rotateX(2deg) scale(0.985);
+          }
+          50% {
+            transform: translateY(-4px) rotateY(7deg) rotateX(-1deg) scale(1.015);
+          }
+        }
       `}</style>
 
       {hasHunt && !isOpeningMode && (
@@ -406,6 +414,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                   <div
                     className="absolute inset-0 overflow-hidden"
                     style={{
+                      perspective: '1000px',
                       maskImage: 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)',
                       WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
                     }}
@@ -436,7 +445,9 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                                 ? '2px solid rgba(239, 68, 68, 0.95)'
                                 : '1px solid rgba(255,255,255,0.3)',
                               boxShadow: '0 8px 18px rgba(0,0,0,0.35)',
-                              background: 'rgba(0,0,0,0.25)'
+                              background: 'rgba(0,0,0,0.25)',
+                              transformStyle: 'preserve-3d',
+                              animation: `huntCardFloat3d 4.2s ease-in-out ${actualIndex * 0.18}s infinite`
                             }}
                           >
                             {item.slot_image_url && (
