@@ -212,7 +212,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   })();
 
   return (
-    <div className="w-[240px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '110px' }}>
+    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>
       <style>{`
         @keyframes slideInFromLeft {
           from {
