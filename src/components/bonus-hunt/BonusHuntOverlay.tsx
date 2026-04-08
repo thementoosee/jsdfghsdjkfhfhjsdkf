@@ -259,10 +259,10 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
         }
         @keyframes huntCardFloat3d {
           0%, 100% {
-            transform: translateY(0) rotateY(-7deg) rotateX(2deg) scale(0.985);
+            transform: translateY(0) rotateY(-15deg) rotateX(3deg) scale(0.97);
           }
           50% {
-            transform: translateY(-4px) rotateY(7deg) rotateX(-1deg) scale(1.015);
+            transform: translateY(-6px) rotateY(15deg) rotateX(-2deg) scale(1.03);
           }
         }
       `}</style>
@@ -403,14 +403,15 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
           >
             <div className="flex-shrink-0 relative h-[200px] overflow-hidden"
               style={{
-                perspective: '1200px',
-                maskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)'
+                perspective: '800px',
+                paddingLeft: 'calc(50% - 47.5px)',
+                maskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)',
+                WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)'
               }}
             >
               {carouselItems.length > 0 ? (
                 <div
-                  className="flex h-full items-stretch gap-3 px-3"
+                  className="flex h-full items-stretch gap-3"
                   style={{
                     width: 'max-content',
                     animation: carouselItems.length > 1
@@ -427,7 +428,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                     return (
                       <div
                         key={`hunt-carousel-${item.id}-${index}`}
-                        className="w-[95px] h-full flex-shrink-0 rounded-xl overflow-hidden relative"
+                        className="w-[95px] h-full flex-shrink-0 rounded-xl relative"
                         style={{
                           border: item.is_super_bonus === true
                             ? '2px solid rgba(255, 215, 0, 0.95)'
@@ -439,49 +440,50 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                             : item.is_extreme_bonus === true
                             ? '0 0 18px rgba(239,68,68,0.45), 0 8px 24px rgba(0,0,0,0.6)'
                             : '0 8px 24px rgba(0,0,0,0.6)',
-                          background: 'rgba(8,12,28,0.75)',
                           transformStyle: 'preserve-3d',
                           animation: `huntCardFloat3d 4.2s ease-in-out ${actualIndex * 0.18}s infinite`
                         }}
                       >
-                        <div
-                          className="absolute inset-0"
-                          style={{
-                            backgroundImage: `url("${item.slot_image_url || '/image.png'}")`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: 'blur(10px) brightness(0.35)',
-                            transform: 'scale(1.1)'
-                          }}
-                        />
-
-                        <div className="relative z-10 flex items-center justify-between gap-1 bg-black/50 px-1.5 py-1">
-                          <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
-                          <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
-                        </div>
-
-                        <div className="relative z-10 flex-1" style={{ height: 'calc(100% - 52px)', overflow: 'hidden' }}>
-                          <img
-                            src={item.slot_image_url || '/image.png'}
-                            alt={item.slot_name}
-                            className="w-full h-full object-cover"
-                            onError={(e) => { e.currentTarget.src = '/image.png'; }}
+                        <div className="absolute inset-0 overflow-hidden rounded-xl flex flex-col" style={{ background: 'rgba(8,12,28,0.75)' }}>
+                          <div
+                            className="absolute inset-0"
+                            style={{
+                              backgroundImage: `url("${item.slot_image_url || '/image.png'}")`,
+                              backgroundSize: 'cover',
+                              backgroundPosition: 'center',
+                              filter: 'blur(10px) brightness(0.35)',
+                              transform: 'scale(1.1)'
+                            }}
                           />
-                          {item.is_extreme_bonus === true && (
-                            <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">EXTREME</span>
-                          )}
-                          {item.is_super_bonus === true && (
-                            <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">SUPER</span>
-                          )}
-                        </div>
 
-                        <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1">
-                          <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
-                            {isOpened ? `€${(item.result_amount || 0).toFixed(0)}` : 'PENDING'}
-                          </span>
-                          <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
-                            {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${actualIndex + 1}`}
-                          </span>
+                          <div className="relative z-10 flex items-center justify-between gap-1 bg-black/50 px-1.5 py-1 flex-shrink-0">
+                            <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
+                            <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
+                          </div>
+
+                          <div className="relative z-10 flex-1 overflow-hidden">
+                            <img
+                              src={item.slot_image_url || '/image.png'}
+                              alt={item.slot_name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => { e.currentTarget.src = '/image.png'; }}
+                            />
+                            {item.is_extreme_bonus === true && (
+                              <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">EXTREME</span>
+                            )}
+                            {item.is_super_bonus === true && (
+                              <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">SUPER</span>
+                            )}
+                          </div>
+
+                          <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1 flex-shrink-0">
+                            <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
+                              {isOpened ? `€${(item.result_amount || 0).toFixed(0)}` : 'PENDING'}
+                            </span>
+                            <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
+                              {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${actualIndex + 1}`}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
