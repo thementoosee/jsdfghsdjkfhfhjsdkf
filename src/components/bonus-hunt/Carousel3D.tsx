@@ -1,34 +1,27 @@
-import { useRef, useEffect, useCallback, useState, type ReactNode } from 'react';
+import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 
 // ─────────────────────────────────────────────────────────────
 // Carousel3D – Premium casino-style 3D step carousel
 // ─────────────────────────────────────────────────────────────
 //
-// STEP MOTION:
-//   Instead of continuous linear scroll, the carousel holds on
-//   each card for a dwell period (pauseDuration), then eases to
-//   the next card with a smooth cubic-bezier transition. This
-//   lets viewers read slot names, bets, and payouts clearly.
+// STEP MOTION (direct DOM – bypasses React batching):
+//   The track position is controlled entirely via refs and
+//   direct style mutation so that:
+//     1. transition property is set on the DOM element
+//     2. browser paints it (forced via getComputedStyle)
+//     3. transform is updated → CSS transition animates smoothly
+//   This two-phase approach guarantees the browser sees the
+//   transition before the position changes.
 //
 // INFINITE LOOP:
-//   Items tripled (A B C → A B C A B C A B C). The logical
-//   index wraps modulo items.length. When the transition ends
-//   past the first set boundary, we instantly (no transition)
-//   jump back to the equivalent position in the first set —
-//   invisible because the rendered cards are identical.
+//   Items tripled. When we pass the end of the middle set,
+//   we disable transition, jump back to the equivalent card
+//   in the first set, then re-enable transition.
 //
 // 3D TILT (INWARD-FACING):
-//   Cards tilt *toward* the center card — left cards rotateY
-//   positive (right edge recedes), right cards rotateY negative
-//   (left edge recedes). This creates the "book shelf" /
-//   "fan" look from the reference image. The center card is
-//   flat (0°), full scale, full brightness.
-//
-// ANIMATION:
-//   All transforms are GPU-accelerated (translate3d, rotateY,
-//   scale). Per-card depth is applied via rAF measuring each
-//   card's distance from container center every frame, so the
-//   3D effect stays perfectly synced during transitions.
+//   rAF measures each card's distance from center and applies
+//   rotateY ±35°, scale, translateZ, opacity, blur — so side
+//   cards always angle toward the center card.
 // ─────────────────────────────────────────────────────────────
 
 export interface Carousel3DItem {
@@ -38,13 +31,9 @@ export interface Carousel3DItem {
 
 interface Carousel3DProps {
   items: Carousel3DItem[];
-  /** Card width in px (default 110) */
   cardWidth?: number;
-  /** Gap between cards in px (default 14) */
   gap?: number;
-  /** Container height CSS value (default '200px') */
   height?: string;
-  /** Unique prefix for CSS classes to avoid collisions */
   id?: string;
   /** Seconds each card stays centered before stepping (default 3) */
   pauseDuration?: number;
@@ -65,62 +54,87 @@ export function Carousel3D({
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number>(0);
   const pausedRef = useRef(false);
-
-  // Step state – logical index into the items array
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isAnimating, setIsAnimating] = useState(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const indexRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   const step = cardWidth + gap;
+  const n = items.length;
 
-  // Triple the items for seamless infinite wrap
-  const loopItems = items.length > 1
-    ? [...items, ...items, ...items]
-    : items;
+  // Triple for infinite wrap
+  const loopItems = n > 1 ? [...items, ...items, ...items] : items;
 
-  // Offset: center the currentIndex-th card. We start from the
-  // second set (items.length) so we have room to wrap both ways.
-  const baseIndex = items.length + currentIndex;
-  const targetOffset = baseIndex * step;
+  // ─── Move the track to a given logical index ───
+  // animate=true  → smooth CSS transition
+  // animate=false → instant jump (for wrap-around reset)
+  const moveTo = useCallback(
+    (logicalIndex: number, animate: boolean) => {
+      const track = trackRef.current;
+      if (!track) return;
 
-  // ─── Schedule next step ───
-  const scheduleNext = useCallback(() => {
-    if (items.length <= 1) return;
-    clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      if (pausedRef.current) {
-        return;
+      // Cards start at the middle set (offset n) so we have
+      // room to wrap in both directions
+      const offset = (n + logicalIndex) * step;
+
+      if (animate) {
+        // Phase 1: apply transition
+        track.style.transition = `transform ${slideDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
+        // Force browser to commit the transition property before
+        // we change the transform (prevents batching into one frame)
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        getComputedStyle(track).transition;
+        // Phase 2: change position → browser animates
+        track.style.transform = `translate3d(${-offset}px, 0, 0)`;
+      } else {
+        // Instant jump – no transition
+        track.style.transition = 'none';
+        track.style.transform = `translate3d(${-offset}px, 0, 0)`;
       }
-      setIsAnimating(true);
-      setCurrentIndex(prev => prev + 1);
-    }, pauseDuration * 1000);
-  }, [items.length, pauseDuration]);
+    },
+    [n, step, slideDuration],
+  );
 
-  // When currentIndex changes, handle wrap-around and schedule next
-  useEffect(() => {
-    if (items.length <= 1) return;
+  // ─── Step to next card ───
+  const stepForward = useCallback(() => {
+    if (n <= 1) return;
 
-    // After transition completes, check if we need to wrap
-    const delay = isAnimating ? slideDuration * 1000 + 50 : 0;
-    const wrapTimeout = setTimeout(() => {
-      setIsAnimating(false);
-      if (currentIndex >= items.length) {
-        // Silently reset to equivalent position in first logical set
-        setCurrentIndex(prev => prev % items.length);
+    indexRef.current += 1;
+    moveTo(indexRef.current, true);
+
+    // After animation completes, wrap if needed + schedule next
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (indexRef.current >= n) {
+        // Silent reset to equivalent position in set 1
+        indexRef.current = indexRef.current % n;
+        moveTo(indexRef.current, false);
       }
+      // Schedule next step
       if (!pausedRef.current) {
         scheduleNext();
       }
-    }, delay);
+    }, slideDuration * 1000 + 50);
+  }, [n, moveTo, slideDuration]);
 
-    return () => clearTimeout(wrapTimeout);
-  }, [currentIndex, items.length, slideDuration, scheduleNext, isAnimating]);
+  // ─── Schedule the next auto-step ───
+  const scheduleNext = useCallback(() => {
+    if (n <= 1) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (!pausedRef.current) {
+        stepForward();
+      }
+    }, pauseDuration * 1000);
+  }, [n, pauseDuration, stepForward]);
 
-  // Initial schedule
+  // ─── Initial position + start auto-play ───
   useEffect(() => {
+    if (n <= 1) return;
+    // Set initial position (no animation)
+    indexRef.current = 0;
+    moveTo(0, false);
     scheduleNext();
-    return () => clearTimeout(timeoutRef.current);
-  }, [scheduleNext]);
+    return () => clearTimeout(timerRef.current);
+  }, [n, moveTo, scheduleNext]);
 
   // ─── Per-frame 3D depth update ───
   const updateDepth = useCallback(() => {
@@ -138,21 +152,17 @@ export function Carousel3D({
       const cardRect = card.getBoundingClientRect();
       const cardCenterX = cardRect.left + cardRect.width / 2;
 
-      // Normalized distance: 0 = center, ±1 = one container-width away
       const halfWidth = containerRect.width / 2;
       const dist = (cardCenterX - containerCenterX) / halfWidth;
       const absDist = Math.min(Math.abs(dist), 1.5);
 
-      // ── Cards tilt INWARD toward center ──
-      // Left cards (dist < 0): positive rotateY → right edge recedes, face turns right toward center
-      // Right cards (dist > 0): negative rotateY → left edge recedes, face turns left toward center
-      // This creates the "book shelf" / fan look from the reference image
-      const rotateY = dist * -35;                             // ±35° at edges, inward-facing
-      const scale = 1.06 - absDist * 0.16;                    // 1.06 center → ~0.82 far
-      const translateZ = 40 - absDist * 55;                   // +40px center → -15px far
-      const opacity = 1 - absDist * 0.35;                     // 1 center → 0.48 far
-      const blur = absDist * 1.4;                              // 0 center → ~2px far (subtle)
-      const brightness = 1 - absDist * 0.2;                    // subtle dimming at edges
+      // Cards tilt INWARD toward center (book-shelf / fan look)
+      const rotateY = dist * -35;
+      const scale = 1.06 - absDist * 0.16;
+      const translateZ = 40 - absDist * 55;
+      const opacity = 1 - absDist * 0.35;
+      const blur = absDist * 1.4;
+      const brightness = 1 - absDist * 0.2;
 
       card.style.transform =
         `translate3d(0, 0, ${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
@@ -164,17 +174,16 @@ export function Carousel3D({
     rafRef.current = requestAnimationFrame(updateDepth);
   }, []);
 
-  // Start rAF depth loop
   useEffect(() => {
-    if (items.length === 0) return;
+    if (n === 0) return;
     rafRef.current = requestAnimationFrame(updateDepth);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [updateDepth, items.length]);
+  }, [updateDepth, n]);
 
   // ─── Hover pause / resume ───
   const handleMouseEnter = useCallback(() => {
     pausedRef.current = true;
-    clearTimeout(timeoutRef.current);
+    clearTimeout(timerRef.current);
   }, []);
 
   const handleMouseLeave = useCallback(() => {
@@ -182,7 +191,7 @@ export function Carousel3D({
     scheduleNext();
   }, [scheduleNext]);
 
-  if (items.length === 0) {
+  if (n === 0) {
     return (
       <div
         className="w-full flex items-center justify-center text-[11px] font-bold text-white/60"
@@ -195,14 +204,10 @@ export function Carousel3D({
 
   return (
     <>
-      {/* Scoped CSS – only what Tailwind can't express */}
       <style>{`
         .${id}-wrap {
           perspective: 900px;
           perspective-origin: 50% 50%;
-        }
-        .${id}-track {
-          will-change: transform;
         }
         .${id}-card {
           transform-style: preserve-3d;
@@ -235,17 +240,13 @@ export function Carousel3D({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        {/* Track – positioned by transform, animated with CSS transition */}
         <div
           ref={trackRef}
-          className={`${id}-track flex items-stretch h-full`}
+          className="flex items-stretch h-full"
           style={{
             gap: `${gap}px`,
             paddingLeft: `calc(50% - ${cardWidth / 2}px)`,
-            transform: `translate3d(${-targetOffset}px, 0, 0)`,
-            transition: isAnimating
-              ? `transform ${slideDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`
-              : 'none',
+            willChange: 'transform',
           }}
         >
           {loopItems.map((item, index) => (
@@ -259,7 +260,6 @@ export function Carousel3D({
                 boxShadow: '0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
               }}
             >
-              {/* Glassmorphism inner glow */}
               <div
                 className="absolute inset-0 pointer-events-none rounded-xl"
                 style={{
@@ -267,7 +267,6 @@ export function Carousel3D({
                     'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 40%)',
                 }}
               />
-              {/* Shine sweep */}
               <div className="absolute inset-0 pointer-events-none z-[2] overflow-hidden rounded-xl">
                 <div
                   className="absolute inset-0"
@@ -275,11 +274,10 @@ export function Carousel3D({
                     background:
                       'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.13) 50%, transparent 65%)',
                     animation: `${id}Shine 7s ease-in-out infinite`,
-                    animationDelay: `${(index % items.length) * -1}s`,
+                    animationDelay: `${(index % n) * -1}s`,
                   }}
                 />
               </div>
-              {/* Card content */}
               <div className="relative z-[1] flex flex-col h-full">
                 {item.render()}
               </div>
