@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Gift, TrendingUp, TrendingDown, DollarSign, Zap, Flame, Target } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BonusOpeningOverlay } from './BonusOpeningOverlay';
+import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
 interface BonusHunt {
   id: string;
@@ -198,8 +199,6 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   const superBonusCount = items.filter(item => item.is_super_bonus === true).length;
   const extremeBonusCount = items.filter(item => item.is_extreme_bonus === true).length;
   const carouselItems = items;
-  const huntCarouselLoopItems = carouselItems.length > 1 ? [...carouselItems, ...carouselItems] : carouselItems;
-  const huntCarouselDuration = Math.max(16, carouselItems.length * 4);
   const scrollingItems = items.length > 4 ? [...items, ...items] : items;
 
   const currentBreakEven = (() => {
@@ -248,79 +247,6 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             opacity: 0;
             transform: translateX(100%);
           }
-        }
-        @keyframes huntCarouselSlide {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
-        }
-
-        .hunt-carousel-track {
-          animation: huntCarouselSlide var(--hunt-scroll-duration, 40s) linear infinite;
-        }
-        .hunt-carousel-track.hunt-no-scroll {
-          animation: none;
-        }
-        /* Position-synced depth cycle: each card goes right -> center -> left in sync with the track. */
-        @keyframes huntCardDepthCycle {
-          0%, 100% {
-            transform: translate3d(0, 0, 58px) rotateY(0deg) scale(1.12);
-            filter: blur(0px) saturate(1.1);
-            opacity: 1;
-          }
-          18% {
-            transform: translate3d(0, 0, 24px) rotateY(12deg) scale(0.96);
-            filter: blur(0.3px) saturate(1.02);
-            opacity: 0.92;
-          }
-          36% {
-            transform: translate3d(0, 1px, 6px) rotateY(21deg) scale(0.82);
-            filter: blur(1.1px) saturate(0.92);
-            opacity: 0.64;
-          }
-          49% {
-            transform: translate3d(0, 1px, -2px) rotateY(24deg) scale(0.76);
-            filter: blur(1.9px) saturate(0.84);
-            opacity: 0.35;
-          }
-          50.01% {
-            transform: translate3d(0, 1px, -2px) rotateY(-24deg) scale(0.76);
-            filter: blur(1.9px) saturate(0.84);
-            opacity: 0.35;
-          }
-          64% {
-            transform: translate3d(0, 1px, 6px) rotateY(-21deg) scale(0.82);
-            filter: blur(1.1px) saturate(0.92);
-            opacity: 0.64;
-          }
-          82% {
-            transform: translate3d(0, 0, 24px) rotateY(-12deg) scale(0.96);
-            filter: blur(0.3px) saturate(1.02);
-            opacity: 0.92;
-          }
-        }
-
-        @keyframes huntCardParallax {
-          0%, 100% { transform: translate3d(0, 0, 0) scale(1.12); }
-          50% { transform: translate3d(-8px, 0, 0) scale(1.16); }
-        }
-
-        @keyframes huntCardShine {
-          0%, 100% { opacity: 0.18; transform: translateX(-28%); }
-          50% { opacity: 0.34; transform: translateX(32%); }
-        }
-
-        .hunt-carousel-track,
-        .hunt-carousel-card,
-        .hunt-carousel-parallax,
-        .hunt-carousel-shine {
-          will-change: transform, opacity, filter;
-        }
-
-        .hunt-carousel-region:hover .hunt-carousel-track,
-        .hunt-carousel-region:hover .hunt-carousel-card,
-        .hunt-carousel-region:hover .hunt-carousel-parallax,
-        .hunt-carousel-region:hover .hunt-carousel-shine {
-          animation-play-state: paused;
         }
       `}</style>
 
@@ -458,112 +384,78 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             className="flex-1 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
-            <div className="hunt-carousel-region flex-shrink-0 relative h-[200px] overflow-hidden"
-              style={{
-                paddingLeft: 'calc(50% - 47.5px)',
-                maskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)',
-                WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)'
-              }}
-            >
-              {carouselItems.length > 0 ? (
-                <div
-                  className={`hunt-carousel-track flex h-full items-stretch gap-3${carouselItems.length <= 1 ? ' hunt-no-scroll' : ''}`}
-                  style={{
-                    width: 'max-content',
-                    ['--hunt-scroll-duration' as any]: `${huntCarouselDuration}s`
-                  }}
-                >
-                  {huntCarouselLoopItems.map((item, index) => {
-                    const actualIndex = carouselItems.length > 0 ? (index % carouselItems.length) : 0;
-                    // Keep per-card phase synchronized with horizontal movement for seamless infinite depth shifts.
-                    const phaseDelay = carouselItems.length > 0 ? -(actualIndex * (huntCarouselDuration / carouselItems.length)) : 0;
-                    const payment = item.payment_amount || item.bet_amount;
-                    const isOpened = item.status === 'opened';
-                    const isWin = isOpened && (item.result_amount || 0) > payment;
-
-                    return (
+            <Carousel3D
+              id="hunt-c3d"
+              height="200px"
+              cardWidth={110}
+              gap={14}
+              speed={42}
+              items={carouselItems.map((item) => {
+                const payment = item.payment_amount || item.bet_amount;
+                const isOpened = item.status === 'opened';
+                const isWin = isOpened && (item.result_amount || 0) > payment;
+                return {
+                  id: item.id,
+                  render: () => (
+                    <>
+                      {/* Blurred parallax background */}
                       <div
-                        key={`hunt-carousel-${item.id}-${index}`}
-                        className="hunt-carousel-card w-[95px] h-full flex-shrink-0 rounded-xl relative"
+                        className="absolute inset-0"
                         style={{
-                          perspective: '800px',
-                          border: item.is_super_bonus === true
-                            ? '2px solid rgba(255, 215, 0, 0.95)'
-                            : item.is_extreme_bonus === true
-                            ? '2px solid rgba(239, 68, 68, 0.95)'
-                            : '1px solid rgba(255,255,255,0.18)',
-                          boxShadow: item.is_super_bonus === true
-                            ? '0 0 20px rgba(255,215,0,0.5), 0 12px 28px rgba(0,0,0,0.62)'
-                            : item.is_extreme_bonus === true
-                            ? '0 0 20px rgba(239,68,68,0.5), 0 12px 28px rgba(0,0,0,0.62)'
-                            : '0 12px 28px rgba(0,0,0,0.62)',
-                          transformStyle: 'preserve-3d',
-                          animation: carouselItems.length > 1
-                            ? `huntCardDepthCycle ${huntCarouselDuration}s cubic-bezier(0.45, 0.05, 0.2, 1) ${phaseDelay}s infinite`
-                            : 'none'
+                          backgroundImage: `url("${item.slot_image_url || '/image.png'}")`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          filter: 'blur(10px) brightness(0.3)',
+                          transform: 'scale(1.15)',
                         }}
-                      >
-                        <div className="absolute inset-0 overflow-hidden rounded-xl flex flex-col" style={{ background: 'rgba(8,12,28,0.75)' }}>
-                          <div
-                            className="hunt-carousel-parallax absolute inset-0"
-                            style={{
-                              backgroundImage: `url("${item.slot_image_url || '/image.png'}")`,
-                              backgroundSize: 'cover',
-                              backgroundPosition: 'center',
-                              filter: 'blur(10px) brightness(0.35)',
-                              transform: 'scale(1.1)',
-                              animation: `huntCardParallax 7.2s ease-in-out ${phaseDelay}s infinite`
-                            }}
-                          />
-
-                          <div
-                            className="hunt-carousel-shine pointer-events-none absolute inset-0 z-[1]"
-                            style={{
-                              background: 'linear-gradient(112deg, transparent 28%, rgba(255,255,255,0.2) 47%, transparent 66%)',
-                              mixBlendMode: 'screen',
-                              animation: `huntCardShine 4.6s ease-in-out ${phaseDelay}s infinite`
-                            }}
-                          />
-
-                          <div className="relative z-10 flex items-center justify-between gap-1 bg-black/50 px-1.5 py-1 flex-shrink-0">
-                            <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
-                            <span className="text-[8px] font-bold text-sky-300">€{payment.toFixed(2)}</span>
-                          </div>
-
-                          <div className="relative z-10 flex-1 overflow-hidden">
-                            <img
-                              src={item.slot_image_url || '/image.png'}
-                              alt={item.slot_name}
-                              className="w-full h-full object-cover"
-                              onError={(e) => { e.currentTarget.src = '/image.png'; }}
-                            />
-                            {item.is_extreme_bonus === true && (
-                              <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">EXTREME</span>
-                            )}
-                            {item.is_super_bonus === true && (
-                              <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10">SUPER</span>
-                            )}
-                          </div>
-
-                          <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1 flex-shrink-0">
-                            <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
-                              {isOpened ? `€${(item.result_amount || 0).toFixed(0)}` : 'PENDING'}
-                            </span>
-                            <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
-                              {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${actualIndex + 1}`}
-                            </span>
-                          </div>
-                        </div>
+                      />
+                      {/* Super / Extreme neon border overlay */}
+                      {item.is_super_bonus === true && (
+                        <div className="absolute inset-0 rounded-xl pointer-events-none" style={{
+                          boxShadow: 'inset 0 0 12px rgba(255,215,0,0.4), 0 0 18px rgba(255,215,0,0.35)',
+                          border: '2px solid rgba(255, 215, 0, 0.9)',
+                        }} />
+                      )}
+                      {item.is_extreme_bonus === true && (
+                        <div className="absolute inset-0 rounded-xl pointer-events-none" style={{
+                          boxShadow: 'inset 0 0 12px rgba(239,68,68,0.4), 0 0 18px rgba(239,68,68,0.35)',
+                          border: '2px solid rgba(239, 68, 68, 0.9)',
+                        }} />
+                      )}
+                      {/* Top bar – name + bet */}
+                      <div className="relative z-10 flex items-center justify-between gap-1 bg-black/55 px-1.5 py-1 flex-shrink-0 backdrop-blur-sm">
+                        <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
+                        <span className="text-[8px] font-bold text-sky-300 whitespace-nowrap">€{payment.toFixed(2)}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-white/60">
-                  No bonuses yet
-                </div>
-              )}
-            </div>
+                      {/* Slot image */}
+                      <div className="relative z-10 flex-1 overflow-hidden">
+                        <img
+                          src={item.slot_image_url || '/image.png'}
+                          alt={item.slot_name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.src = '/image.png'; }}
+                        />
+                        {item.is_extreme_bonus === true && (
+                          <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">EXTREME</span>
+                        )}
+                        {item.is_super_bonus === true && (
+                          <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">SUPER</span>
+                        )}
+                      </div>
+                      {/* Bottom bar – payout / index */}
+                      <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1 flex-shrink-0 backdrop-blur-sm">
+                        <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
+                          {isOpened ? `€${(item.result_amount || 0).toFixed(0)}` : 'PENDING'}
+                        </span>
+                        <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
+                          {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${(carouselItems.indexOf(item) + 1)}`}
+                        </span>
+                      </div>
+                    </>
+                  ),
+                } as Carousel3DItem;
+              })}
+            />
 
             <div className="flex items-center gap-2 mb-2 px-4 pt-1 flex-shrink-0">
               <div className="w-1 h-5 rounded-full" style={{ backgroundColor: '#fbbf24' }}></div>
