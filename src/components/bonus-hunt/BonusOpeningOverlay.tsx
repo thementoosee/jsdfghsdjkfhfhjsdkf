@@ -623,7 +623,8 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
               height="200px"
               cardWidth={110}
               gap={14}
-              speed={42}
+              pauseDuration={3}
+              slideDuration={0.8}
               items={carouselItems.map((item) => {
                 const payment = item.payment;
                 const isOpened = item.status === 'opened';

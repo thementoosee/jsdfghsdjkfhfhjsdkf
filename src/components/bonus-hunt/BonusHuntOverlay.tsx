@@ -389,7 +389,8 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
               height="200px"
               cardWidth={110}
               gap={14}
-              speed={42}
+              pauseDuration={3}
+              slideDuration={0.8}
               items={carouselItems.map((item) => {
                 const payment = item.payment_amount || item.bet_amount;
                 const isOpened = item.status === 'opened';
