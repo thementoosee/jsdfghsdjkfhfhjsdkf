@@ -428,12 +428,15 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
           }
         }
         @keyframes openingCarouselSlide {
-          from {
-            transform: translate3d(0, 0, 0);
-          }
-          to {
-            transform: translate3d(-50%, 0, 0);
-          }
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+
+        .opening-carousel-track {
+          animation: openingCarouselSlide var(--opening-scroll-duration, 40s) linear infinite;
+        }
+        .opening-carousel-track.opening-no-scroll {
+          animation: none;
         }
         /* Position-synced depth cycle: cards pass right -> center -> left with smooth depth shifts. */
         @keyframes openingCardDepthCycle {
@@ -691,7 +694,6 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
           >
             <div className="opening-carousel-region flex-shrink-0 relative h-[200px] overflow-hidden"
               style={{
-                perspective: '800px',
                 paddingLeft: 'calc(50% - 47.5px)',
                 maskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)',
                 WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)'
@@ -699,12 +701,10 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
             >
               {carouselItems.length > 0 ? (
                 <div
-                  className="opening-carousel-track flex h-full items-stretch gap-3"
+                  className={`opening-carousel-track flex h-full items-stretch gap-3${carouselItems.length <= 1 ? ' opening-no-scroll' : ''}`}
                   style={{
                     width: 'max-content',
-                    animation: carouselItems.length > 1
-                      ? `openingCarouselSlide ${openingCarouselDuration}s linear infinite`
-                      : 'none'
+                    ['--opening-scroll-duration' as any]: `${openingCarouselDuration}s`
                   }}
                 >
                   {openingCarouselLoopItems.map((item, index) => {
@@ -720,6 +720,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
                         key={`carousel-${item.id}-${index}`}
                         className="opening-carousel-card w-[95px] h-full flex-shrink-0 rounded-xl relative"
                         style={{
+                          perspective: '800px',
                           border: item.super_bonus === true
                             ? '2px solid rgba(255, 215, 0, 0.95)'
                             : item.super_bonus === false

@@ -250,12 +250,15 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
           }
         }
         @keyframes huntCarouselSlide {
-          from {
-            transform: translate3d(0, 0, 0);
-          }
-          to {
-            transform: translate3d(-50%, 0, 0);
-          }
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-50%); }
+        }
+
+        .hunt-carousel-track {
+          animation: huntCarouselSlide var(--hunt-scroll-duration, 40s) linear infinite;
+        }
+        .hunt-carousel-track.hunt-no-scroll {
+          animation: none;
         }
         /* Position-synced depth cycle: each card goes right -> center -> left in sync with the track. */
         @keyframes huntCardDepthCycle {
@@ -457,7 +460,6 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
           >
             <div className="hunt-carousel-region flex-shrink-0 relative h-[200px] overflow-hidden"
               style={{
-                perspective: '800px',
                 paddingLeft: 'calc(50% - 47.5px)',
                 maskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)',
                 WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 8%, black 92%, transparent 100%)'
@@ -465,12 +467,10 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             >
               {carouselItems.length > 0 ? (
                 <div
-                  className="hunt-carousel-track flex h-full items-stretch gap-3"
+                  className={`hunt-carousel-track flex h-full items-stretch gap-3${carouselItems.length <= 1 ? ' hunt-no-scroll' : ''}`}
                   style={{
                     width: 'max-content',
-                    animation: carouselItems.length > 1
-                      ? `huntCarouselSlide ${huntCarouselDuration}s linear infinite`
-                      : 'none'
+                    ['--hunt-scroll-duration' as any]: `${huntCarouselDuration}s`
                   }}
                 >
                   {huntCarouselLoopItems.map((item, index) => {
@@ -486,6 +486,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                         key={`hunt-carousel-${item.id}-${index}`}
                         className="hunt-carousel-card w-[95px] h-full flex-shrink-0 rounded-xl relative"
                         style={{
+                          perspective: '800px',
                           border: item.is_super_bonus === true
                             ? '2px solid rgba(255, 215, 0, 0.95)'
                             : item.is_extreme_bonus === true
