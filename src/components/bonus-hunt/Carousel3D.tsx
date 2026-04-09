@@ -1,27 +1,21 @@
 import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 
 // ─────────────────────────────────────────────────────────────
-// Carousel3D – Premium casino-style 3D step carousel
+// Carousel3D – Step-by-step conveyor carousel
 // ─────────────────────────────────────────────────────────────
 //
-// STEP MOTION (direct DOM – bypasses React batching):
-//   The track position is controlled entirely via refs and
-//   direct style mutation so that:
-//     1. transition property is set on the DOM element
-//     2. browser paints it (forced via getComputedStyle)
-//     3. transform is updated → CSS transition animates smoothly
-//   This two-phase approach guarantees the browser sees the
-//   transition before the position changes.
+// Cards slide left one position at a time with a smooth CSS
+// transition, then pause so viewers can read. When the last
+// card scrolls off the left edge, the track silently (no
+// transition) wraps back to the equivalent card in a cloned
+// set — the reset is invisible because all three sets are
+// identical.
 //
-// INFINITE LOOP:
-//   Items tripled. When we pass the end of the middle set,
-//   we disable transition, jump back to the equivalent card
-//   in the first set, then re-enable transition.
-//
-// 3D TILT (INWARD-FACING):
-//   rAF measures each card's distance from center and applies
-//   rotateY ±35°, scale, translateZ, opacity, blur — so side
-//   cards always angle toward the center card.
+// The wrap-around uses the "double rAF" trick: disable
+// transition → set position → wait two animation frames →
+// then schedule the next animated step. This guarantees the
+// browser has painted the no-transition state before any
+// new transition is applied.
 // ─────────────────────────────────────────────────────────────
 
 export interface Carousel3DItem {
@@ -56,6 +50,8 @@ export function Carousel3D({
   const pausedRef = useRef(false);
   const indexRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const wrapRafRef = useRef<number>(0);
+  const busyRef = useRef(false);          // prevents overlapping steps
 
   const step = cardWidth + gap;
   const n = items.length;
@@ -63,78 +59,96 @@ export function Carousel3D({
   // Triple for infinite wrap
   const loopItems = n > 1 ? [...items, ...items, ...items] : items;
 
-  // ─── Move the track to a given logical index ───
-  // animate=true  → smooth CSS transition
-  // animate=false → instant jump (for wrap-around reset)
-  const moveTo = useCallback(
-    (logicalIndex: number, animate: boolean) => {
-      const track = trackRef.current;
-      if (!track) return;
-
-      // Cards start at the middle set (offset n) so we have
-      // room to wrap in both directions
-      const offset = (n + logicalIndex) * step;
-
-      if (animate) {
-        // Phase 1: apply transition
-        track.style.transition = `transform ${slideDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
-        // Force browser to commit the transition property before
-        // we change the transform (prevents batching into one frame)
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        getComputedStyle(track).transition;
-        // Phase 2: change position → browser animates
-        track.style.transform = `translate3d(${-offset}px, 0, 0)`;
-      } else {
-        // Instant jump – no transition
-        track.style.transition = 'none';
-        track.style.transform = `translate3d(${-offset}px, 0, 0)`;
-      }
-    },
-    [n, step, slideDuration],
+  // ─── Compute the px offset for a logical index ───
+  const offsetFor = useCallback(
+    (logicalIndex: number) => (n + logicalIndex) * step,
+    [n, step],
   );
 
-  // ─── Step to next card ───
-  const stepForward = useCallback(() => {
-    if (n <= 1) return;
+  // ─── Perform one animated step to the next card ───
+  const doStep = useCallback(() => {
+    const track = trackRef.current;
+    if (!track || n <= 1 || busyRef.current) return;
 
+    busyRef.current = true;
     indexRef.current += 1;
-    moveTo(indexRef.current, true);
+    const offset = offsetFor(indexRef.current);
 
-    // After animation completes, wrap if needed + schedule next
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      if (indexRef.current >= n) {
-        // Silent reset to equivalent position in set 1
-        indexRef.current = indexRef.current % n;
-        moveTo(indexRef.current, false);
-      }
-      // Schedule next step
-      if (!pausedRef.current) {
-        scheduleNext();
-      }
-    }, slideDuration * 1000 + 50);
-  }, [n, moveTo, slideDuration]);
+    // 1. Apply transition on the element
+    track.style.transition =
+      `transform ${slideDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
 
-  // ─── Schedule the next auto-step ───
+    // 2. Wait one frame so the browser commits the transition rule,
+    //    then change the transform → triggers smooth animation.
+    wrapRafRef.current = requestAnimationFrame(() => {
+      track.style.transform = `translate3d(${-offset}px, 0, 0)`;
+
+      // 3. After the animation finishes, handle wrap + schedule next
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => {
+        if (indexRef.current >= n) {
+          // ── Invisible wrap-around ──
+          indexRef.current = indexRef.current % n;
+          const resetOffset = offsetFor(indexRef.current);
+
+          // Disable transition, jump to equivalent spot
+          track.style.transition = 'none';
+          track.style.transform = `translate3d(${-resetOffset}px, 0, 0)`;
+
+          // Double-rAF: wait for TWO frames so the browser has
+          // painted the no-transition state before we continue
+          wrapRafRef.current = requestAnimationFrame(() => {
+            wrapRafRef.current = requestAnimationFrame(() => {
+              busyRef.current = false;
+              if (!pausedRef.current) {
+                scheduleNext();
+              }
+            });
+          });
+        } else {
+          busyRef.current = false;
+          if (!pausedRef.current) {
+            scheduleNext();
+          }
+        }
+      }, slideDuration * 1000 + 60);
+    });
+  }, [n, offsetFor, slideDuration]);
+
+  // ─── Schedule the next auto-step after pauseDuration ───
   const scheduleNext = useCallback(() => {
     if (n <= 1) return;
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
       if (!pausedRef.current) {
-        stepForward();
+        doStep();
       }
     }, pauseDuration * 1000);
-  }, [n, pauseDuration, stepForward]);
+  }, [n, pauseDuration, doStep]);
 
   // ─── Initial position + start auto-play ───
   useEffect(() => {
-    if (n <= 1) return;
-    // Set initial position (no animation)
+    const track = trackRef.current;
+    if (!track || n <= 1) return;
+
     indexRef.current = 0;
-    moveTo(0, false);
-    scheduleNext();
-    return () => clearTimeout(timerRef.current);
-  }, [n, moveTo, scheduleNext]);
+    track.style.transition = 'none';
+    track.style.transform = `translate3d(${-offsetFor(0)}px, 0, 0)`;
+
+    // Wait for the browser to paint the initial position,
+    // then start the cycle
+    const raf1 = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scheduleNext();
+      });
+    });
+
+    return () => {
+      clearTimeout(timerRef.current);
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(wrapRafRef.current);
+    };
+  }, [n, offsetFor, scheduleNext]);
 
   // ─── Per-frame 3D depth update ───
   const updateDepth = useCallback(() => {
