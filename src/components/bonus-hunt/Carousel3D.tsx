@@ -1,21 +1,20 @@
 import { useRef, useEffect, useCallback, type ReactNode } from 'react';
 
 // ─────────────────────────────────────────────────────────────
-// Carousel3D – Step-by-step conveyor carousel
+// Carousel3D – Smooth step-by-step conveyor carousel
 // ─────────────────────────────────────────────────────────────
 //
-// Cards slide left one position at a time with a smooth CSS
-// transition, then pause so viewers can read. When the last
-// card scrolls off the left edge, the track silently (no
-// transition) wraps back to the equivalent card in a cloned
-// set — the reset is invisible because all three sets are
-// identical.
+// The WHOLE track (all cards together) slides left via a CSS
+// transition on the track's transform. Individual cards never
+// change position — they ride with the track. The 3D depth
+// effects (tilt, scale, opacity) are applied to a WRAPPER div
+// around each card so they don't interfere with the track's
+// sliding transform.
 //
-// The wrap-around uses the "double rAF" trick: disable
-// transition → set position → wait two animation frames →
-// then schedule the next animated step. This guarantees the
-// browser has painted the no-transition state before any
-// new transition is applied.
+// Reflow is forced with `void track.offsetHeight` (synchronous
+// layout flush) — the most reliable cross-browser method to
+// guarantee the browser commits one style change before seeing
+// the next. The `transitionend` event detects completion.
 // ─────────────────────────────────────────────────────────────
 
 export interface Carousel3DItem {
@@ -29,9 +28,7 @@ interface Carousel3DProps {
   gap?: number;
   height?: string;
   id?: string;
-  /** Seconds each card stays centered before stepping (default 3) */
   pauseDuration?: number;
-  /** Seconds for the slide transition between cards (default 0.8) */
   slideDuration?: number;
 }
 
@@ -46,131 +43,122 @@ export function Carousel3D({
 }: Carousel3DProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
+  const depthRafRef = useRef<number>(0);
   const pausedRef = useRef(false);
   const indexRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
-  const wrapRafRef = useRef<number>(0);
-  const busyRef = useRef(false);          // prevents overlapping steps
+  const aliveRef = useRef(true);
 
   const step = cardWidth + gap;
   const n = items.length;
-
-  // Triple for infinite wrap
   const loopItems = n > 1 ? [...items, ...items, ...items] : items;
 
-  // ─── Compute the px offset for a logical index ───
+  // ─── px offset for a logical index (middle set starts at n) ───
   const offsetFor = useCallback(
-    (logicalIndex: number) => (n + logicalIndex) * step,
+    (idx: number) => (n + idx) * step,
     [n, step],
   );
 
-  // ─── Perform one animated step to the next card ───
+  // ─── Schedule the next step after a pause ───
+  const scheduleNext = useCallback(() => {
+    if (n <= 1 || !aliveRef.current) return;
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      if (pausedRef.current || !aliveRef.current) return;
+      doStep();
+    }, pauseDuration * 1000);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, pauseDuration]);
+
+  // ─── Perform one animated step ───
   const doStep = useCallback(() => {
     const track = trackRef.current;
-    if (!track || n <= 1 || busyRef.current) return;
+    if (!track || n <= 1 || !aliveRef.current) return;
 
-    busyRef.current = true;
     indexRef.current += 1;
     const offset = offsetFor(indexRef.current);
 
-    // 1. Apply transition on the element
+    // One-shot transitionend listener — fires when the slide finishes
+    const onEnd = (e: TransitionEvent) => {
+      if (e.propertyName !== 'transform') return;
+      track.removeEventListener('transitionend', onEnd);
+
+      if (!aliveRef.current) return;
+
+      // Wrap around if we've gone past the original set
+      if (indexRef.current >= n) {
+        indexRef.current = indexRef.current % n;
+        const resetOffset = offsetFor(indexRef.current);
+
+        // Instant jump — no transition
+        track.style.transition = 'none';
+        track.style.transform = `translate3d(${-resetOffset}px, 0, 0)`;
+        // Force synchronous reflow so the browser actually paints
+        // the jump BEFORE any future transition is applied
+        void track.offsetHeight;
+      }
+
+      if (!pausedRef.current) {
+        scheduleNext();
+      }
+    };
+
+    track.addEventListener('transitionend', onEnd);
+
+    // Step 1: Set the transition rule (no transform change yet)
     track.style.transition =
       `transform ${slideDuration}s cubic-bezier(0.25, 0.1, 0.25, 1)`;
 
-    // 2. Wait one frame so the browser commits the transition rule,
-    //    then change the transform → triggers smooth animation.
-    wrapRafRef.current = requestAnimationFrame(() => {
-      track.style.transform = `translate3d(${-offset}px, 0, 0)`;
+    // Force the browser to commit the transition property
+    void track.offsetHeight;
 
-      // 3. After the animation finishes, handle wrap + schedule next
-      clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => {
-        if (indexRef.current >= n) {
-          // ── Invisible wrap-around ──
-          indexRef.current = indexRef.current % n;
-          const resetOffset = offsetFor(indexRef.current);
+    // Step 2: NOW change the transform → browser animates smoothly
+    track.style.transform = `translate3d(${-offset}px, 0, 0)`;
+  }, [n, offsetFor, slideDuration, scheduleNext]);
 
-          // Disable transition, jump to equivalent spot
-          track.style.transition = 'none';
-          track.style.transform = `translate3d(${-resetOffset}px, 0, 0)`;
-
-          // Double-rAF: wait for TWO frames so the browser has
-          // painted the no-transition state before we continue
-          wrapRafRef.current = requestAnimationFrame(() => {
-            wrapRafRef.current = requestAnimationFrame(() => {
-              busyRef.current = false;
-              if (!pausedRef.current) {
-                scheduleNext();
-              }
-            });
-          });
-        } else {
-          busyRef.current = false;
-          if (!pausedRef.current) {
-            scheduleNext();
-          }
-        }
-      }, slideDuration * 1000 + 60);
-    });
-  }, [n, offsetFor, slideDuration]);
-
-  // ─── Schedule the next auto-step after pauseDuration ───
-  const scheduleNext = useCallback(() => {
-    if (n <= 1) return;
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      if (!pausedRef.current) {
-        doStep();
-      }
-    }, pauseDuration * 1000);
-  }, [n, pauseDuration, doStep]);
-
-  // ─── Initial position + start auto-play ───
+  // ─── Mount: set initial position + start ───
   useEffect(() => {
     const track = trackRef.current;
     if (!track || n <= 1) return;
 
+    aliveRef.current = true;
     indexRef.current = 0;
+
+    // Set initial position without transition
     track.style.transition = 'none';
     track.style.transform = `translate3d(${-offsetFor(0)}px, 0, 0)`;
+    void track.offsetHeight;
 
-    // Wait for the browser to paint the initial position,
-    // then start the cycle
-    const raf1 = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        scheduleNext();
-      });
-    });
+    scheduleNext();
 
     return () => {
+      aliveRef.current = false;
       clearTimeout(timerRef.current);
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(wrapRafRef.current);
     };
   }, [n, offsetFor, scheduleNext]);
 
-  // ─── Per-frame 3D depth update ───
+  // ─── Per-frame 3D depth on wrapper divs ───
   const updateDepth = useCallback(() => {
-    if (!trackRef.current || !containerRef.current) {
-      rafRef.current = requestAnimationFrame(updateDepth);
+    const track = trackRef.current;
+    const container = containerRef.current;
+    if (!track || !container) {
+      depthRafRef.current = requestAnimationFrame(updateDepth);
       return;
     }
 
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const containerCenterX = containerRect.left + containerRect.width / 2;
-    const cards = trackRef.current.children;
+    const cRect = container.getBoundingClientRect();
+    const cx = cRect.left + cRect.width / 2;
+    const hw = cRect.width / 2;
 
-    for (let i = 0; i < cards.length; i++) {
-      const card = cards[i] as HTMLElement;
-      const cardRect = card.getBoundingClientRect();
-      const cardCenterX = cardRect.left + cardRect.width / 2;
+    // Each child of the track is a depth-wrapper div that contains the card
+    for (let i = 0; i < track.children.length; i++) {
+      const wrapper = track.children[i] as HTMLElement;
+      const wRect = wrapper.getBoundingClientRect();
+      const wcx = wRect.left + wRect.width / 2;
 
-      const halfWidth = containerRect.width / 2;
-      const dist = (cardCenterX - containerCenterX) / halfWidth;
+      const dist = (wcx - cx) / hw;
       const absDist = Math.min(Math.abs(dist), 1.5);
 
-      // Cards tilt INWARD toward center (book-shelf / fan look)
       const rotateY = dist * -35;
       const scale = 1.06 - absDist * 0.16;
       const translateZ = 40 - absDist * 55;
@@ -178,20 +166,20 @@ export function Carousel3D({
       const blur = absDist * 1.4;
       const brightness = 1 - absDist * 0.2;
 
-      card.style.transform =
-        `translate3d(0, 0, ${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
-      card.style.opacity = `${Math.max(0.25, opacity)}`;
-      card.style.filter =
+      wrapper.style.transform =
+        `translate3d(0,0,${translateZ}px) rotateY(${rotateY}deg) scale(${scale})`;
+      wrapper.style.opacity = `${Math.max(0.25, opacity)}`;
+      wrapper.style.filter =
         `blur(${blur}px) brightness(${brightness}) saturate(${1.05 - absDist * 0.1})`;
     }
 
-    rafRef.current = requestAnimationFrame(updateDepth);
+    depthRafRef.current = requestAnimationFrame(updateDepth);
   }, []);
 
   useEffect(() => {
     if (n === 0) return;
-    rafRef.current = requestAnimationFrame(updateDepth);
-    return () => cancelAnimationFrame(rafRef.current);
+    depthRafRef.current = requestAnimationFrame(updateDepth);
+    return () => cancelAnimationFrame(depthRafRef.current);
   }, [updateDepth, n]);
 
   // ─── Hover pause / resume ───
@@ -199,7 +187,6 @@ export function Carousel3D({
     pausedRef.current = true;
     clearTimeout(timerRef.current);
   }, []);
-
   const handleMouseLeave = useCallback(() => {
     pausedRef.current = false;
     scheduleNext();
@@ -223,10 +210,12 @@ export function Carousel3D({
           perspective: 900px;
           perspective-origin: 50% 50%;
         }
-        .${id}-card {
+        .${id}-depth {
           transform-style: preserve-3d;
           will-change: transform, opacity, filter;
           backface-visibility: hidden;
+        }
+        .${id}-card {
           transition: box-shadow 0.3s ease;
         }
         .${id}-card:hover {
@@ -254,6 +243,7 @@ export function Carousel3D({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Track – the ONLY element that slides via CSS transition */}
         <div
           ref={trackRef}
           className="flex items-stretch h-full"
@@ -264,36 +254,44 @@ export function Carousel3D({
           }}
         >
           {loopItems.map((item, index) => (
+            /* Depth wrapper — 3D tilt/scale/opacity applied here by rAF.
+               This div does NOT have its own transition, so the rAF
+               updates don't fight the track's slide transition. */
             <div
               key={`${id}-${item.id}-${index}`}
-              className={`${id}-card flex-shrink-0 rounded-xl relative overflow-hidden`}
-              style={{
-                width: `${cardWidth}px`,
-                background: 'rgba(8, 12, 28, 0.8)',
-                border: '1px solid rgba(255,255,255,0.12)',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
-              }}
+              className={`${id}-depth flex-shrink-0`}
+              style={{ width: `${cardWidth}px` }}
             >
               <div
-                className="absolute inset-0 pointer-events-none rounded-xl"
+                className={`${id}-card w-full h-full rounded-xl relative overflow-hidden`}
                 style={{
-                  background:
-                    'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 40%)',
+                  background: 'rgba(8, 12, 28, 0.8)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  boxShadow:
+                    '0 8px 32px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.06)',
                 }}
-              />
-              <div className="absolute inset-0 pointer-events-none z-[2] overflow-hidden rounded-xl">
+              >
                 <div
-                  className="absolute inset-0"
+                  className="absolute inset-0 pointer-events-none rounded-xl"
                   style={{
                     background:
-                      'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.13) 50%, transparent 65%)',
-                    animation: `${id}Shine 7s ease-in-out infinite`,
-                    animationDelay: `${(index % n) * -1}s`,
+                      'linear-gradient(160deg, rgba(255,255,255,0.06) 0%, transparent 40%)',
                   }}
                 />
-              </div>
-              <div className="relative z-[1] flex flex-col h-full">
-                {item.render()}
+                <div className="absolute inset-0 pointer-events-none z-[2] overflow-hidden rounded-xl">
+                  <div
+                    className="absolute inset-0"
+                    style={{
+                      background:
+                        'linear-gradient(105deg, transparent 35%, rgba(255,255,255,0.13) 50%, transparent 65%)',
+                      animation: `${id}Shine 7s ease-in-out infinite`,
+                      animationDelay: `${(index % n) * -1}s`,
+                    }}
+                  />
+                </div>
+                <div className="relative z-[1] flex flex-col h-full">
+                  {item.render()}
+                </div>
               </div>
             </div>
           ))}
