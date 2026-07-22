@@ -19,7 +19,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
   const [overlay, setOverlay] = useState<Overlay | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rawWager, setRawWager] = useState<'raw' | 'wager'>('raw');
+  const [, setRawWager] = useState<'raw' | 'wager'>('raw');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [cryptoPrices, setCryptoPrices] = useState({
     BTC: '...',
@@ -33,12 +33,12 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
   });
   const [currentSocial, setCurrentSocial] = useState(0);
   const [cryptoOffset, setCryptoOffset] = useState(0);
-  const [nowActivity, setNowActivity] = useState('Playing Casino');
-  const [nextActivity, setNextActivity] = useState('Opening Cases');
-  const [showNowNext, setShowNowNext] = useState<'now' | 'next'>('now');
+  const [, setNowActivity] = useState('Playing Casino');
+  const [, setNextActivity] = useState('Opening Cases');
+  const [, setShowNowNext] = useState<'now' | 'next'>('now');
   const [brandLogo, setBrandLogo] = useState('');
   const [activeBrandLogo, setActiveBrandLogo] = useState('');
-  const [logoFit, setLogoFit] = useState<'contain' | 'cover'>('contain');
+  const [, setLogoFit] = useState<'contain' | 'cover'>('contain');
   const [logoScale, setLogoScale] = useState(0.8);
   const [casinoLogoScale, setCasinoLogoScale] = useState(1);
   const [showWagerText, setShowWagerText] = useState(false);
@@ -68,19 +68,19 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
           if (payload.eventType === 'UPDATE' && payload.new.id === overlayId) {
             const updated = payload.new as Overlay;
             setOverlay(updated);
-            if (updated.config?.streamMode) {
+            if (updated.config?.streamMode === 'raw' || updated.config?.streamMode === 'wager') {
               setRawWager(updated.config.streamMode);
             }
             if (typeof updated.config?.nowText === 'string') {
               setNowActivity(updated.config.nowText);
             }
-            if (updated.config?.nextText) {
+            if (typeof updated.config?.nextText === 'string') {
               setNextActivity(updated.config.nextText);
             }
-            if (updated.config?.brandLogo) {
+            if (typeof updated.config?.brandLogo === 'string') {
               setBrandLogo(updated.config.brandLogo);
             }
-            if (updated.config?.logoFit) {
+            if (updated.config?.logoFit === 'contain' || updated.config?.logoFit === 'cover') {
               setLogoFit(updated.config.logoFit);
             }
             if (typeof updated.config?.logoScale === 'number') {
@@ -90,7 +90,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
               setCasinoLogoScale(updated.config.casinoLogoScale);
             }
 
-            loadActiveBrandLogo(updated.config?.nowText);
+            loadActiveBrandLogo(typeof updated.config?.nowText === 'string' ? updated.config.nowText : undefined);
           } else if (payload.eventType === 'UPDATE') {
             loadOverlay();
           }
@@ -307,7 +307,9 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
     );
   }
 
-  if (!overlay.is_active && overlay.type !== 'main_stream') {
+  // main_stream/bar/chat are layout chrome: always render when their URL is opened.
+  // Content overlays (hunt/chill/etc.) still respect is_active when used as standalone OBS sources.
+  if (!overlay.is_active && !['main_stream', 'bar', 'chat'].includes(overlay.type)) {
     return (
       <div className="min-h-screen bg-transparent"></div>
     );
@@ -381,9 +383,9 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
       case 'main_stream':
         return <MainStreamOverlay />;
 
-      case 'bar':
-        const currentMode = overlay.config?.streamMode || 'Opening';
-        const rawWagerType = overlay.config?.nextText || 'Raw';
+      case 'bar': {
+        const currentMode = (overlay.config?.streamMode as string) || 'Opening';
+        const rawWagerType = (overlay.config?.nextText as string) || 'Raw';
 
         return (
           <div className="w-[1920px] h-[1080px] relative">
@@ -615,6 +617,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
             </div>
           </div>
         );
+      }
 
       default:
         return (

@@ -44,7 +44,7 @@ interface ChillSessionOverlayProps {
   frozen?: boolean;
 }
 
-export function ChillSessionOverlay({ sessionId, embedded = false, frozen = false }: ChillSessionOverlayProps = {}) {
+export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, frozen = false }: ChillSessionOverlayProps = {}) {
   const [session, setSession] = useState<ChillSession | null>(null);
   const [brandLogo, setBrandLogo] = useState<BrandLogo | null>(null);
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
@@ -233,71 +233,12 @@ export function ChillSessionOverlay({ sessionId, embedded = false, frozen = fals
     }
   };
 
-  const renderPlaceholderOverlay = () => {
-    return (
-      <div className={`${embedded ? 'w-full h-full' : 'w-screen h-screen'} bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 flex items-center justify-center relative overflow-hidden`}>
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)',
-            backgroundSize: '40px 40px'
-          }} />
-        </div>
-
-        <div className="relative z-10 text-center space-y-8">
-          <div className="w-32 h-32 mx-auto bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-2xl flex items-center justify-center border-2 border-blue-400/30 backdrop-blur-sm">
-            <Zap className="w-16 h-16 text-blue-400" />
-          </div>
-
-          <div className="space-y-3">
-            <h1 className="text-5xl font-black text-white uppercase tracking-wider">
-              Modo Chill
-            </h1>
-            <p className="text-2xl text-blue-300 font-semibold">
-              Aguardando sessão...
-            </p>
-          </div>
-
-          <div className="flex items-center justify-center gap-8 pt-8">
-            <div className="text-center">
-              <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">Slots Jogados</div>
-              <div className="text-4xl font-bold text-white">-</div>
-            </div>
-            <div className="w-px h-16 bg-gradient-to-b from-transparent via-blue-400/50 to-transparent" />
-            <div className="text-center">
-              <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">Melhor Multi</div>
-              <div className="text-4xl font-bold text-white">-</div>
-            </div>
-            <div className="w-px h-16 bg-gradient-to-b from-transparent via-blue-400/50 to-transparent" />
-            <div className="text-center">
-              <div className="text-gray-400 text-sm uppercase tracking-widest mb-2">Maior Win</div>
-              <div className="text-4xl font-bold text-white">-</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="absolute bottom-8 left-0 right-0 text-center">
-          <div className="text-blue-300/50 text-sm uppercase tracking-wider animate-pulse">
-            Inicie uma sessão para começar
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const hasSession = !!session;
 
   const slotImageUrl = slotInfo?.image_url || '';
   const maxWin = slotInfo?.max_win ? `${slotInfo.max_win.toFixed(0)}x` : '10000x';
   const rtp = slotInfo?.rtp ? `${slotInfo.rtp.toFixed(2)}%` : '96.00%';
   const volatility = slotInfo?.volatility || 'Medium';
-
-  const getElapsedTime = () => {
-    if (!session) return '0m';
-    const start = new Date(session.started_at);
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - start.getTime()) / 1000 / 60);
-    return `${diff}m`;
-  };
 
   return (
     <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>

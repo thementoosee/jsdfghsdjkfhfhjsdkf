@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Star, TrendingUp, DollarSign, Zap, Calendar, Award, Edit2, Trash2, Save, X } from 'lucide-react';
+import { Plus, Search, Star, TrendingUp, DollarSign, Zap, Award, Edit2, Trash2, Save, X } from 'lucide-react';
 
 interface Slot {
   id: string;
@@ -61,6 +61,9 @@ export function SlotDatabase() {
     max_win: 0,
     volatility: 'Medium',
     rtp: 96.0,
+    min_bet: 0.2,
+    max_bet: 100,
+    theme: '',
     release_date: '',
     features: [] as string[]
   });
@@ -273,9 +276,10 @@ export function SlotDatabase() {
       const maxWinIdx = headers.indexOf('Max Win');
       const volatilityIdx = headers.indexOf('Volatility');
       const rtpIdx = headers.indexOf('RTP');
-      const minBetIdx = headers.indexOf('Min Bet');
-      const maxBetIdx = headers.indexOf('Max Bet');
-      const themeIdx = headers.indexOf('Theme');
+      const _minBetIdx = headers.indexOf('Min Bet');
+      const _maxBetIdx = headers.indexOf('Max Bet');
+      const _themeIdx = headers.indexOf('Theme');
+      void _minBetIdx; void _maxBetIdx; void _themeIdx;
 
       let imported = 0;
       let skipped = 0;
@@ -344,6 +348,8 @@ export function SlotDatabase() {
   const fetchAllRows = async (table: string, selectColumns: string) => {
     const pageSize = 1000;
     let from = 0;
+    // CSV import rows are loosely typed from dynamic headers
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let allRows: any[] = [];
 
     while (true) {

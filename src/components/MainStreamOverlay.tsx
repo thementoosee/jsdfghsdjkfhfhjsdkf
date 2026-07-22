@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
-import { GiveawayOverlay } from './GiveawayOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
 import { FeverChampionsOverlay } from './FeverChampionsOverlay';
@@ -42,19 +41,23 @@ export function MainStreamOverlay() {
   }, []);
 
   const initializeOverlays = async () => {
-    const { data: barData } = await supabase
+    const { data: barRows, error: barError } = await supabase
       .from('overlays')
       .select('*')
       .eq('type', 'bar')
-      .maybeSingle();
-    if (barData) setBarOverlayId(barData.id);
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (barError) console.error('[Main Init] Error loading bar overlay:', barError);
+    if (barRows?.[0]) setBarOverlayId(barRows[0].id);
 
-    const { data: chatData } = await supabase
+    const { data: chatRows, error: chatError } = await supabase
       .from('overlays')
       .select('*')
       .eq('type', 'chat')
-      .maybeSingle();
-    if (chatData) setChatOverlayId(chatData.id);
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (chatError) console.error('[Main Init] Error loading chat overlay:', chatError);
+    if (chatRows?.[0]) setChatOverlayId(chatRows[0].id);
 
     const { data: activeOpening } = await supabase
       .from('bonus_openings')
@@ -137,7 +140,7 @@ export function MainStreamOverlay() {
   const subscribeToChanges = () => {
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const handleChange = async (payload?: any) => {
+    const handleChange = async (payload?: { table?: string }) => {
       console.log(`[Main] 🔄 ${payload?.table} changed`, payload);
 
       if (debounceTimer) clearTimeout(debounceTimer);

@@ -121,17 +121,6 @@ export function FeverBracketOverlay() {
     }
   };
 
-  const calculatePoints = (result1?: number, result2?: number): number => {
-    const r1 = result1 || 0;
-    const r2 = result2 || 0;
-    const avg = (r1 + r2) / 2;
-
-    if (avg >= 100) return 3;
-    if (avg >= 50) return 2;
-    if (avg >= 26) return 1;
-    return 0;
-  };
-
   const formatTournamentName = (tournament: Tournament) => {
     const date = new Date(tournament.created_at);
     const day = String(date.getDate()).padStart(2, '0');

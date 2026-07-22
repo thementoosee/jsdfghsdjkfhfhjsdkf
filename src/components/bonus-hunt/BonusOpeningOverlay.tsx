@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Gift, TrendingUp, TrendingDown, Target, BarChart3, DollarSign, Zap, Flame } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Gift, TrendingUp, Target, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
@@ -42,7 +42,7 @@ interface BonusOpeningOverlayProps {
   embedded?: boolean;
 }
 
-export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: BonusOpeningOverlayProps = {}) {
+export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayProps = {}) {
   const [opening, setOpening] = useState<BonusOpening | null>(null);
   const [items, setItems] = useState<BonusOpeningItem[]>([]);
   const [showInitialBE, setShowInitialBE] = useState(true);
@@ -59,7 +59,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
         async (payload) => {
           console.log('[BonusOpeningOverlay] Realtime event received:', payload);
           if (payload.eventType === 'UPDATE' && payload.new) {
-            const newData = payload.new as any;
+            const newData = payload.new as BonusOpening;
             if (newData.show_on_main_overlay) {
               setOpening({ ...newData });
               if (newData.id) {
@@ -87,7 +87,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
         async (payload) => {
           console.log('[BonusOpeningOverlay] Hunt event received:', payload);
           if (payload.eventType === 'UPDATE' && payload.new) {
-            const newData = payload.new as any;
+            const newData = payload.new as BonusOpening;
             if (newData.status === 'opening' || newData.show_on_main_overlay) {
               setOpening({ ...newData, isHunt: true });
               if (newData.id) {
@@ -118,7 +118,18 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
           (payload) => {
             console.log('[BonusOpeningOverlay] Hunt item changed:', payload);
             if (payload.eventType === 'UPDATE' && payload.new) {
-              const updatedItem = payload.new as any;
+              const updatedItem = payload.new as {
+                id: string;
+                slot_name: string;
+                slot_image_url?: string;
+                payment_amount?: number;
+                bet_amount?: number;
+                result_amount?: number;
+                multiplier?: number;
+                status: 'pending' | 'opened';
+                order_index: number;
+                is_super_bonus?: boolean | null;
+              };
               setItems(prev => prev.map(item =>
                 item.id === updatedItem.id
                   ? {
@@ -207,7 +218,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
 
         if (data) {
           console.log('[BonusOpeningOverlay] Hunt loaded by ID:', data);
-          setOpening({ ...data, isHunt: true } as any);
+          setOpening({ ...data, isHunt: true } as BonusOpening);
           await loadHuntItems(data.id);
         } else {
           console.warn('[BonusOpeningOverlay] No hunt found with ID:', huntId);
@@ -253,7 +264,7 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
 
       if (huntData) {
         console.log('[BonusOpeningOverlay] Hunt in opening mode found:', huntData);
-        setOpening({ ...huntData, isHunt: true } as any);
+        setOpening({ ...huntData, isHunt: true } as BonusOpening);
         await loadHuntItems(huntData.id);
         return;
       }
@@ -347,9 +358,6 @@ export function BonusOpeningOverlay({ openingId, huntId, embedded = false }: Bon
 
   const totalPay = items.reduce((sum, item) => sum + (item.payout || 0), 0);
   const startAmount = opening?.initial_investment || opening?.total_investment || opening?.total_invested || 0;
-  const profit = totalPay + startAmount;
-  const isProfitable = profit >= 0;
-
   const average = (() => {
     const openedItemsList = items.filter(item => item.status === 'opened');
     if (openedItemsList.length === 0) return '0.00x';

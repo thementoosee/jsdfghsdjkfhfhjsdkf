@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Type, Image as ImageIcon, TrendingUp, Upload, Check, Trash2, X, BarChart3 } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface BarConfig {
@@ -37,8 +37,6 @@ export function OverlayBarManager({ showOnlyButtons = false, showOnlySelects = f
     casinoLogoScale: 1
   });
   const [overlayId, setOverlayId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [casinos, setCasinos] = useState<Casino[]>([]);
   const [autoGameMode, setAutoGameMode] = useState(true);
 
@@ -160,7 +158,7 @@ export function OverlayBarManager({ showOnlyButtons = false, showOnlySelects = f
         }
 
         if (autoGameMode) {
-          setConfig(prev => ({ ...prev, streamMode: gameMode as any }));
+          setConfig(prev => ({ ...prev, streamMode: gameMode as BarConfig['streamMode'] }));
           await handleSaveMode(gameMode);
         }
       }
@@ -187,47 +185,6 @@ export function OverlayBarManager({ showOnlyButtons = false, showOnlySelects = f
     }
   };
 
-
-  const handleSave = async () => {
-    setSaving(true);
-    setSaved(false);
-
-    try {
-      if (overlayId) {
-        const { error } = await supabase
-          .from('overlays')
-          .update({
-            config: config,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', overlayId);
-
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase
-          .from('overlays')
-          .insert({
-            type: 'bar',
-            name: 'Barra Principal',
-            config: config,
-            is_active: true
-          })
-          .select()
-          .single();
-
-        if (error) throw error;
-        setOverlayId(data.id);
-      }
-
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch (error) {
-      console.error('Error saving config:', error);
-      alert('Erro ao guardar configuração');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (!isOpen) {
     return (

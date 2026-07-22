@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Coffee, Plus, X, TrendingUp, TrendingDown, CreditCard as Edit2, Search, Monitor } from 'lucide-react';
+import { Coffee, X, TrendingUp, TrendingDown, Search, Monitor } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface ChillSession {

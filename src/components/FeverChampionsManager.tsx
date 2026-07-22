@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Trophy, Plus, X, Users, PlayCircle, CheckCircle, CreditCard as Edit2, Trash2, TrendingUp, Monitor } from 'lucide-react';
+import { Trophy, Plus, X, Users, PlayCircle, CheckCircle, CreditCard as Edit2, Trash2 } from 'lucide-react';
 
 interface Tournament {
   id: string;
@@ -32,15 +32,6 @@ interface Participant {
   position: number;
   created_at: string;
   updated_at: string;
-}
-
-interface Spin {
-  id: string;
-  participant_id: string;
-  tournament_id: string;
-  multiplier: number;
-  points_earned: number;
-  created_at: string;
 }
 
 interface Slot {
@@ -358,8 +349,8 @@ export function FeverChampionsManager() {
 
           // Organize matches into rounds using round-robin algorithm
           // Each participant plays once per round
-          const n = participantIds.length;
-          const totalRounds = n % 2 === 0 ? n - 1 : n;
+          const _n = participantIds.length;
+          void _n;
           const matchesToCreate: Array<{ round: number; p1: string; p2: string }> = [];
 
           // Distribute fixtures into proper rounds
@@ -432,9 +423,9 @@ export function FeverChampionsManager() {
         await loadTournamentData(selectedTournament.id);
       }
       alert('Torneio iniciado com sucesso!');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error updating tournament status:', error);
-      alert(`Erro ao atualizar status: ${error?.message || 'Erro desconhecido'}`);
+      alert(`Erro ao atualizar status: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -1392,8 +1383,6 @@ export function FeverChampionsManager() {
                 const participant = Object.values(participants)
                   .flat()
                   .find((p) => p.id === participantId);
-                const bonus1Id = playerNum === 1 ? selectedMatch.participant1_bonus_id : selectedMatch.participant2_bonus_id;
-                const bonus2Id = playerNum === 1 ? selectedMatch.participant1_bonus2_id : selectedMatch.participant2_bonus2_id;
                 const result1 = playerNum === 1 ? selectedMatch.participant1_bonus_result : selectedMatch.participant2_bonus_result;
                 const result2 = playerNum === 1 ? selectedMatch.participant1_bonus2_result : selectedMatch.participant2_bonus2_result;
 

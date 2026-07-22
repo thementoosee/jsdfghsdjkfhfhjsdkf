@@ -126,7 +126,7 @@ export function Statistics() {
         total_bonuses: 0,
       };
 
-      const { data: openingItemsCount } = await supabase
+      const { count: openingItemsCount } = await supabase
         .from('bonus_opening_items')
         .select('id', { count: 'exact', head: true });
 
@@ -229,8 +229,13 @@ export function Statistics() {
         }
       });
 
-      sessions?.forEach((session: any) => {
-        if (session.slot_name && session.total_bonuses > 0) {
+      sessions?.forEach((session: {
+        slot_name?: string;
+        total_bonuses?: number;
+        total_bet?: number;
+        total_won?: number;
+      }) => {
+        if (session.slot_name && (session.total_bonuses || 0) > 0) {
           const slotName = session.slot_name;
           const existing = slotMap.get(slotName) || { bet: 0, won: 0, count: 0, image: null };
           slotMap.set(slotName, {

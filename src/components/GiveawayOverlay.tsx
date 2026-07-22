@@ -1,5 +1,5 @@
 import { useState, useEffect, CSSProperties } from 'react';
-import { Gift, Trophy, Users, Clock, Shuffle } from 'lucide-react';
+import { Gift, Trophy, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Giveaway {
@@ -25,7 +25,7 @@ export function GiveawayOverlay() {
   const [giveaway, setGiveaway] = useState<Giveaway | null>(null);
   const [showWinner, setShowWinner] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<string>('00:00');
-  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [, setParticipants] = useState<Participant[]>([]);
   const [isRolling, setIsRolling] = useState(false);
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -44,8 +44,8 @@ export function GiveawayOverlay() {
     const channel = supabase
       .channel('giveaway_overlay')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'giveaways' }, (payload) => {
-        if (payload.new && (payload.new as any).status === 'drawing') {
-          startRolling((payload.new as any).id);
+        if (payload.new && (payload.new as { status?: string }).status === 'drawing') {
+          startRolling((payload.new as { id: string }).id);
         } else {
           loadActiveGiveaway();
         }
@@ -73,7 +73,7 @@ export function GiveawayOverlay() {
 
     const updateTimer = () => {
       const now = new Date().getTime();
-      const end = new Date(giveaway.end_time).getTime();
+      const end = new Date(giveaway.end_time as string).getTime();
       const diff = end - now;
 
       if (diff <= 0) {

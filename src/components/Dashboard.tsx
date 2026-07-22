@@ -1,4 +1,4 @@
-import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, Copy, ExternalLink, Check, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft } from 'lucide-react';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase, Overlay, OverlayType } from '../lib/supabase';
 
@@ -8,16 +8,17 @@ const SlotDatabase = lazy(() => import('./SlotDatabase').then((m) => ({ default:
 const ChillSessionManager = lazy(() => import('./ChillSessionManager').then((m) => ({ default: m.ChillSessionManager })));
 const Statistics = lazy(() => import('./Statistics').then((m) => ({ default: m.Statistics })));
 const FeverChampionsManager = lazy(() => import('./FeverChampionsManager').then((m) => ({ default: m.FeverChampionsManager })));
+const StreamElementsIntegration = lazy(() => import('./StreamElementsIntegration').then((m) => ({ default: m.StreamElementsIntegration })));
+const TwitchIntegration = lazy(() => import('./TwitchIntegration').then((m) => ({ default: m.TwitchIntegration })));
 const GiveawayManager = lazy(() => import('./GiveawayManager').then((m) => ({ default: m.GiveawayManager })));
 const CasinoManager = lazy(() => import('./CasinoManager'));
 
 type FullscreenView = 'bar' | 'chill' | 'bonus' | 'fever' | 'giveaway' | null;
-type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'database' | 'stats' | 'live_preview' | null;
+type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'twitch' | 'streamelements' | 'database' | 'stats' | 'live_preview' | null;
 
 export function Dashboard() {
   const [overlaysByType, setOverlaysByType] = useState<Record<string, Overlay[]>>({});
   const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [fullscreenView, setFullscreenView] = useState<FullscreenView>(null);
   const [activePanelPage, setActivePanelPage] = useState<PanelPage>(null);
   const [previewOverlayType, setPreviewOverlayType] = useState<OverlayType>('main_stream');
@@ -154,29 +155,40 @@ export function Dashboard() {
 
   const ensureDefaultOverlaysExist = async () => {
     try {
-      const requiredTypes: { type: OverlayType; name: string }[] = [
+      const requiredTypes: { type: OverlayType; name: string; isActive?: boolean }[] = [
         { type: 'bonus_hunt', name: 'Bonus Hunt Principal' },
         { type: 'bonus_opening', name: 'Bonus Opening Principal' },
-        { type: 'chill', name: 'Chill Principal' },
-        { type: 'fever_champions', name: 'Fever Champions Principal' }
+        { type: 'chill', name: 'Chill Principal', isActive: true },
+        { type: 'fever_champions', name: 'Fever Champions Principal' },
+        { type: 'bar', name: 'Default Bar', isActive: true },
+        { type: 'chat', name: 'Chat Interface', isActive: true },
+        { type: 'main_stream', name: 'Main Overlay Principal', isActive: true }
       ];
 
-      for (const { type, name } of requiredTypes) {
-        const { data: existing } = await supabase
+      for (const { type, name, isActive } of requiredTypes) {
+        const { data: existingRows, error: existingError } = await supabase
           .from('overlays')
-          .select('id')
+          .select('id, is_active')
           .eq('type', type)
-          .maybeSingle();
+          .order('created_at', { ascending: true })
+          .limit(1);
 
-        if (!existing) {
+        if (existingError) throw existingError;
+
+        if (!existingRows?.length) {
           await supabase
             .from('overlays')
             .insert({
               type,
               name,
               config: {},
-              is_active: type === 'chill'
+              is_active: isActive ?? type === 'chill'
             });
+        } else if (isActive && !existingRows[0].is_active) {
+          await supabase
+            .from('overlays')
+            .update({ is_active: true })
+            .eq('id', existingRows[0].id);
         }
       }
     } catch (error) {
@@ -188,18 +200,6 @@ export function Dashboard() {
     return `${window.location.origin}/overlay/${id}`;
   };
 
-  const copyToClipboard = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const url = getOverlayUrl(id);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch (error) {
-      console.error('Error copying to clipboard:', error);
-    }
-  };
-
   const openOverlay = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const url = getOverlayUrl(id);
@@ -207,27 +207,32 @@ export function Dashboard() {
   };
 
   const getOrCreateDefaultOverlay = async (type: OverlayType, typeName: string) => {
+    const payload = {
+      type,
+      name: `${typeName} Principal`,
+      config: {},
+      is_active: true
+    };
+
     try {
-      let { data: existing, error: fetchError } = await supabase
+      console.log('[getOrCreateDefaultOverlay] payload', payload);
+
+      const { data: existingRows, error: fetchError } = await supabase
         .from('overlays')
         .select('*')
         .eq('type', type)
-        .maybeSingle();
+        .order('created_at', { ascending: true })
+        .limit(1);
 
       if (fetchError) throw fetchError;
 
-      if (existing) {
-        return existing;
+      if (existingRows?.length) {
+        return existingRows[0];
       }
 
       const { data, error } = await supabase
         .from('overlays')
-        .insert({
-          type: type,
-          name: `${typeName} Principal`,
-          config: {},
-          is_active: true
-        })
+        .insert(payload)
         .select()
         .single();
 
@@ -235,18 +240,32 @@ export function Dashboard() {
 
       await loadAllOverlays();
       return data;
-    } catch (error) {
-      console.error('Error creating overlay:', error);
-      alert('Erro ao criar overlay');
+    } catch (error: unknown) {
+      const err = error as {
+        message?: string;
+        code?: string;
+        details?: string;
+        hint?: string;
+        status?: number;
+      };
+      console.error('[getOrCreateDefaultOverlay] erro real', {
+        message: err?.message,
+        code: err?.code,
+        details: err?.details,
+        hint: err?.hint,
+        status: err?.status,
+        payload,
+        raw: error
+      });
+      alert(
+        `Erro ao criar overlay\n` +
+          `message: ${err?.message ?? String(error)}\n` +
+          `code: ${err?.code ?? 'n/a'}\n` +
+          `details: ${err?.details ?? 'n/a'}\n` +
+          `hint: ${err?.hint ?? 'n/a'}\n` +
+          `status: ${err?.status ?? 'n/a'}`
+      );
       return null;
-    }
-  };
-
-  const handleCopyLink = async (type: OverlayType, typeName: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const overlay = await getOrCreateDefaultOverlay(type, typeName);
-    if (overlay) {
-      copyToClipboard(overlay.id, e);
     }
   };
 
@@ -264,6 +283,8 @@ export function Dashboard() {
     fever: 'Fever Champions League',
     giveaway: 'Giveaways',
     chill: 'Chill',
+    twitch: 'Twitch Integration',
+    streamelements: 'StreamElements',
     database: 'Slots Database',
     stats: 'Statistics',
     live_preview: 'Live Preview (OBS)'
@@ -286,6 +307,12 @@ export function Dashboard() {
     }
     if (activePanelPage === 'giveaway') {
       return <Suspense fallback={sectionLoader}><GiveawayManager /></Suspense>;
+    }
+    if (activePanelPage === 'streamelements') {
+      return <Suspense fallback={sectionLoader}><StreamElementsIntegration /></Suspense>;
+    }
+    if (activePanelPage === 'twitch') {
+      return <Suspense fallback={sectionLoader}><TwitchIntegration /></Suspense>;
     }
     if (activePanelPage === 'stats') {
       return <Suspense fallback={sectionLoader}><Statistics /></Suspense>;
@@ -665,7 +692,7 @@ export function Dashboard() {
           <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>Panels</h2>
-              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>7</span>
+              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>9</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
@@ -725,6 +752,36 @@ export function Dashboard() {
                     <Coffee className="w-4 h-4" style={{ color: '#b89968' }} />
                   </div>
                   <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Chill</h3>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActivePanelPage('twitch')}
+                className="rounded-lg p-3 transition-all text-left"
+                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
+                    <MessageSquare className="w-4 h-4" style={{ color: '#b89968' }} />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Twitch Integration</h3>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActivePanelPage('streamelements')}
+                className="rounded-lg p-3 transition-all text-left"
+                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
+                    <Zap className="w-4 h-4" style={{ color: '#b89968' }} />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>StreamElements</h3>
                 </div>
               </button>
 

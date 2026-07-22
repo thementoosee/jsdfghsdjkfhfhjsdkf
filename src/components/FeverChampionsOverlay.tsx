@@ -31,9 +31,9 @@ interface FeverChampionsOverlayProps {
   embedded?: boolean;
 }
 
-export function FeverChampionsOverlay({ embedded = false }: FeverChampionsOverlayProps = {}) {
+export function FeverChampionsOverlay(_props: FeverChampionsOverlayProps = {}) {
   const [tournament, setTournament] = useState<Tournament | null>(null);
-  const [groups, setGroups] = useState<Record<string, Group>>({});
+  const [, setGroups] = useState<Record<string, Group>>({});
   const [participants, setParticipants] = useState<Record<string, Participant[]>>({});
   const [loading, setLoading] = useState(true);
 

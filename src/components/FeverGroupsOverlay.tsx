@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
 interface Tournament {
@@ -134,14 +134,6 @@ export default function FeverGroupsOverlay() {
     return null;
   }
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = String(date.getFullYear()).slice(-2);
-    return `${day}/${month}/${year}`;
-  };
-
   const firstRow = groups.slice(0, 4);
   const secondRow = groups.slice(4, 8);
 
@@ -232,8 +224,6 @@ export default function FeverGroupsOverlay() {
         <div className="flex-1 flex flex-col justify-center px-6 gap-6">
           <div className="grid grid-cols-4 gap-4">
             {firstRow.map((group) => {
-              const participants = getGroupParticipants(group.id);
-
               return (
                 <div
                   key={group.id}
@@ -307,8 +297,6 @@ export default function FeverGroupsOverlay() {
 
           <div className="grid grid-cols-4 gap-4">
             {secondRow.map((group) => {
-              const participants = getGroupParticipants(group.id);
-
               return (
                 <div
                   key={group.id}

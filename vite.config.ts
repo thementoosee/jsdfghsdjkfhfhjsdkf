@@ -24,7 +24,7 @@ export default defineConfig({
                 if (stat.isFile()) {
                   fs.copyFileSync(src, dest);
                 }
-              } catch (e) {
+              } catch {
                 console.warn(`Skipping ${file}`);
               }
             }

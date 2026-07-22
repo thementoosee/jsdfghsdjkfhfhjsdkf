@@ -2,6 +2,20 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { UserPlus, Swords, Star, Zap, DollarSign } from 'lucide-react';
 import { GiveawayOverlay } from './GiveawayOverlay';
+import { syncStreamElementsData } from '../lib/streamelements-service';
+import {
+  loadTwitchBadgeCatalog,
+  normalizeBadgeList,
+  resolveTwitchBadges,
+  type ResolvedTwitchBadge,
+  type TwitchBadgeRef,
+} from '../lib/twitch-badges';
+import {
+  mergeRecentEvents,
+  recentEventLabel,
+  RECENT_EVENTS_LIMIT,
+  type NormalizedRecentEvent,
+} from '../lib/recent-events';
 
 interface ChatMessage {
   id: string;
@@ -9,19 +23,9 @@ interface ChatMessage {
   display_name: string;
   message: string;
   color: string;
+  badges?: TwitchBadgeRef[] | null;
   is_subscriber: boolean;
   is_moderator: boolean;
-  created_at: string;
-}
-
-interface CombinedEvent {
-  id: string;
-  event_id?: string | null;
-  event_type: string;
-  username: string;
-  display_name: string;
-  amount: number;
-  months: number;
   created_at: string;
 }
 
@@ -37,19 +41,55 @@ interface TopSlot {
 
 export function ChatOverlay() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [alerts, setAlerts] = useState<CombinedEvent[]>([]);
+  const [alerts, setAlerts] = useState<NormalizedRecentEvent[]>([]);
   const [giveawayWinner, setGiveawayWinner] = useState<string | null>(null);
   const [winnerSelectedAt, setWinnerSelectedAt] = useState<string | null>(null);
 
   const [topSlots, setTopSlots] = useState<TopSlot[]>([]);
   const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
+  const [badgeCatalog, setBadgeCatalog] = useState<Record<string, { set_id: string; id: string; title: string; image_url_1x: string; image_url_2x: string; image_url_4x: string; source?: 'channel' | 'global' }> | null>(null);
 
   useEffect(() => {
     console.log('🚀 ChatOverlay: Initializing...');
     loadTopSlots();
+    loadMessages();
+    loadAlerts();
     loadActiveGiveawayWinner();
-    setMessages([]);
-    setAlerts([]);
+    void loadTwitchBadgeCatalog()
+      .then((catalog) => setBadgeCatalog(catalog))
+      .catch((error) => console.warn('[ChatOverlay] badge catalog load failed:', error));
+
+    syncStreamElementsData().catch((error) => {
+      console.error('Error syncing StreamElements data:', error);
+    });
+
+    const chatChannel = supabase
+      .channel(`chat-messages-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'twitch_chat_messages' }, (payload) => {
+        console.log('💬 [REALTIME] New chat message received:', payload);
+        const newMessage = payload.new as ChatMessage;
+        setMessages((prev) => [newMessage, ...prev].slice(0, 13));
+      })
+      .subscribe((status) => {
+        console.log('📡 Chat channel status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Chat: Successfully subscribed to twitch_chat_messages!');
+        }
+      });
+
+    const alertsChannel = supabase
+      .channel(`chat-alerts-${Date.now()}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'streamelements_events' }, (payload) => {
+        console.log('🔔 New StreamElements event received:', payload);
+        loadAlerts();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'twitch_alerts' }, (payload) => {
+        console.log('🔔 New Twitch alert received:', payload);
+        loadAlerts();
+      })
+      .subscribe((status) => {
+        console.log('📡 Alerts channel status:', status);
+      });
 
     const dataChannel = supabase
       .channel(`chat-data-${Date.now()}`)
@@ -78,9 +118,23 @@ export function ChatOverlay() {
         console.log('📡 Data channel status:', status);
       });
 
+    const interval = setInterval(() => {
+      loadAlerts();
+    }, 5000);
+
+    const streamElementsSyncInterval = setInterval(() => {
+      syncStreamElementsData().catch((error) => {
+        console.error('Error syncing StreamElements data:', error);
+      });
+    }, 20000);
+
     return () => {
       console.log('🔌 ChatOverlay: Cleaning up subscriptions...');
+      supabase.removeChannel(chatChannel);
+      supabase.removeChannel(alertsChannel);
       supabase.removeChannel(dataChannel);
+      clearInterval(interval);
+      clearInterval(streamElementsSyncInterval);
     };
   }, []);
 
@@ -93,6 +147,21 @@ export function ChatOverlay() {
 
     return () => clearInterval(interval);
   }, [topSlots.length]);
+
+  const loadMessages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('twitch_chat_messages')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(13);
+
+      if (error) throw error;
+      setMessages(data || []);
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
+  };
 
   const loadActiveGiveawayWinner = async () => {
     try {
@@ -110,6 +179,42 @@ export function ChatOverlay() {
       setWinnerSelectedAt(data?.completed_at || null);
     } catch (error) {
       console.error('Error loading giveaway winner:', error);
+    }
+  };
+
+  const loadAlerts = async () => {
+    try {
+      const [{ data: twitchData, error: twitchError }, seResult] = await Promise.all([
+        supabase
+          .from('twitch_alerts')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('streamelements_events')
+          .select('*')
+          .eq('event_type', 'tip')
+          .order('created_at', { ascending: false })
+          .limit(20),
+      ]);
+
+      if (twitchError) {
+        console.error('[ChatOverlay] Twitch alerts load failed:', twitchError);
+      }
+
+      if (seResult.error) {
+        console.warn('[ChatOverlay] StreamElements tips unavailable:', seResult.error.message);
+      }
+
+      setAlerts(
+        mergeRecentEvents(
+          (twitchData || []) as Record<string, unknown>[],
+          (seResult.data || []) as Record<string, unknown>[],
+          RECENT_EVENTS_LIMIT
+        )
+      );
+    } catch (error) {
+      console.error('Error loading alerts:', error);
     }
   };
 
@@ -159,8 +264,13 @@ export function ChatOverlay() {
         }
       });
 
-      sessions?.forEach((session: any) => {
-        if (session.slot_name && session.total_bonuses > 0) {
+      sessions?.forEach((session: {
+        slot_name?: string;
+        total_bonuses?: number;
+        total_bet?: number;
+        total_won?: number;
+      }) => {
+        if (session.slot_name && (session.total_bonuses || 0) > 0) {
           const slotName = session.slot_name;
           const existing = slotMap.get(slotName) || { bet: 0, won: 0, count: 0, image: null };
           slotMap.set(slotName, {
@@ -200,7 +310,7 @@ export function ChatOverlay() {
   };
 
   return (
-    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginRight: '5px' }}>
+    <div className="w-[240px] h-[720px] relative" style={{ marginTop: '0px', marginRight: '5px' }}>
       <div
         className="w-full h-full overflow-hidden flex flex-col"
         style={{
@@ -261,10 +371,32 @@ export function ChatOverlay() {
                         animation: 'pulse 2s infinite'
                       } : {}}
                     >
-                      <span className="font-bold text-[11px]" style={{ color: isWinner ? '#ffffff' : (msg.color || '#ffffff') }}>
-                        {msg.is_subscriber && 'S'}
-                        {msg.is_moderator && 'M'}
-                        {msg.display_name}
+                      <span className="inline-flex items-center align-middle max-w-full">
+                        {resolveTwitchBadges(normalizeBadgeList(msg.badges), badgeCatalog).map((badge: ResolvedTwitchBadge) => (
+                          <img
+                            key={`${msg.id}-${badge.set_id}-${badge.id}`}
+                            src={badge.image_url}
+                            alt={badge.title}
+                            title={badge.title}
+                            className="inline-block mr-0.5 flex-shrink-0"
+                            style={{
+                              height: '18px',
+                              width: 'auto',
+                              verticalAlign: 'middle',
+                            }}
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            }}
+                          />
+                        ))}
+                        <span
+                          className="font-bold text-[11px]"
+                          style={{ color: isWinner ? '#ffffff' : (msg.color || '#ffffff') }}
+                        >
+                          {msg.display_name}
+                        </span>
                       </span>
                       <span className="text-white/90 text-[11px] ml-1">{msg.message}</span>
                     </div>
@@ -294,65 +426,47 @@ export function ChatOverlay() {
 
             <div className="space-y-2">
               {alerts.length > 0 ? (
-                alerts.map((alert) => {
+                alerts.slice(0, RECENT_EVENTS_LIMIT).map((alert) => {
                   const getEventStyles = () => {
-                    switch (alert.event_type) {
+                    switch (alert.type) {
                       case 'follow':
-                      case 'follower':
                         return {
                           icon: UserPlus,
                           bgColor: 'rgba(52, 211, 153, 0.2)',
                           iconColor: '#34d399',
-                          label: 'New Follower'
                         };
                       case 'raid':
                         return {
                           icon: Swords,
                           bgColor: 'rgba(249, 115, 22, 0.2)',
                           iconColor: '#f97316',
-                          label: `Raid (${alert.amount || ''})`
                         };
-                      case 'subscriber':
                       case 'subscription':
+                      case 'resubscription':
+                      case 'gift_subscription':
                         return {
                           icon: Star,
                           bgColor: 'rgba(168, 85, 247, 0.2)',
                           iconColor: '#a855f7',
-                          label: alert.months > 1 ? `Resub (${alert.months}mo)` : 'New Sub'
                         };
                       case 'cheer':
-                        return {
-                          icon: DollarSign,
-                          bgColor: 'rgba(245, 158, 11, 0.2)',
-                          iconColor: '#f59e0b',
-                          label: `${alert.amount} Bits`
-                        };
                       case 'tip':
-                      case 'donation':
                         return {
                           icon: DollarSign,
                           bgColor: 'rgba(245, 158, 11, 0.2)',
                           iconColor: '#f59e0b',
-                          label: `€${alert.amount?.toFixed(2)}`
-                        };
-                      case 'host':
-                        return {
-                          icon: Zap,
-                          bgColor: 'rgba(96, 165, 250, 0.2)',
-                          iconColor: '#60a5fa',
-                          label: `Host`
                         };
                       default:
                         return {
-                          icon: UserPlus,
+                          icon: Zap,
                           bgColor: 'rgba(52, 211, 153, 0.2)',
                           iconColor: '#34d399',
-                          label: alert.event_type
                         };
                     }
                   };
 
-                  const { icon: Icon, bgColor, iconColor, label } = getEventStyles();
+                  const { icon: Icon, bgColor, iconColor } = getEventStyles();
+                  const label = recentEventLabel(alert);
 
                   return (
                     <div key={alert.id} className="flex items-center gap-2">

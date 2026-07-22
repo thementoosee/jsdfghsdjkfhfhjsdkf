@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Gift, Plus, Trash2, Play, Trophy, Eye, EyeOff, Users, StopCircle, Shuffle } from 'lucide-react';
+import { Gift, Plus, Trash2, Trophy, Eye, EyeOff, Users, StopCircle, Shuffle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Giveaway {

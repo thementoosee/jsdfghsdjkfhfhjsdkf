@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Gift, TrendingUp, TrendingDown, DollarSign, Zap, Flame, Target } from 'lucide-react';
+import { Gift, TrendingUp, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { BonusOpeningOverlay } from './BonusOpeningOverlay';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
@@ -58,8 +58,8 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
           console.log('[BonusHuntOverlay] Hunt change:', payload);
 
           if (payload.eventType === 'UPDATE' && currentHuntIdRef.current) {
-            const newRecord = payload.new as any;
-            const oldRecord = payload.old as any;
+            const newRecord = payload.new as Record<string, unknown>;
+            const oldRecord = payload.old as Record<string, unknown>;
 
             if (newRecord.id === currentHuntIdRef.current &&
                 newRecord.show_on_main_overlay !== oldRecord.show_on_main_overlay) {
@@ -194,8 +194,6 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
     return <BonusOpeningOverlay huntId={hunt.id} embedded={embedded} />;
   }
 
-  const pendingItems = items.filter(item => item.status === 'pending');
-  const openedItems = items.filter(item => item.status === 'opened');
   const superBonusCount = items.filter(item => item.is_super_bonus === true).length;
   const extremeBonusCount = items.filter(item => item.is_extreme_bonus === true).length;
   const carouselItems = items;
@@ -205,12 +203,6 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
     if (!hunt) return '0x';
     const breakEven = hunt.opened_count > 0 ? hunt.current_break_even : hunt.initial_break_even;
     return `${breakEven.toFixed(0)}x`;
-  })();
-
-  const currentMultiplier = (() => {
-    if (!hunt || hunt.total_invested === 0) return '0x';
-    const multiplier = hunt.total_won / hunt.total_invested;
-    return `${multiplier.toFixed(2)}x`;
   })();
 
   return (

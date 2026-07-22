@@ -304,33 +304,6 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     }
   };
 
-  const createNewHunt = async () => {
-    try {
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from('bonus_hunts')
-        .insert({
-          name: `Bonus Hunt ${new Date().toLocaleDateString('pt-PT')}`,
-          status: 'active',
-          show_on_main_overlay: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await loadHunts();
-      setSelectedHunt(data);
-    } catch (error) {
-      console.error('Error creating hunt:', error);
-      alert('Erro ao criar bonus hunt');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const toggleOverlay = async () => {
     if (!selectedHunt) return;
 
