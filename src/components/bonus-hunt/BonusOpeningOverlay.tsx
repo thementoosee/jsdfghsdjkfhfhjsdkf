@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Gift, TrendingUp, Target, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slot-image';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
 interface BonusOpening {
@@ -23,17 +24,31 @@ interface BonusOpening {
   isHunt?: boolean;
 }
 
+interface SlotImageJoin {
+  image_storage_path?: string | null;
+  image_url?: string | null;
+}
+
 interface BonusOpeningItem {
   id: string;
   bonus_opening_id: string;
+  slot_id?: string | null;
   slot_name: string;
   slot_image: string;
+  slots?: SlotImageJoin | null;
   payment: number;
   payout: number;
   multiplier: number;
   status: 'pending' | 'opened';
   order_index: number;
   super_bonus: boolean | null;
+}
+
+function openingItemImageUrl(item: BonusOpeningItem): string {
+  return resolveHistoricalSlotImage({
+    slot: item.slots,
+    snapshotUrl: item.slot_image,
+  });
 }
 
 interface BonusOpeningOverlayProps {
@@ -299,7 +314,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
     try {
       const { data, error } = await supabase
         .from('bonus_hunt_items')
-        .select('*')
+        .select('*, slots:slot_id(image_storage_path, image_url)')
         .eq('hunt_id', huntId)
         .order('order_index', { ascending: true });
 
@@ -309,8 +324,10 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
         const mappedData = data.map(item => ({
           id: item.id,
           bonus_opening_id: huntId,
+          slot_id: item.slot_id,
           slot_name: item.slot_name,
           slot_image: item.slot_image_url || '',
+          slots: item.slots,
           payment: item.payment_amount || item.bet_amount || 0,
           payout: item.result_amount || 0,
           multiplier: item.multiplier || 0,
@@ -331,7 +348,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
       console.log('[BonusOpeningOverlay] Loading opening items for:', openingId);
       const { data, error } = await supabase
         .from('bonus_opening_items')
-        .select('*')
+        .select('*, slots:slot_id(image_storage_path, image_url)')
         .eq('bonus_opening_id', openingId)
         .order('order_index', { ascending: true });
 
@@ -644,7 +661,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundImage: `url("${item.slot_image || '/slot-fallback.svg'}")`,
+                          backgroundImage: `url("${openingItemImageUrl(item)}")`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           filter: 'blur(10px) brightness(0.3)',
@@ -672,10 +689,10 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       {/* Slot image */}
                       <div className="relative z-10 flex-1 overflow-hidden">
                         <img
-                          src={item.slot_image || '/slot-fallback.svg'}
+                          src={openingItemImageUrl(item)}
                           alt={item.slot_name}
                           className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = '/slot-fallback.svg'; }}
+                          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                         />
                         {item.super_bonus === false && (
                           <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">EXTREME</span>
@@ -719,6 +736,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                   const payment = item.payment;
                   const isOpened = item.status === 'opened';
                   const isWin = isOpened && item.payout && item.payout > payment;
+                  const imageUrl = openingItemImageUrl(item);
 
                   return (
                     <div
@@ -738,27 +756,25 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                           : '1px solid rgba(251, 191, 36, 0.35)'
                       }}
                     >
-                      {item.slot_image && (
-                        <div
-                          className="absolute inset-0 opacity-20"
-                          style={{
-                            backgroundImage: `url("${item.slot_image}"), url("/slot-fallback.svg")`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: 'blur(10px)',
-                            transform: 'scale(1.08)'
-                          }}
-                        />
-                      )}
+                      <div
+                        className="absolute inset-0 opacity-20"
+                        style={{
+                          backgroundImage: `url("${imageUrl}"), url("${SLOT_FALLBACK_IMAGE}")`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          filter: 'blur(10px)',
+                          transform: 'scale(1.08)'
+                        }}
+                      />
 
                       <div className="flex items-center relative z-10 h-full">
                         <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
                           <img
-                            src={item.slot_image || '/slot-fallback.svg'}
+                            src={imageUrl}
                             alt={item.slot_name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              e.currentTarget.src = '/slot-fallback.svg';
+                              e.currentTarget.src = SLOT_FALLBACK_IMAGE;
                             }}
                           />
                         </div>

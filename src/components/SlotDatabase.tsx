@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Search, Star, TrendingUp, DollarSign, Zap, Award, Edit2, Trash2, Save, X } from 'lucide-react';
-import { getSlotProviders, isValidHttpUrl, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
+import { getSlotProviders, isValidHttpUrl, resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
 
 interface Slot {
   id: string;
   name: string;
   provider: string;
   image_url: string | null;
+  image_storage_path?: string | null;
   max_win: number;
   volatility: string;
   rtp: number;
@@ -709,7 +710,7 @@ export function SlotDatabase() {
                 <div key={slot.id} className="rounded-xl p-6 transition-all" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', opacity: slot.is_active === false ? 0.65 : 1 }}>
                   <div className="mb-4 overflow-hidden rounded-lg" style={{ background: '#1a1a1a', border: '1px solid #2d2d2d' }}>
                     <img
-                      src={slot.image_url || SLOT_FALLBACK_IMAGE}
+                      src={resolveSlotImageUrl(slot)}
                       alt={slot.name}
                       loading="lazy"
                       className="w-full h-36 object-cover"

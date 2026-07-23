@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Coffee, X, TrendingUp, TrendingDown, Search, Monitor } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../lib/slots-search';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS, resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
 
 interface ChillSession {
   id: string;
@@ -28,6 +28,7 @@ interface Slot {
   name: string;
   provider: string;
   image_url?: string;
+  image_storage_path?: string | null;
 }
 
 export function ChillSessionManager() {
@@ -102,6 +103,7 @@ export function ChillSessionManager() {
         name: s.name,
         provider: s.provider,
         image_url: s.image_url ?? undefined,
+        image_storage_path: s.image_storage_path ?? undefined,
       })));
     } catch (error) {
       console.error('Error searching slots:', error);
@@ -124,7 +126,7 @@ export function ChillSessionManager() {
       if (data) {
         const { data: slotData } = await supabase
           .from('slots')
-          .select('id, name, provider, image_url')
+          .select('id, name, provider, image_url, image_storage_path')
           .eq('name', data.slot_name)
           .maybeSingle();
 
@@ -454,12 +456,14 @@ export function ChillSessionManager() {
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <div className="flex items-center gap-3">
-                    {slot.image_url && (
-                      <img src={slot.image_url}
+                    <img
+                      src={resolveSlotImageUrl(slot)}
                       onError={(e) => {
-                        e.currentTarget.src = '/slot-fallback.svg';
-                      }} alt={slot.name} className="w-16 h-16 rounded object-cover" />
-                    )}
+                        e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                      }}
+                      alt={slot.name}
+                      className="w-16 h-16 rounded object-cover"
+                    />
                     <div>
                       <div className="font-bold uppercase text-sm" style={{ color: '#d4d4d4' }}>{slot.name}</div>
                       <div className="text-xs uppercase" style={{ color: '#8a8a8a' }}>{slot.provider}</div>
@@ -473,12 +477,14 @@ export function ChillSessionManager() {
 
         {selectedSlot && (
           <div className="mb-6 p-3 rounded-lg flex items-center gap-4" style={{ background: '#1a1a1a', border: '1px solid #3d3d3d' }}>
-            {selectedSlot.image_url && (
-              <img src={selectedSlot.image_url}
-                      onError={(e) => {
-                        e.currentTarget.src = '/slot-fallback.svg';
-                      }} alt={selectedSlot.name} className="w-20 h-20 rounded-lg object-cover" />
-            )}
+            <img
+              src={resolveSlotImageUrl(selectedSlot)}
+              onError={(e) => {
+                e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+              }}
+              alt={selectedSlot.name}
+              className="w-20 h-20 rounded-lg object-cover"
+            />
             <div>
               <div className="font-bold uppercase" style={{ color: '#b89968' }}>{selectedSlot.name}</div>
               <div className="text-sm uppercase" style={{ color: '#8a8a8a' }}>{selectedSlot.provider}</div>
@@ -509,11 +515,16 @@ export function ChillSessionManager() {
       <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            {selectedSlot?.image_url && (
-              <img src={selectedSlot.image_url}
-                      onError={(e) => {
-                        e.currentTarget.src = '/slot-fallback.svg';
-                      }} alt={selectedSlot.name} className="w-24 h-24 rounded-xl object-cover" style={{ border: '2px solid #3d3d3d' }} />
+            {selectedSlot && (
+              <img
+                src={resolveSlotImageUrl(selectedSlot)}
+                onError={(e) => {
+                  e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                }}
+                alt={selectedSlot.name}
+                className="w-24 h-24 rounded-xl object-cover"
+                style={{ border: '2px solid #3d3d3d' }}
+              />
             )}
             <div>
               <h3 className="text-2xl font-bold uppercase" style={{ color: '#b89968' }}>{activeSession.slot_name}</h3>
@@ -574,12 +585,14 @@ export function ChillSessionManager() {
                   onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                 >
                   <div className="flex items-center gap-3">
-                    {slot.image_url && (
-                      <img src={slot.image_url}
+                    <img
+                      src={resolveSlotImageUrl(slot)}
                       onError={(e) => {
-                        e.currentTarget.src = '/slot-fallback.svg';
-                      }} alt={slot.name} className="w-16 h-16 rounded object-cover" />
-                    )}
+                        e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                      }}
+                      alt={slot.name}
+                      className="w-16 h-16 rounded object-cover"
+                    />
                     <div>
                       <div className="font-bold uppercase text-sm" style={{ color: '#d4d4d4' }}>{slot.name}</div>
                       <div className="text-xs uppercase" style={{ color: '#8a8a8a' }}>{slot.provider}</div>
@@ -627,12 +640,12 @@ export function ChillSessionManager() {
       <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
         <div className="bg-slate-800/60 rounded-lg p-4" style={{ border: '1px solid rgba(255, 255, 255, 0.1)' }}>
           <div className="flex items-center gap-3">
-            {selectedSlot?.image_url && (
+            {selectedSlot && (
               <img
-                src={selectedSlot.image_url}
-                      onError={(e) => {
-                        e.currentTarget.src = '/slot-fallback.svg';
-                      }}
+                src={resolveSlotImageUrl(selectedSlot)}
+                onError={(e) => {
+                  e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                }}
                 alt={selectedSlot.name}
                 className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
                 style={{ border: '1px solid rgba(255, 255, 255, 0.1)' }}

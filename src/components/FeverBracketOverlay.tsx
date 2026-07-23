@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Trophy, Star } from 'lucide-react';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface Tournament {
   id: string;
@@ -130,7 +131,7 @@ export function FeverBracketOverlay() {
   };
 
   const renderTeamSlot = (participant: Participant | null, won: boolean = false, lost: boolean = false) => {
-    if (!participant || !participant.slot_image) {
+    if (!participant) {
       return (
         <div className={`w-20 h-24 rounded-lg border-3 ${won ? 'border-yellow-400' : 'border-white/30'} bg-gray-800/90 backdrop-blur-sm flex items-center justify-center`}>
           <span className="text-white/50 text-xs font-bold">TBD</span>
@@ -138,11 +139,14 @@ export function FeverBracketOverlay() {
       );
     }
 
+    const imageUrl = resolveHistoricalSlotImage({ snapshotUrl: participant.slot_image });
+
     return (
       <div className={`w-20 h-24 rounded-lg border-3 ${won ? 'border-yellow-400 shadow-lg shadow-yellow-400/50' : lost ? 'border-gray-600/50' : 'border-white/50'} bg-white/10 backdrop-blur-sm overflow-hidden`}>
         <img
-          src={participant.slot_image}
+          src={imageUrl}
           alt={participant.slot_name}
+          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
           style={{
             width: '80px',
             height: '96px',

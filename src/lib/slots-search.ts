@@ -1,10 +1,12 @@
 import { supabase } from './supabase';
+import { SLOT_FALLBACK_IMAGE } from './slot-image';
 
 export type SlotSearchResult = {
   id: string;
   name: string;
   provider: string;
   image_url: string | null;
+  image_storage_path?: string | null;
   aliases?: string[] | null;
   is_active?: boolean;
   max_win?: number;
@@ -14,7 +16,8 @@ export type SlotSearchResult = {
   rank_score?: number;
 };
 
-export const SLOT_FALLBACK_IMAGE = '/slot-fallback.svg';
+export { SLOT_FALLBACK_IMAGE };
+export { resolveSlotImageUrl, resolveHistoricalSlotImage, publicSlotImageUrl } from './slot-image';
 export const SLOT_SEARCH_LIMIT = 20;
 export const SLOT_SEARCH_DEBOUNCE_MS = 300;
 

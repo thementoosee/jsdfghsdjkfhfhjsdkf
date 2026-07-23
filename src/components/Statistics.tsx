@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Target, Percent, Gift, Coffee } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface BonusHuntStats {
   total_hunts: number;
@@ -250,14 +251,17 @@ export function Statistics() {
       const slotNames = Array.from(slotMap.keys());
       const { data: slotsData } = await supabase
         .from('slots')
-        .select('name, image_url')
+        .select('name, image_url, image_storage_path')
         .in('name', slotNames);
 
-      const slotImages = new Map(slotsData?.map(s => [s.name, s.image_url]) || []);
+      const slotsByName = new Map(slotsData?.map(s => [s.name, s]) || []);
 
       const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
         slot_name: name,
-        slot_image: data.image || slotImages.get(name) || '/slot-fallback.svg',
+        slot_image: resolveHistoricalSlotImage({
+          slot: slotsByName.get(name),
+          snapshotUrl: data.image,
+        }),
         total_bonuses: data.count,
         total_bet: data.bet,
         total_won: data.won,
@@ -454,10 +458,11 @@ export function Statistics() {
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-3">
                         <img
-                          src={slot.slot_image || '/slot-fallback.svg'}
+                          src={slot.slot_image || SLOT_FALLBACK_IMAGE}
                           alt={slot.slot_name}
                           className="w-10 h-14 object-cover rounded"
                           style={{ border: '1px solid #3d3d3d' }}
+                          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                         />
                         <span className="font-semibold text-sm uppercase" style={{ color: '#d4d4d4' }}>{slot.slot_name}</span>
                       </div>

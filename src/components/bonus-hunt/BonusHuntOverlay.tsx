@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Gift, TrendingUp, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slot-image';
 import { BonusOpeningOverlay } from './BonusOpeningOverlay';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
@@ -19,10 +20,17 @@ interface BonusHunt {
   opened_count: number;
 }
 
+interface SlotImageJoin {
+  image_storage_path?: string | null;
+  image_url?: string | null;
+}
+
 interface BonusHuntItem {
   id: string;
+  slot_id?: string | null;
   slot_name: string;
   slot_image_url?: string;
+  slots?: SlotImageJoin | null;
   bet_amount: number;
   payment_amount: number | null;
   result_amount: number | null;
@@ -31,6 +39,13 @@ interface BonusHuntItem {
   order_index: number;
   is_super_bonus: boolean | null;
   is_extreme_bonus?: boolean | null;
+}
+
+function huntItemImageUrl(item: BonusHuntItem): string {
+  return resolveHistoricalSlotImage({
+    slot: item.slots,
+    snapshotUrl: item.slot_image_url,
+  });
 }
 
 interface BonusHuntOverlayProps {
@@ -141,7 +156,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
     try {
       const { data, error } = await supabase
         .from('bonus_hunt_items')
-        .select('*')
+        .select('*, slots:slot_id(image_storage_path, image_url)')
         .eq('hunt_id', huntId)
         .order('order_index', { ascending: true });
 
@@ -394,7 +409,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundImage: `url("${item.slot_image_url || '/slot-fallback.svg'}")`,
+                          backgroundImage: `url("${huntItemImageUrl(item)}")`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           filter: 'blur(10px) brightness(0.3)',
@@ -422,10 +437,10 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                       {/* Slot image */}
                       <div className="relative z-10 flex-1 overflow-hidden">
                         <img
-                          src={item.slot_image_url || '/slot-fallback.svg'}
+                          src={huntItemImageUrl(item)}
                           alt={item.slot_name}
                           className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = '/slot-fallback.svg'; }}
+                          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                         />
                         {item.is_extreme_bonus === true && (
                           <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">EXTREME</span>
@@ -472,6 +487,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                   const isFirstOccurrence = index < items.length;
                   const isNewItem = newItemIds.has(item.id) && isFirstOccurrence;
                   const isRemovedItem = removedItemIds.has(item.id);
+                  const imageUrl = huntItemImageUrl(item);
 
                   return (
                     <div
@@ -496,27 +512,25 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                           : 'none'
                       }}
                     >
-                      {item.slot_image_url && (
-                        <div
-                          className="absolute inset-0 opacity-20"
-                          style={{
-                            backgroundImage: `url("${item.slot_image_url}"), url("/slot-fallback.svg")`,
-                            backgroundSize: 'cover',
-                            backgroundPosition: 'center',
-                            filter: 'blur(10px)',
-                            transform: 'scale(1.08)'
-                          }}
-                        />
-                      )}
+                      <div
+                        className="absolute inset-0 opacity-20"
+                        style={{
+                          backgroundImage: `url("${imageUrl}"), url("${SLOT_FALLBACK_IMAGE}")`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          filter: 'blur(10px)',
+                          transform: 'scale(1.08)'
+                        }}
+                      />
 
                       <div className="flex items-center relative z-10 h-full">
                         <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
                           <img
-                            src={item.slot_image_url || '/slot-fallback.svg'}
+                            src={imageUrl}
                             alt={item.slot_name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              e.currentTarget.src = '/slot-fallback.svg';
+                              e.currentTarget.src = SLOT_FALLBACK_IMAGE;
                             }}
                           />
                         </div>

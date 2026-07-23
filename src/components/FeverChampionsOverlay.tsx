@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Trophy, Star } from 'lucide-react';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface Tournament {
   id: string;
@@ -280,16 +281,15 @@ export function FeverChampionsOverlay(_props: FeverChampionsOverlayProps = {}) {
                         </div>
                       </div>
 
-                      {participant.slot_name && (
+                            {participant.slot_name && (
                         <div className="bg-gray-800/50 px-4 py-3 flex items-center justify-between">
                           <div className="flex items-center gap-3">
-                            {participant.slot_image && (
-                              <img
-                                src={participant.slot_image}
+                            <img
+                                src={resolveHistoricalSlotImage({ snapshotUrl: participant.slot_image })}
                                 alt={participant.slot_name}
                                 className="w-12 h-12 rounded-lg object-contain border-2 border-gray-700"
+                                onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                               />
-                            )}
                             <div>
                               <p className="text-white font-bold text-sm">
                                 {participant.slot_name}

@@ -2,7 +2,7 @@
 import { ArrowLeft, ArrowUpDown, Monitor, Plus, Trash2, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { calculateBE, calculateLiveBE, calculateTotalBetAll, formatMultiplier } from '../../lib/breakEvenCalculations';
-import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../../lib/slots-search';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS, resolveSlotImageUrl, resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slots-search';
 
 interface BonusHunt {
   id: string;
@@ -29,6 +29,7 @@ interface BonusHuntItem {
   slot_id?: string | null;
   slot_name: string;
   slot_image_url?: string;
+  slots?: { image_storage_path?: string | null; image_url?: string | null } | null;
   bet_amount: number;
   payment_amount: number | null;
   result_amount: number | null;
@@ -44,6 +45,7 @@ interface Slot {
   name: string;
   provider: string;
   image_url?: string | null;
+  image_storage_path?: string | null;
 }
 
 interface UnifiedBonusHuntControllerProps {
@@ -147,7 +149,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     try {
       const { data, error } = await supabase
         .from('bonus_hunt_items')
-        .select('*')
+        .select('*, slots:slot_id(image_storage_path, image_url)')
         .eq('hunt_id', huntId)
         .order('order_index', { ascending: true });
 
@@ -188,6 +190,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
         name: s.name,
         provider: s.provider,
         image_url: s.image_url ?? undefined,
+        image_storage_path: s.image_storage_path ?? undefined,
       })));
     } catch (error) {
       console.error('Error searching slots:', error);
@@ -266,17 +269,20 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     try {
       const nextIndex = items.length;
 
-      let slotImageUrl = selectedSlot?.image_url || null;
+      let slotForImage: Slot | null = selectedSlot;
       let slotId = selectedSlot?.id || null;
-      if (!slotImageUrl && slotName) {
+      if (!slotForImage && slotName) {
         const { data: slotData } = await supabase
           .from('slots')
-          .select('id, image_url')
+          .select('id, name, provider, image_url, image_storage_path')
           .eq('name', slotName)
           .maybeSingle();
-        slotImageUrl = slotData?.image_url || null;
-        slotId = slotData?.id || slotId;
+        if (slotData) {
+          slotForImage = slotData as Slot;
+          slotId = slotData.id || slotId;
+        }
       }
+      const slotImageUrl = slotForImage ? resolveSlotImageUrl(slotForImage) : SLOT_FALLBACK_IMAGE;
 
       const { error } = await supabase
         .from('bonus_hunt_items')
@@ -682,9 +688,10 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   {selectedSlot && (
                     <div className="flex-shrink-0">
                       <img
-                        src={selectedSlot.image_url || '/slot-fallback.svg'}
+                        src={resolveSlotImageUrl(selectedSlot)}
                         alt={selectedSlot.name}
                         className="w-6 h-8 rounded object-contain"
+                        onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                       />
                     </div>
                   )}
@@ -819,13 +826,15 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   <div className="text-xs font-bold text-center" style={{ color: '#8a8a8a' }}>#{index + 1}</div>
 
                   <div className="flex items-center gap-3">
-                    {item.slot_image_url && (
-                      <img
-                        src={item.slot_image_url}
-                        alt={item.slot_name}
-                        className="w-8 h-10 rounded object-contain"
-                      />
-                    )}
+                    <img
+                      src={resolveHistoricalSlotImage({
+                        slot: item.slots,
+                        snapshotUrl: item.slot_image_url,
+                      })}
+                      alt={item.slot_name}
+                      className="w-8 h-10 rounded object-contain"
+                      onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
+                    />
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-white text-sm font-medium">{item.slot_name}</span>
                       {item.is_super_bonus && (

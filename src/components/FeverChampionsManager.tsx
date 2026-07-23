@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Trophy, Plus, X, Users, PlayCircle, CheckCircle, CreditCard as Edit2, Trash2 } from 'lucide-react';
-import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../lib/slots-search';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS, resolveSlotImageUrl, resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
 
 interface Tournament {
   id: string;
@@ -40,6 +40,7 @@ interface Slot {
   name: string;
   provider: string;
   image_url: string | null;
+  image_storage_path?: string | null;
 }
 
 interface Match {
@@ -167,6 +168,7 @@ export function FeverChampionsManager() {
         name: s.name,
         provider: s.provider,
         image_url: s.image_url,
+        image_storage_path: s.image_storage_path,
       })));
     } catch (error) {
       console.error('Error loading slots:', error);
@@ -445,7 +447,7 @@ export function FeverChampionsManager() {
           group_id: group.id,
           viewer_name: newParticipant.viewer_name,
           slot_name: selectedSlot.name,
-          slot_image: selectedSlot.image_url
+          slot_image: resolveSlotImageUrl(selectedSlot)
         });
 
       if (error) throw error;
@@ -518,7 +520,7 @@ export function FeverChampionsManager() {
         .update({
           viewer_name: editParticipantData.viewer_name,
           slot_name: selectedSlot.name,
-          slot_image: selectedSlot.image_url || ''
+          slot_image: resolveSlotImageUrl(selectedSlot)
         })
         .eq('id', showEditParticipant.id);
 
@@ -868,16 +870,14 @@ export function FeverChampionsManager() {
                                         newParticipant.slot_id === slot.id ? 'bg-gray-800' : ''
                                       }`}
                                     >
-                                      {slot.image_url && (
-                                        <img
-                                          src={slot.image_url}
+                                      <img
+                                          src={resolveSlotImageUrl(slot)}
                                           alt={slot.name}
                                           className="w-8 h-8 rounded object-contain"
                                           onError={(e) => {
-                                            e.currentTarget.src = '/slot-fallback.svg';
+                                            e.currentTarget.src = SLOT_FALLBACK_IMAGE;
                                           }}
                                         />
-                                      )}
                                       <div className="flex-1 min-w-0">
                                         <p className="text-white text-xs font-medium truncate">{slot.name}</p>
                                         <p className="text-gray-500 text-xs truncate">{slot.provider}</p>
@@ -911,33 +911,28 @@ export function FeverChampionsManager() {
                     )}
 
                     <div className="space-y-2">
-                      {(participants[groupName] || []).map((participant, index) => (
+                      {(participants[groupName] || []).map((participant, index) => {
+                        const participantImage = resolveHistoricalSlotImage({ snapshotUrl: participant.slot_image });
+                        return (
                         <div key={participant.id} className="relative border border-gray-700 rounded-lg overflow-hidden">
-                          {participant.slot_image && (
-                            <div
+                          <div
                               className="absolute inset-0 opacity-20"
                               style={{
-                                backgroundImage: `url(${participant.slot_image})`,
+                                backgroundImage: `url(${participantImage})`,
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
                                 filter: 'blur(8px)',
                                 transform: 'scale(1.1)'
                               }}
                             />
-                          )}
                           <div className="flex relative z-10 bg-gray-800">
-                            {participant.slot_image ? (
-                              <img
-                                src={participant.slot_image}
+                            <img
+                                src={participantImage}
                                 alt={participant.slot_name}
                                 className="w-12 object-contain flex-shrink-0"
                                 style={{ margin: 0, padding: 0, display: 'block' }}
+                                onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                               />
-                            ) : (
-                              <div className="w-12 flex-shrink-0 bg-gray-700 flex items-center justify-center">
-                                <span className="text-2xl font-bold text-gray-500">?</span>
-                              </div>
-                            )}
                             <div className="flex-1 p-3">
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
@@ -958,6 +953,7 @@ export function FeverChampionsManager() {
                                           name: s.name,
                                           provider: s.provider,
                                           image_url: s.image_url,
+                                          image_storage_path: s.image_storage_path,
                                         }))
                                       : [];
                                     setSlots(loadedSlots);
@@ -997,7 +993,8 @@ export function FeverChampionsManager() {
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}

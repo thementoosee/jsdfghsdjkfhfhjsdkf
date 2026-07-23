@@ -16,6 +16,7 @@ import {
   RECENT_EVENTS_LIMIT,
   type NormalizedRecentEvent,
 } from '../lib/recent-events';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface ChatMessage {
   id: string;
@@ -285,14 +286,17 @@ export function ChatOverlay() {
       const slotNames = Array.from(slotMap.keys());
       const { data: slotsData } = await supabase
         .from('slots')
-        .select('name, image_url')
+        .select('name, image_url, image_storage_path')
         .in('name', slotNames);
 
-      const slotImages = new Map(slotsData?.map(s => [s.name, s.image_url]) || []);
+      const slotsByName = new Map(slotsData?.map(s => [s.name, s]) || []);
 
       const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
         slot_name: name,
-        slot_image: data.image || slotImages.get(name) || '/slot-fallback.svg',
+        slot_image: resolveHistoricalSlotImage({
+          slot: slotsByName.get(name),
+          snapshotUrl: data.image,
+        }),
         total_bonuses: data.count,
         total_bet: data.bet,
         total_won: data.won,
@@ -512,13 +516,14 @@ export function ChatOverlay() {
 
             {topSlots.length > 0 ? (
               <div className="flex gap-3">
-                {topSlots[currentSlotIndex]?.slot_image ? (
+                {topSlots[currentSlotIndex] ? (
                   <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden">
                     <img
-                      src={topSlots[currentSlotIndex].slot_image}
+                      src={resolveHistoricalSlotImage({ snapshotUrl: topSlots[currentSlotIndex].slot_image })}
                       alt={topSlots[currentSlotIndex].slot_name}
                       className="min-w-full min-h-full object-cover rounded-lg"
                       style={{ objectPosition: 'center center' }}
+                      onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                     />
                   </div>
                 ) : (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface Tournament {
   id: string;
@@ -99,11 +100,13 @@ export default function FeverGroupsOverlay() {
   };
 
   const renderTeamSlot = (participant: Participant | null) => {
-    if (!participant || !participant.slot_image) {
+    if (!participant) {
       return (
         <div className="w-full h-full bg-gradient-to-br from-gray-700 to-gray-800" style={{ borderTopRightRadius: '6px', borderBottomRightRadius: '6px' }}></div>
       );
     }
+
+    const imageUrl = resolveHistoricalSlotImage({ snapshotUrl: participant.slot_image });
 
     return (
       <div style={{
@@ -117,8 +120,9 @@ export default function FeverGroupsOverlay() {
         overflow: 'hidden'
       }}>
         <img
-          src={participant.slot_image}
+          src={imageUrl}
           alt={participant.slot_name}
+          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
           style={{
             width: '80px',
             height: '96px',

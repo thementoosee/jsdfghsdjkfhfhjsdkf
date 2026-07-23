@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Zap, Target, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 
 interface ChillSession {
   id: string;
@@ -27,6 +28,7 @@ interface SlotInfo {
   name: string;
   provider: string;
   image_url: string | null;
+  image_storage_path?: string | null;
   max_win: number | null;
   rtp: number | null;
   volatility: string | null;
@@ -235,7 +237,7 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
 
   const hasSession = !!session;
 
-  const slotImageUrl = slotInfo?.image_url || '';
+  const slotImageUrl = slotInfo ? resolveSlotImageUrl(slotInfo) : '';
   const maxWin = slotInfo?.max_win ? `${slotInfo.max_win.toFixed(0)}x` : '10000x';
   const rtp = slotInfo?.rtp ? `${slotInfo.rtp.toFixed(2)}%` : '96.00%';
   const volatility = slotInfo?.volatility || 'Medium';
@@ -260,12 +262,14 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
                   alt=""
                   aria-hidden="true"
                   className="absolute inset-0 w-full h-full object-cover blur-sm scale-105 opacity-50"
+                  onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                 />
                 <div className="absolute inset-4 z-10 flex items-center justify-center">
                   <img
                     src={slotImageUrl}
                     alt={session?.slot_name}
                     className="max-w-full max-h-full w-auto h-auto object-contain animate-pulse-zoom overflow-hidden rounded-[10px] border border-white/35 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
+                    onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                   />
                 </div>
               </div>
