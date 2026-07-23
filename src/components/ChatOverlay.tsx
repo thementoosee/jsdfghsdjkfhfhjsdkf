@@ -292,7 +292,7 @@ export function ChatOverlay() {
 
       const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
         slot_name: name,
-        slot_image: data.image || slotImages.get(name) || '/image.png',
+        slot_image: data.image || slotImages.get(name) || '/slot-fallback.svg',
         total_bonuses: data.count,
         total_bet: data.bet,
         total_won: data.won,

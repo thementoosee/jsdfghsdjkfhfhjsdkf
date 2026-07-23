@@ -257,7 +257,7 @@ export function Statistics() {
 
       const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
         slot_name: name,
-        slot_image: data.image || slotImages.get(name) || '/image.png',
+        slot_image: data.image || slotImages.get(name) || '/slot-fallback.svg',
         total_bonuses: data.count,
         total_bet: data.bet,
         total_won: data.won,
@@ -454,7 +454,7 @@ export function Statistics() {
                     <td className="py-3 px-2">
                       <div className="flex items-center gap-3">
                         <img
-                          src={slot.slot_image || '/image.png'}
+                          src={slot.slot_image || '/slot-fallback.svg'}
                           alt={slot.slot_name}
                           className="w-10 h-14 object-cover rounded"
                           style={{ border: '1px solid #3d3d3d' }}

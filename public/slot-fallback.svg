@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="Slot placeholder">
+  <rect width="128" height="128" rx="16" fill="#1f1f1f"/>
+  <rect x="16" y="16" width="96" height="96" rx="12" fill="#2d2d2d" stroke="#3d3d3d"/>
+  <circle cx="64" cy="52" r="18" fill="#3d3d3d"/>
+  <rect x="36" y="80" width="56" height="10" rx="5" fill="#3d3d3d"/>
+  <text x="64" y="118" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#8a8a8a">SLOT</text>
+</svg>

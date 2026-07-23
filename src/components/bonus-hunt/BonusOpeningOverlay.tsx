@@ -644,7 +644,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       <div
                         className="absolute inset-0"
                         style={{
-                          backgroundImage: `url("${item.slot_image || '/image.png'}")`,
+                          backgroundImage: `url("${item.slot_image || '/slot-fallback.svg'}")`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
                           filter: 'blur(10px) brightness(0.3)',
@@ -672,10 +672,10 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       {/* Slot image */}
                       <div className="relative z-10 flex-1 overflow-hidden">
                         <img
-                          src={item.slot_image || '/image.png'}
+                          src={item.slot_image || '/slot-fallback.svg'}
                           alt={item.slot_name}
                           className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = '/image.png'; }}
+                          onError={(e) => { e.currentTarget.src = '/slot-fallback.svg'; }}
                         />
                         {item.super_bonus === false && (
                           <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">EXTREME</span>
@@ -742,7 +742,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                         <div
                           className="absolute inset-0 opacity-20"
                           style={{
-                            backgroundImage: `url("${item.slot_image}"), url("/image.png")`,
+                            backgroundImage: `url("${item.slot_image}"), url("/slot-fallback.svg")`,
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                             filter: 'blur(10px)',
@@ -754,11 +754,11 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       <div className="flex items-center relative z-10 h-full">
                         <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
                           <img
-                            src={item.slot_image || '/image.png'}
+                            src={item.slot_image || '/slot-fallback.svg'}
                             alt={item.slot_name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              e.currentTarget.src = '/image.png';
+                              e.currentTarget.src = '/slot-fallback.svg';
                             }}
                           />
                         </div>

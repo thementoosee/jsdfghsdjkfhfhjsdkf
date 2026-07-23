@@ -31,3 +31,4 @@ dist-ssr
 
 supabase/.temp/
 .tmp-style-ref/
+scripts/reports/

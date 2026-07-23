@@ -521,7 +521,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
                     />
                   ) : (
                     <img
-                      src="/wVqLzwT_default.png"
+                      src="/slot-fallback.svg"
                       alt="Casino"
                       className="w-auto object-contain"
                       style={{ height: '32px', transform: `scale(${casinoLogoScale})`, transformOrigin: 'center center' }}

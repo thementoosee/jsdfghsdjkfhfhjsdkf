@@ -2,6 +2,7 @@
 import { ArrowLeft, ArrowUpDown, Monitor, Plus, Trash2, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { calculateBE, calculateLiveBE, calculateTotalBetAll, formatMultiplier } from '../../lib/breakEvenCalculations';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../../lib/slots-search';
 
 interface BonusHunt {
   id: string;
@@ -25,6 +26,7 @@ interface BonusHunt {
 interface BonusHuntItem {
   id: string;
   hunt_id: string;
+  slot_id?: string | null;
   slot_name: string;
   slot_image_url?: string;
   bet_amount: number;
@@ -41,7 +43,7 @@ interface Slot {
   id: string;
   name: string;
   provider: string;
-  image_url?: string;
+  image_url?: string | null;
 }
 
 interface UnifiedBonusHuntControllerProps {
@@ -92,7 +94,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
   useEffect(() => {
     const debounce = setTimeout(() => {
       searchSlots(slotSearchQuery);
-    }, 300);
+    }, SLOT_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(debounce);
   }, [slotSearchQuery]);
 
@@ -180,15 +182,13 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     }
 
     try {
-      const { data, error } = await supabase
-        .from('slots')
-        .select('id, name, provider, image_url')
-        .ilike('name', `%${query}%`)
-        .order('name', { ascending: true })
-        .limit(50);
-
-      if (error) throw error;
-      setSlots(data || []);
+      const data = await searchSlotsCatalog(query);
+      setSlots(data.map((s) => ({
+        id: s.id,
+        name: s.name,
+        provider: s.provider,
+        image_url: s.image_url ?? undefined,
+      })));
     } catch (error) {
       console.error('Error searching slots:', error);
     }
@@ -266,20 +266,23 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     try {
       const nextIndex = items.length;
 
-      let slotImageUrl = null;
-      if (slotName) {
+      let slotImageUrl = selectedSlot?.image_url || null;
+      let slotId = selectedSlot?.id || null;
+      if (!slotImageUrl && slotName) {
         const { data: slotData } = await supabase
           .from('slots')
-          .select('image_url')
+          .select('id, image_url')
           .eq('name', slotName)
           .maybeSingle();
         slotImageUrl = slotData?.image_url || null;
+        slotId = slotData?.id || slotId;
       }
 
       const { error } = await supabase
         .from('bonus_hunt_items')
         .insert({
           hunt_id: selectedHunt.id,
+          slot_id: slotId,
           slot_name: slotName,
           slot_image_url: slotImageUrl,
           bet_amount: betAmount,
@@ -679,7 +682,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   {selectedSlot && (
                     <div className="flex-shrink-0">
                       <img
-                        src={selectedSlot.image_url}
+                        src={selectedSlot.image_url || '/slot-fallback.svg'}
                         alt={selectedSlot.name}
                         className="w-6 h-8 rounded object-contain"
                       />

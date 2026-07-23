@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Search, Star, TrendingUp, DollarSign, Zap, Award, Edit2, Trash2, Save, X } from 'lucide-react';
+import { getSlotProviders, isValidHttpUrl, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
 
 interface Slot {
   id: string;
@@ -15,6 +16,11 @@ interface Slot {
   theme: string | null;
   release_date: string | null;
   features: string[];
+  aliases?: string[];
+  is_active?: boolean;
+  feature_buy?: boolean | null;
+  source_name?: string | null;
+  source_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -65,26 +71,34 @@ export function SlotDatabase() {
     max_bet: 100,
     theme: '',
     release_date: '',
-    features: [] as string[]
+    features: [] as string[],
+    aliasesText: '',
+    is_active: true,
+    feature_buy: false,
+    source_name: '',
+    source_url: '',
   });
+  const realtimeReloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadSlots();
 
+    const scheduleReload = () => {
+      if (realtimeReloadTimer.current) clearTimeout(realtimeReloadTimer.current);
+      realtimeReloadTimer.current = setTimeout(() => {
+        loadSlots();
+      }, 400);
+    };
+
     const channel = supabase
       .channel('slots_changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'slots' }, () => {
-        loadSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_stats' }, () => {
-        loadSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_favorites' }, () => {
-        loadSlots();
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slots' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_stats' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'slot_favorites' }, scheduleReload)
       .subscribe();
 
     return () => {
+      if (realtimeReloadTimer.current) clearTimeout(realtimeReloadTimer.current);
       supabase.removeChannel(channel);
     };
   }, [currentPage, searchTerm, filterProvider, filterVolatility]);
@@ -95,7 +109,9 @@ export function SlotDatabase() {
       let query = supabase.from('slots').select('*', { count: 'exact' });
 
       if (searchTerm) {
-        query = query.or(`name.ilike.%${searchTerm}%,provider.ilike.%${searchTerm}%`);
+        query = query.or(
+          `name.ilike.%${searchTerm}%,provider.ilike.%${searchTerm}%,search_normalized.ilike.%${searchTerm}%`
+        );
       }
       if (filterProvider !== 'all') {
         query = query.eq('provider', filterProvider);
@@ -142,22 +158,73 @@ export function SlotDatabase() {
     }
   };
 
+  const parseAliases = (text: string) =>
+    text
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+  const validateSlotForm = (slot: {
+    name: string;
+    provider: string;
+    rtp: number;
+    min_bet: number;
+    max_bet: number;
+    max_win: number;
+    image_url?: string | null;
+  }) => {
+    if (!slot.name?.trim() || !slot.provider?.trim()) {
+      return 'Por favor preencha pelo menos o nome e provider da slot';
+    }
+    if (Number.isNaN(slot.rtp) || slot.rtp < 0 || slot.rtp > 100) {
+      return 'RTP deve estar entre 0 e 100';
+    }
+    if (slot.min_bet < 0 || slot.max_bet < 0 || slot.max_win < 0) {
+      return 'Apostas e max win não podem ser negativos';
+    }
+    if (slot.image_url && slot.image_url.trim() && !isValidHttpUrl(slot.image_url.trim()) && !slot.image_url.startsWith('/')) {
+      return 'URL de imagem inválida (use http/https ou path local)';
+    }
+    return null;
+  };
+
   const handleAddSlot = async () => {
-    if (!newSlot.name || !newSlot.provider) {
-      alert('Por favor preencha pelo menos o nome e provider da slot');
+    const validationError = validateSlotForm(newSlot);
+    if (validationError) {
+      alert(validationError);
       return;
     }
 
     try {
+      const { data: duplicate } = await supabase
+        .from('slots')
+        .select('id')
+        .ilike('name', newSlot.name.trim())
+        .ilike('provider', newSlot.provider.trim())
+        .maybeSingle();
+
+      if (duplicate?.id) {
+        alert('Já existe uma slot com o mesmo nome e provider');
+        return;
+      }
+
       const slotData = {
-        name: newSlot.name,
-        provider: newSlot.provider,
+        name: newSlot.name.trim(),
+        provider: newSlot.provider.trim(),
         image_url: newSlot.image_url || null,
         max_win: newSlot.max_win,
         volatility: newSlot.volatility,
         rtp: newSlot.rtp,
+        min_bet: newSlot.min_bet,
+        max_bet: newSlot.max_bet,
+        theme: newSlot.theme || null,
         release_date: newSlot.release_date || null,
-        features: newSlot.features
+        features: newSlot.features,
+        aliases: parseAliases(newSlot.aliasesText),
+        is_active: newSlot.is_active,
+        feature_buy: newSlot.feature_buy,
+        source_name: newSlot.source_name || null,
+        source_url: newSlot.source_url || null,
       };
 
       const { error } = await supabase
@@ -181,7 +248,12 @@ export function SlotDatabase() {
         max_bet: 100.0,
         theme: '',
         release_date: '',
-        features: []
+        features: [],
+        aliasesText: '',
+        is_active: true,
+        feature_buy: false,
+        source_name: '',
+        source_url: '',
       });
       await loadSlots();
     } catch (error) {
@@ -192,6 +264,20 @@ export function SlotDatabase() {
 
   const handleUpdateSlot = async () => {
     if (!editingSlot) return;
+
+    const validationError = validateSlotForm({
+      name: editingSlot.name,
+      provider: editingSlot.provider,
+      rtp: editingSlot.rtp,
+      min_bet: editingSlot.min_bet,
+      max_bet: editingSlot.max_bet,
+      max_win: editingSlot.max_win,
+      image_url: editingSlot.image_url,
+    });
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
 
     try {
       const { error } = await supabase
@@ -208,6 +294,11 @@ export function SlotDatabase() {
           theme: editingSlot.theme,
           release_date: editingSlot.release_date,
           features: editingSlot.features,
+          aliases: editingSlot.aliases || [],
+          is_active: editingSlot.is_active ?? true,
+          feature_buy: editingSlot.feature_buy ?? null,
+          source_name: editingSlot.source_name || null,
+          source_url: editingSlot.source_url || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', editingSlot.id);
@@ -218,7 +309,7 @@ export function SlotDatabase() {
       await loadSlots();
     } catch (error) {
       console.error('Error updating slot:', error);
-      alert('Erro ao atualizar slot');
+      alert(`Erro ao atualizar slot: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -377,7 +468,7 @@ export function SlotDatabase() {
     }
 
     setRepairingImages(true);
-    const defaultImage = '/wVqLzwT_default.png';
+    const defaultImage = SLOT_FALLBACK_IMAGE;
 
     try {
       const allSlots = await fetchAllRows('slots', 'id, name, image_url');
@@ -475,13 +566,12 @@ export function SlotDatabase() {
 
   useEffect(() => {
     const loadProviders = async () => {
-      const { data } = await supabase
-        .from('slots')
-        .select('provider')
-        .order('provider');
-
-      const uniqueProviders = Array.from(new Set((data || []).map(s => s.provider))).filter(Boolean);
-      setProviders(uniqueProviders as string[]);
+      try {
+        const uniqueProviders = await getSlotProviders();
+        setProviders(uniqueProviders);
+      } catch (error) {
+        console.error('Error loading providers:', error);
+      }
     };
     loadProviders();
   }, []);
@@ -616,11 +706,25 @@ export function SlotDatabase() {
 
             <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}>
               {slots.map((slot) => (
-                <div key={slot.id} className="rounded-xl p-6 transition-all" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
+                <div key={slot.id} className="rounded-xl p-6 transition-all" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', opacity: slot.is_active === false ? 0.65 : 1 }}>
+                  <div className="mb-4 overflow-hidden rounded-lg" style={{ background: '#1a1a1a', border: '1px solid #2d2d2d' }}>
+                    <img
+                      src={slot.image_url || SLOT_FALLBACK_IMAGE}
+                      alt={slot.name}
+                      loading="lazy"
+                      className="w-full h-36 object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                      }}
+                    />
+                  </div>
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex-1">
                       <h3 className="font-bold uppercase text-lg mb-1" style={{ color: '#d4d4d4' }}>{slot.name}</h3>
                       <p className="text-sm uppercase" style={{ color: '#8a8a8a' }}>{slot.provider}</p>
+                      {slot.is_active === false && (
+                        <p className="text-xs uppercase mt-1" style={{ color: '#ef4444' }}>Inativa</p>
+                      )}
                     </div>
                     <button
                       onClick={() => handleToggleFavorite(slot.id, slot.is_favorite || false)}
@@ -875,6 +979,75 @@ export function SlotDatabase() {
                   className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
                   style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Aliases (separados por vírgula)</label>
+                <input
+                  type="text"
+                  value={editingSlot ? (editingSlot.aliases || []).join(', ') : newSlot.aliasesText}
+                  onChange={(e) => editingSlot
+                    ? setEditingSlot({ ...editingSlot, aliases: parseAliases(e.target.value) })
+                    : setNewSlot({ ...newSlot, aliasesText: e.target.value })
+                  }
+                  className="w-full px-4 py-2 rounded-lg transition-all text-sm"
+                  style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
+                  placeholder="GOO 1000, gates 1000"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Source Name</label>
+                  <input
+                    type="text"
+                    value={editingSlot ? editingSlot.source_name || '' : newSlot.source_name}
+                    onChange={(e) => editingSlot
+                      ? setEditingSlot({ ...editingSlot, source_name: e.target.value })
+                      : setNewSlot({ ...newSlot, source_name: e.target.value })
+                    }
+                    className="w-full px-4 py-2 rounded-lg transition-all text-sm"
+                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Source URL</label>
+                  <input
+                    type="text"
+                    value={editingSlot ? editingSlot.source_url || '' : newSlot.source_url}
+                    onChange={(e) => editingSlot
+                      ? setEditingSlot({ ...editingSlot, source_url: e.target.value })
+                      : setNewSlot({ ...newSlot, source_url: e.target.value })
+                    }
+                    className="w-full px-4 py-2 rounded-lg transition-all text-sm"
+                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-sm uppercase" style={{ color: '#d4d4d4' }}>
+                  <input
+                    type="checkbox"
+                    checked={editingSlot ? editingSlot.is_active !== false : newSlot.is_active}
+                    onChange={(e) => editingSlot
+                      ? setEditingSlot({ ...editingSlot, is_active: e.target.checked })
+                      : setNewSlot({ ...newSlot, is_active: e.target.checked })
+                    }
+                  />
+                  Ativa
+                </label>
+                <label className="flex items-center gap-2 text-sm uppercase" style={{ color: '#d4d4d4' }}>
+                  <input
+                    type="checkbox"
+                    checked={editingSlot ? Boolean(editingSlot.feature_buy) : newSlot.feature_buy}
+                    onChange={(e) => editingSlot
+                      ? setEditingSlot({ ...editingSlot, feature_buy: e.target.checked })
+                      : setNewSlot({ ...newSlot, feature_buy: e.target.checked })
+                    }
+                  />
+                  Feature Buy
+                </label>
               </div>
 
               <div className="flex gap-3 pt-4">

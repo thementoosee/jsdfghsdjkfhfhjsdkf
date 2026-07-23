@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Trophy, Plus, X, Users, PlayCircle, CheckCircle, CreditCard as Edit2, Trash2 } from 'lucide-react';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../lib/slots-search';
 
 interface Tournament {
   id: string;
@@ -38,7 +39,7 @@ interface Slot {
   id: string;
   name: string;
   provider: string;
-  image_url: string;
+  image_url: string | null;
 }
 
 interface Match {
@@ -108,13 +109,13 @@ export function FeverChampionsManager() {
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (showAddParticipant) {
+      if (showAddParticipant || showEditParticipant) {
         loadSlots(slotSearch);
       }
-    }, 300);
+    }, SLOT_SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(timer);
-  }, [slotSearch, showAddParticipant]);
+  }, [slotSearch, showAddParticipant, showEditParticipant]);
 
   useEffect(() => {
     if (selectedTournament) {
@@ -156,19 +157,17 @@ export function FeverChampionsManager() {
   const loadSlots = async (searchTerm: string = '') => {
     setSlotsLoading(true);
     try {
-      let query = supabase
-        .from('slots')
-        .select('id, name, provider, image_url')
-        .order('name', { ascending: true });
-
-      if (searchTerm.trim()) {
-        query = query.or(`name.ilike.%${searchTerm}%,provider.ilike.%${searchTerm}%`);
+      if (!searchTerm.trim()) {
+        setSlots([]);
+        return;
       }
-
-      const { data, error } = await query.limit(50);
-
-      if (error) throw error;
-      setSlots(data || []);
+      const data = await searchSlotsCatalog(searchTerm);
+      setSlots(data.map((s) => ({
+        id: s.id,
+        name: s.name,
+        provider: s.provider,
+        image_url: s.image_url,
+      })));
     } catch (error) {
       console.error('Error loading slots:', error);
     } finally {
@@ -875,7 +874,7 @@ export function FeverChampionsManager() {
                                           alt={slot.name}
                                           className="w-8 h-8 rounded object-contain"
                                           onError={(e) => {
-                                            e.currentTarget.src = '/image.png';
+                                            e.currentTarget.src = '/slot-fallback.svg';
                                           }}
                                         />
                                       )}
@@ -952,27 +951,22 @@ export function FeverChampionsManager() {
                               {selectedTournament.status !== 'completed' && (
                                 <button
                                   onClick={async () => {
-                                    // Load slots first and try to match the current one
                                     const searchTerm = participant.slot_name || '';
-                                    const { data: loadedSlots } = await supabase
-                                      .from('slots')
-                                      .select('id, name, provider, image_url')
-                                      .ilike('name', `%${searchTerm}%`)
-                                      .order('name')
-                                      .limit(50);
-
-                                    if (loadedSlots) {
-                                      setSlots(loadedSlots);
-                                      // Find exact match
-                                      const matchingSlot = loadedSlots.find(s => s.name === participant.slot_name);
-
-                                      setEditParticipantData({
-                                        viewer_name: participant.viewer_name,
-                                        slot_id: matchingSlot?.id || ''
-                                      });
-                                      setSlotSearch(searchTerm);
-                                    }
-
+                                    const loadedSlots = searchTerm
+                                      ? (await searchSlotsCatalog(searchTerm)).map((s) => ({
+                                          id: s.id,
+                                          name: s.name,
+                                          provider: s.provider,
+                                          image_url: s.image_url,
+                                        }))
+                                      : [];
+                                    setSlots(loadedSlots);
+                                    const matchingSlot = loadedSlots.find(s => s.name === participant.slot_name);
+                                    setEditParticipantData({
+                                      viewer_name: participant.viewer_name,
+                                      slot_id: matchingSlot?.id || ''
+                                    });
+                                    setSlotSearch(searchTerm);
                                     setShowEditParticipant(participant);
                                   }}
                                   className="p-1.5 bg-blue-500/20 text-blue-400 rounded hover:bg-blue-500/30 transition-colors"
@@ -1035,7 +1029,6 @@ export function FeverChampionsManager() {
                   value={slotSearch}
                   onChange={(e) => {
                     setSlotSearch(e.target.value);
-                    loadSlots(e.target.value);
                   }}
                   className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-yellow-500 mb-2"
                   placeholder="Pesquisar slot..."

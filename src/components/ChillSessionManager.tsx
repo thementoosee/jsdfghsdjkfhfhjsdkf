@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Coffee, X, TrendingUp, TrendingDown, Search, Monitor } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS } from '../lib/slots-search';
 
 interface ChillSession {
   id: string;
@@ -69,7 +70,7 @@ export function ChillSessionManager() {
   useEffect(() => {
     const debounce = setTimeout(() => {
       searchSlots(slotSearchQuery);
-    }, 300);
+    }, SLOT_SEARCH_DEBOUNCE_MS);
 
     return () => clearTimeout(debounce);
   }, [slotSearchQuery]);
@@ -95,15 +96,13 @@ export function ChillSessionManager() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('slots')
-        .select('id, name, provider, image_url')
-        .ilike('name', `%${query}%`)
-        .order('name', { ascending: true })
-        .limit(50);
-
-      if (error) throw error;
-      setSlots(data || []);
+      const data = await searchSlotsCatalog(query);
+      setSlots(data.map((s) => ({
+        id: s.id,
+        name: s.name,
+        provider: s.provider,
+        image_url: s.image_url ?? undefined,
+      })));
     } catch (error) {
       console.error('Error searching slots:', error);
     }
@@ -458,7 +457,7 @@ export function ChillSessionManager() {
                     {slot.image_url && (
                       <img src={slot.image_url}
                       onError={(e) => {
-                        e.currentTarget.src = '/image.png';
+                        e.currentTarget.src = '/slot-fallback.svg';
                       }} alt={slot.name} className="w-16 h-16 rounded object-cover" />
                     )}
                     <div>
@@ -477,7 +476,7 @@ export function ChillSessionManager() {
             {selectedSlot.image_url && (
               <img src={selectedSlot.image_url}
                       onError={(e) => {
-                        e.currentTarget.src = '/image.png';
+                        e.currentTarget.src = '/slot-fallback.svg';
                       }} alt={selectedSlot.name} className="w-20 h-20 rounded-lg object-cover" />
             )}
             <div>
@@ -513,7 +512,7 @@ export function ChillSessionManager() {
             {selectedSlot?.image_url && (
               <img src={selectedSlot.image_url}
                       onError={(e) => {
-                        e.currentTarget.src = '/image.png';
+                        e.currentTarget.src = '/slot-fallback.svg';
                       }} alt={selectedSlot.name} className="w-24 h-24 rounded-xl object-cover" style={{ border: '2px solid #3d3d3d' }} />
             )}
             <div>
@@ -578,7 +577,7 @@ export function ChillSessionManager() {
                     {slot.image_url && (
                       <img src={slot.image_url}
                       onError={(e) => {
-                        e.currentTarget.src = '/image.png';
+                        e.currentTarget.src = '/slot-fallback.svg';
                       }} alt={slot.name} className="w-16 h-16 rounded object-cover" />
                     )}
                     <div>
@@ -632,7 +631,7 @@ export function ChillSessionManager() {
               <img
                 src={selectedSlot.image_url}
                       onError={(e) => {
-                        e.currentTarget.src = '/image.png';
+                        e.currentTarget.src = '/slot-fallback.svg';
                       }}
                 alt={selectedSlot.name}
                 className="w-20 h-20 rounded-lg object-cover flex-shrink-0"
