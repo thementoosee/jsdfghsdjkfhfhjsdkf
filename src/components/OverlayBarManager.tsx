@@ -316,7 +316,7 @@ export function OverlayBarManager({ showOnlyButtons = false, showOnlySelects = f
           <input
             type="range"
             min={0.5}
-            max={1.2}
+            max={5}
             step={0.05}
             value={config.casinoLogoScale ?? 1}
             onChange={async (e) => {
@@ -506,7 +506,7 @@ export function OverlayBarManager({ showOnlyButtons = false, showOnlySelects = f
           <input
             type="range"
             min={0.5}
-            max={1.2}
+            max={5}
             step={0.05}
             value={config.casinoLogoScale ?? 1}
             onChange={async (e) => {
