@@ -49,6 +49,10 @@ function huntItemImageUrl(item: BonusHuntItem): string {
   });
 }
 
+/** Same height as the first list card (short / even index). */
+const BONUS_LIST_CARD_HEIGHT_PX = 66;
+const BONUS_LIST_CARD_GAP_PX = 8;
+
 interface BonusHuntOverlayProps {
   huntId?: string;
   embedded?: boolean;
@@ -59,8 +63,10 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   const [items, setItems] = useState<BonusHuntItem[]>([]);
   const [newItemIds, setNewItemIds] = useState<Set<string>>(new Set());
   const [removedItemIds, setRemovedItemIds] = useState<Set<string>>(new Set());
+  const [listOverflows, setListOverflows] = useState(false);
   const previousItemIdsRef = useRef<Set<string>>(new Set());
   const currentHuntIdRef = useRef<string | null>(null);
+  const listViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     loadActiveHunt();
@@ -106,6 +112,38 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
       supabase.removeChannel(huntChannel);
     };
   }, [huntId]);
+
+  useEffect(() => {
+    const viewport = listViewportRef.current;
+    if (!viewport) return;
+
+    const updateOverflow = () => {
+      const count = items.length;
+      if (count === 0) {
+        setListOverflows(false);
+        return;
+      }
+
+      // clientHeight includes padding; cards live inside the content box.
+      const styles = getComputedStyle(viewport);
+      const padY =
+        (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
+      const availableHeight = Math.max(0, viewport.clientHeight - padY);
+      const contentHeight =
+        count * BONUS_LIST_CARD_HEIGHT_PX + Math.max(0, count - 1) * BONUS_LIST_CARD_GAP_PX;
+
+      setListOverflows(contentHeight > availableHeight);
+    };
+
+    updateOverflow();
+    const rafId = requestAnimationFrame(updateOverflow);
+    const observer = new ResizeObserver(updateOverflow);
+    observer.observe(viewport);
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
+  }, [items.length, hunt?.id]);
 
   const loadActiveHunt = async () => {
     try {
@@ -213,7 +251,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
   const superBonusCount = items.filter(item => item.is_super_bonus === true).length;
   const extremeBonusCount = items.filter(item => item.is_extreme_bonus === true).length;
   const carouselItems = items;
-  const scrollingItems = items.length > 4 ? [...items, ...items] : items;
+  const scrollingItems = listOverflows ? [...items, ...items] : items;
 
   const currentBreakEven = (() => {
     if (!hunt) return '0x';
@@ -392,7 +430,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
           </div>
 
           <div
-            className="flex-1 overflow-hidden flex flex-col"
+            className="flex-1 min-h-0 overflow-hidden flex flex-col"
             style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.5))' }}
           >
             <Carousel3D
@@ -475,16 +513,15 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
               </span>
             </div>
 
-            <div className="flex-1 overflow-hidden px-4 pb-4">
+            <div className="flex-1 min-h-0 overflow-hidden px-4 pb-4" ref={listViewportRef}>
               <div
                 className="space-y-2"
                 style={{
-                  animation: items.length > 4 ? 'scroll 28s linear infinite' : 'none'
+                  animation: listOverflows ? 'scroll 28s linear infinite' : 'none'
                 }}
               >
                 {scrollingItems.map((item, index) => {
                   const actualIndex = items.length > 0 ? (index % items.length) : 0;
-                  const cardIsTall = actualIndex % 2 === 1;
                   const payment = item.payment_amount || item.bet_amount;
                   const isOpened = item.status === 'opened';
                   const isWin = isOpened && (item.result_amount || 0) > payment;
@@ -496,9 +533,11 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                   return (
                     <div
                       key={`${item.id}-${index}`}
-                      className="rounded-xl overflow-hidden relative"
+                      className="rounded-xl overflow-hidden relative flex-shrink-0"
                       style={{
-                        minHeight: cardIsTall ? '88px' : '66px',
+                        height: BONUS_LIST_CARD_HEIGHT_PX,
+                        minHeight: BONUS_LIST_CARD_HEIGHT_PX,
+                        maxHeight: BONUS_LIST_CARD_HEIGHT_PX,
                         background: isOpened
                           ? (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
                           : 'rgba(251, 191, 36, 0.15)',
@@ -528,7 +567,7 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
                       />
 
                       <div className="flex items-center relative z-10 h-full">
-                        <div className={`${cardIsTall ? 'w-14' : 'w-12'} h-full flex-shrink-0 overflow-hidden`}>
+                        <div className="w-12 h-full flex-shrink-0 overflow-hidden">
                           <img
                             src={imageUrl}
                             alt={item.slot_name}

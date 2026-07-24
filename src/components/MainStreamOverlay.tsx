@@ -368,7 +368,8 @@ export function MainStreamOverlay() {
           overflow: hidden;
         }
 
-        .no-overlay-effects * {
+        .overlay-layer.slide-in-left-overlay .no-overlay-effects *,
+        .overlay-layer.slide-out-overlay .no-overlay-effects * {
           animation: none !important;
           transition: none !important;
         }
@@ -435,9 +436,7 @@ export function MainStreamOverlay() {
 
               {!leavingOverlay && !enteringOverlay && (
                 <div className="h-full">
-                  <div className="h-full no-overlay-effects">
-                    {renderLeftOverlay(overlayState)}
-                  </div>
+                  {renderLeftOverlay(overlayState)}
                 </div>
               )}
             </div>
