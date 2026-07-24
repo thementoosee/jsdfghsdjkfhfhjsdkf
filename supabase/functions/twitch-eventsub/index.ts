@@ -591,13 +591,35 @@ async function insertAlertFromNotification(
     return;
   }
 
+  // Idempotency key = Twitch EventSub message id (event_id).
+  // Requires UNIQUE(event_id) — not a partial unique index — so PostgREST
+  // ON CONFLICT (event_id) DO NOTHING works for webhook retries.
+  const eventId = String(alert.event_id ?? '').trim();
+  if (!eventId) {
+    console.warn('[twitch-eventsub] alert skipped: missing event_id', { eventType });
+    return;
+  }
+  alert.event_id = eventId;
+
   const { error } = await supabase
     .from('twitch_alerts')
     .upsert(alert, { onConflict: 'event_id', ignoreDuplicates: true });
 
   if (error) {
+    console.error('[twitch-eventsub] alert upsert failed', {
+      eventType,
+      event_id: eventId,
+      message: error.message,
+    });
     throw new Error(error.message);
   }
+
+  console.log('[twitch-eventsub] alert upsert ok', {
+    eventType,
+    event_id: eventId,
+    alert_type: alert.alert_type,
+    username: alert.username,
+  });
 }
 
 Deno.serve(async (req: Request) => {
