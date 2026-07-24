@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Target, Percent, Gift, Coffee } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import { SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import {
+  createEmptyTopSlotsPlaceholders,
+  isTopSlotFilled,
+  type TopSlotEntry,
+} from '../lib/top-slots';
 
 interface BonusHuntStats {
   total_hunts: number;
@@ -21,16 +26,6 @@ interface ChillSessionStats {
   total_bet: number;
   total_won: number;
   total_profit: number;
-  average_multiplier: number;
-}
-
-interface TopSlot {
-  slot_name: string;
-  slot_image: string | null;
-  total_bonuses: number;
-  total_bet: number;
-  total_won: number;
-  profit: number;
   average_multiplier: number;
 }
 
@@ -56,7 +51,7 @@ export function Statistics() {
     average_multiplier: 0
   });
 
-  const [topSlots, setTopSlots] = useState<TopSlot[]>([]);
+  const [topSlots] = useState<TopSlotEntry[]>(() => createEmptyTopSlotsPlaceholders());
 
   useEffect(() => {
     loadStatistics();
@@ -92,7 +87,6 @@ export function Statistics() {
     await Promise.all([
       loadBonusHuntStats(),
       loadChillStats(),
-      loadTopSlots()
     ]);
   };
 
@@ -181,99 +175,6 @@ export function Statistics() {
       setChillStats(stats);
     } catch (error) {
       console.error('Error loading chill stats:', error);
-    }
-  };
-
-  const loadTopSlots = async () => {
-    try {
-      const { data: huntItems, error: huntError } = await supabase
-        .from('bonus_hunt_items')
-        .select('slot_name, slot_image_url, bet_amount, payment_amount, result_amount, status');
-
-      if (huntError) throw huntError;
-
-      const { data: openingItems, error: openingError } = await supabase
-        .from('bonus_opening_items')
-        .select('slot_name, slot_image, payment, payout, status');
-
-      if (openingError) throw openingError;
-
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('chill_sessions')
-        .select('slot_name, total_bonuses, total_bet, total_won');
-
-      if (sessionsError) throw sessionsError;
-
-      const slotMap = new Map<string, { bet: number; won: number; count: number; image: string | null }>();
-
-      huntItems?.forEach(item => {
-        if (item.status === 'opened' && item.result_amount) {
-          const existing = slotMap.get(item.slot_name) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(item.slot_name, {
-            bet: existing.bet + (item.payment_amount || item.bet_amount),
-            won: existing.won + item.result_amount,
-            count: existing.count + 1,
-            image: existing.image || item.slot_image_url
-          });
-        }
-      });
-
-      openingItems?.forEach(item => {
-        if (item.status === 'opened' && item.payout) {
-          const existing = slotMap.get(item.slot_name) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(item.slot_name, {
-            bet: existing.bet + (item.payment || 0),
-            won: existing.won + (item.payout || 0),
-            count: existing.count + 1,
-            image: existing.image || item.slot_image
-          });
-        }
-      });
-
-      sessions?.forEach((session: {
-        slot_name?: string;
-        total_bonuses?: number;
-        total_bet?: number;
-        total_won?: number;
-      }) => {
-        if (session.slot_name && (session.total_bonuses || 0) > 0) {
-          const slotName = session.slot_name;
-          const existing = slotMap.get(slotName) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(slotName, {
-            bet: existing.bet + (session.total_bet || 0),
-            won: existing.won + (session.total_won || 0),
-            count: existing.count + (session.total_bonuses || 0),
-            image: existing.image
-          });
-        }
-      });
-
-      const slotNames = Array.from(slotMap.keys());
-      const { data: slotsData } = await supabase
-        .from('slots')
-        .select('name, image_url, image_storage_path')
-        .in('name', slotNames);
-
-      const slotsByName = new Map(slotsData?.map(s => [s.name, s]) || []);
-
-      const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
-        slot_name: name,
-        slot_image: resolveHistoricalSlotImage({
-          slot: slotsByName.get(name),
-          snapshotUrl: data.image,
-        }),
-        total_bonuses: data.count,
-        total_bet: data.bet,
-        total_won: data.won,
-        profit: data.won - data.bet,
-        average_multiplier: data.bet > 0 ? data.won / data.bet : 0
-      }));
-
-      slots.sort((a, b) => b.profit - a.profit);
-
-      setTopSlots(slots.slice(0, 5));
-    } catch (error) {
-      console.error('Error loading top slots:', error);
     }
   };
 
@@ -419,15 +320,14 @@ export function Statistics() {
         </div>
       </div>
 
-      {topSlots.length > 0 && (
-        <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
+      <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
               <Target className="w-5 h-5" style={{ color: '#b89968' }} />
             </div>
             <div>
               <h3 className="text-lg font-bold uppercase" style={{ color: '#d4d4d4' }}>Top 5 Slots</h3>
-              <p className="text-xs uppercase" style={{ color: '#8a8a8a' }}>Ordenado por lucro</p>
+              <p className="text-xs uppercase" style={{ color: '#8a8a8a' }}>Ranking por maior multiplicador (em breve)</p>
             </div>
           </div>
 
@@ -437,50 +337,58 @@ export function Statistics() {
                 <tr style={{ borderBottom: '2px solid #3d3d3d' }}>
                   <th className="text-left py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>#</th>
                   <th className="text-left py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Slot</th>
-                  <th className="text-center py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Bonuses</th>
-                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Investido</th>
-                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Ganho</th>
-                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Mult. Médio</th>
-                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Lucro</th>
+                  <th className="text-left py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Provider</th>
+                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Max Mult.</th>
+                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Bet</th>
+                  <th className="text-right py-3 px-2 text-xs font-bold uppercase" style={{ color: '#8a8a8a' }}>Win</th>
                 </tr>
               </thead>
               <tbody>
-                {topSlots.map((slot, index) => (
-                  <tr key={slot.slot_name} style={{ borderBottom: '1px solid #2d2d2d' }} className="transition-colors hover:bg-opacity-50">
-                    <td className="py-3 px-2">
-                      <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold" style={{
-                        background: index === 0 ? '#b89968' : index === 1 ? '#8a8a8a' : index === 2 ? '#a0826d' : '#3d3d3d',
-                        color: index <= 2 ? '#1a1a1a' : '#8a8a8a'
-                      }}>
-                        {index + 1}
-                      </span>
-                    </td>
-                    <td className="py-3 px-2">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={slot.slot_image || SLOT_FALLBACK_IMAGE}
-                          alt={slot.slot_name}
-                          className="w-10 h-14 object-cover rounded"
-                          style={{ border: '1px solid #3d3d3d' }}
-                          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
-                        />
-                        <span className="font-semibold text-sm uppercase" style={{ color: '#d4d4d4' }}>{slot.slot_name}</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-2 text-center font-medium" style={{ color: '#d4d4d4' }}>{slot.total_bonuses}</td>
-                    <td className="py-3 px-2 text-right font-medium" style={{ color: '#d4d4d4' }}>€{slot.total_bet.toFixed(2)}</td>
-                    <td className="py-3 px-2 text-right font-medium" style={{ color: '#d4d4d4' }}>€{slot.total_won.toFixed(2)}</td>
-                    <td className="py-3 px-2 text-right font-bold" style={{ color: '#b89968' }}>{slot.average_multiplier.toFixed(2)}x</td>
-                    <td className="py-3 px-2 text-right font-bold" style={{ color: slot.profit >= 0 ? '#10b981' : '#ef4444' }}>
-                      €{slot.profit.toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {topSlots.map((slot) => {
+                  const filled = isTopSlotFilled(slot);
+                  return (
+                    <tr key={slot.rank} style={{ borderBottom: '1px solid #2d2d2d' }} className="transition-colors hover:bg-opacity-50">
+                      <td className="py-3 px-2">
+                        <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold" style={{
+                          background: slot.rank === 1 ? '#b89968' : slot.rank === 2 ? '#8a8a8a' : slot.rank === 3 ? '#a0826d' : '#3d3d3d',
+                          color: slot.rank <= 3 ? '#1a1a1a' : '#8a8a8a'
+                        }}>
+                          {slot.rank}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={slot.slot_image || SLOT_FALLBACK_IMAGE}
+                            alt={filled ? String(slot.slot_name) : ''}
+                            className="w-10 h-14 object-cover rounded"
+                            style={{ border: '1px solid #3d3d3d' }}
+                            onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
+                          />
+                          <span className="font-semibold text-sm uppercase" style={{ color: filled ? '#d4d4d4' : '#8a8a8a' }}>
+                            {filled ? slot.slot_name : '—'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-2 font-medium" style={{ color: '#8a8a8a' }}>
+                        {slot.provider?.trim() ? slot.provider : '—'}
+                      </td>
+                      <td className="py-3 px-2 text-right font-bold" style={{ color: '#b89968' }}>
+                        {slot.max_multiplier != null ? `${Number(slot.max_multiplier).toFixed(2)}x` : '—'}
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium" style={{ color: '#d4d4d4' }}>
+                        {slot.bet_amount != null ? `€${Number(slot.bet_amount).toFixed(2)}` : '—'}
+                      </td>
+                      <td className="py-3 px-2 text-right font-medium" style={{ color: '#d4d4d4' }}>
+                        {slot.win_amount != null ? `€${Number(slot.win_amount).toFixed(2)}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
-      )}
 
       <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
         <div className="flex items-center gap-3 mb-3">

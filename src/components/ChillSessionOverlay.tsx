@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Trophy, TrendingUp, Zap, Target, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../lib/overlay-layout';
 
 interface ChillSession {
   id: string;
@@ -243,7 +244,10 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
   const volatility = slotInfo?.volatility || 'Medium';
 
   return (
-    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>
+    <div
+      className="h-[720px] relative"
+      style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX, marginTop: 0 }}
+    >
       <div
         className="w-full h-full overflow-hidden flex flex-col"
         style={{

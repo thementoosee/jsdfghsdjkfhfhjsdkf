@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Gift, TrendingUp, Target, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slot-image';
+import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../../lib/overlay-layout';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
 interface BonusOpening {
@@ -396,7 +397,10 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
   const scrollingItems = items.length > 4 ? [...items, ...items] : items;
 
   return (
-    <div className="w-[288px] h-[720px] relative" style={{ marginTop: '0px', marginLeft: '62px' }}>
+    <div
+      className="h-[720px] relative"
+      style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX, marginTop: 0 }}
+    >
       <style>{`
         @keyframes float {
           0%, 100% { transform: translate(0, 0) scale(1); }

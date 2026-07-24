@@ -16,7 +16,13 @@ import {
   RECENT_EVENTS_LIMIT,
   type NormalizedRecentEvent,
 } from '../lib/recent-events';
-import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import { SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import {
+  createEmptyTopSlotsPlaceholders,
+  isTopSlotFilled,
+  type TopSlotEntry,
+} from '../lib/top-slots';
+import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../lib/overlay-layout';
 
 interface ChatMessage {
   id: string;
@@ -30,29 +36,19 @@ interface ChatMessage {
   created_at: string;
 }
 
-interface TopSlot {
-  slot_name: string;
-  slot_image: string | null;
-  total_bonuses: number;
-  total_bet: number;
-  total_won: number;
-  profit: number;
-  average_multiplier: number;
-}
-
 export function ChatOverlay() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [alerts, setAlerts] = useState<NormalizedRecentEvent[]>([]);
   const [giveawayWinner, setGiveawayWinner] = useState<string | null>(null);
   const [winnerSelectedAt, setWinnerSelectedAt] = useState<string | null>(null);
 
-  const [topSlots, setTopSlots] = useState<TopSlot[]>([]);
+  // Visual scaffold only — ranking by historical max multiplier comes later.
+  const [topSlots] = useState<TopSlotEntry[]>(() => createEmptyTopSlotsPlaceholders());
   const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
   const [badgeCatalog, setBadgeCatalog] = useState<Record<string, { set_id: string; id: string; title: string; image_url_1x: string; image_url_2x: string; image_url_4x: string; source?: 'channel' | 'global' }> | null>(null);
 
   useEffect(() => {
     console.log('🚀 ChatOverlay: Initializing...');
-    loadTopSlots();
     loadMessages();
     loadAlerts();
     loadActiveGiveawayWinner();
@@ -94,24 +90,6 @@ export function ChatOverlay() {
 
     const dataChannel = supabase
       .channel(`chat-data-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_hunts' }, () => {
-        loadTopSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_hunt_items' }, () => {
-        loadTopSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_openings' }, () => {
-        loadTopSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_opening_items' }, () => {
-        loadTopSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chill_sessions' }, () => {
-        loadTopSlots();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'chill_bonuses' }, () => {
-        loadTopSlots();
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'giveaways' }, () => {
         loadActiveGiveawayWinner();
       })
@@ -219,102 +197,11 @@ export function ChatOverlay() {
     }
   };
 
-  const loadTopSlots = async () => {
-    try {
-      const { data: huntItems, error: huntError } = await supabase
-        .from('bonus_hunt_items')
-        .select('slot_name, slot_image_url, bet_amount, payment_amount, result_amount, status');
-
-      if (huntError) throw huntError;
-
-      const { data: openingItems, error: openingError } = await supabase
-        .from('bonus_opening_items')
-        .select('slot_name, slot_image, payment, payout, status');
-
-      if (openingError) throw openingError;
-
-      const { data: sessions, error: sessionsError } = await supabase
-        .from('chill_sessions')
-        .select('slot_name, total_bonuses, total_bet, total_won');
-
-      if (sessionsError) throw sessionsError;
-
-      const slotMap = new Map<string, { bet: number; won: number; count: number; image: string | null }>();
-
-      huntItems?.forEach(item => {
-        if (item.status === 'opened' && item.result_amount) {
-          const existing = slotMap.get(item.slot_name) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(item.slot_name, {
-            bet: existing.bet + (item.payment_amount || item.bet_amount),
-            won: existing.won + item.result_amount,
-            count: existing.count + 1,
-            image: existing.image || item.slot_image_url
-          });
-        }
-      });
-
-      openingItems?.forEach(item => {
-        if (item.status === 'opened' && item.payout) {
-          const existing = slotMap.get(item.slot_name) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(item.slot_name, {
-            bet: existing.bet + (item.payment || 0),
-            won: existing.won + (item.payout || 0),
-            count: existing.count + 1,
-            image: existing.image || item.slot_image
-          });
-        }
-      });
-
-      sessions?.forEach((session: {
-        slot_name?: string;
-        total_bonuses?: number;
-        total_bet?: number;
-        total_won?: number;
-      }) => {
-        if (session.slot_name && (session.total_bonuses || 0) > 0) {
-          const slotName = session.slot_name;
-          const existing = slotMap.get(slotName) || { bet: 0, won: 0, count: 0, image: null };
-          slotMap.set(slotName, {
-            bet: existing.bet + (session.total_bet || 0),
-            won: existing.won + (session.total_won || 0),
-            count: existing.count + (session.total_bonuses || 0),
-            image: existing.image
-          });
-        }
-      });
-
-      const slotNames = Array.from(slotMap.keys());
-      const { data: slotsData } = await supabase
-        .from('slots')
-        .select('name, image_url, image_storage_path')
-        .in('name', slotNames);
-
-      const slotsByName = new Map(slotsData?.map(s => [s.name, s]) || []);
-
-      const slots: TopSlot[] = Array.from(slotMap.entries()).map(([name, data]) => ({
-        slot_name: name,
-        slot_image: resolveHistoricalSlotImage({
-          slot: slotsByName.get(name),
-          snapshotUrl: data.image,
-        }),
-        total_bonuses: data.count,
-        total_bet: data.bet,
-        total_won: data.won,
-        profit: data.won - data.bet,
-        average_multiplier: data.bet > 0 ? data.won / data.bet : 0
-      }));
-
-      slots.sort((a, b) => b.profit - a.profit);
-      const top5 = slots.slice(0, 5);
-
-      setTopSlots(top5);
-    } catch (error) {
-      console.error('Error loading top slots:', error);
-    }
-  };
-
   return (
-    <div className="w-[240px] h-[720px] relative" style={{ marginTop: '0px', marginRight: '5px' }}>
+    <div
+      className="h-[720px] relative"
+      style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX, marginTop: 0 }}
+    >
       <div
         className="w-full h-full overflow-hidden flex flex-col"
         style={{
@@ -519,8 +406,12 @@ export function ChatOverlay() {
                 {topSlots[currentSlotIndex] ? (
                   <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden">
                     <img
-                      src={resolveHistoricalSlotImage({ snapshotUrl: topSlots[currentSlotIndex].slot_image })}
-                      alt={topSlots[currentSlotIndex].slot_name}
+                      src={topSlots[currentSlotIndex].slot_image || SLOT_FALLBACK_IMAGE}
+                      alt={
+                        isTopSlotFilled(topSlots[currentSlotIndex])
+                          ? String(topSlots[currentSlotIndex].slot_name)
+                          : ''
+                      }
                       className="min-w-full min-h-full object-cover rounded-lg"
                       style={{ objectPosition: 'center center' }}
                       onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
@@ -534,12 +425,12 @@ export function ChatOverlay() {
 
                 {topSlots.length > 1 && (
                   <div className="flex flex-col justify-center gap-1.5">
-                    {topSlots.map((_, index) => (
+                    {topSlots.map((slot) => (
                       <div
-                        key={index}
+                        key={slot.rank}
                         className="w-1.5 h-1.5 rounded-full transition-all duration-300"
                         style={{
-                          backgroundColor: index === currentSlotIndex ? '#fbbf24' : 'rgba(255,255,255,0.3)'
+                          backgroundColor: slot.rank - 1 === currentSlotIndex ? '#fbbf24' : 'rgba(255,255,255,0.3)'
                         }}
                       />
                     ))}
@@ -553,7 +444,9 @@ export function ChatOverlay() {
                     </div>
                     <div className="flex flex-col">
                       <div className="text-sm font-black" style={{ color: '#fbbf24' }}>
-                        €{topSlots[currentSlotIndex]?.total_won?.toFixed(0) || '0'}
+                        {topSlots[currentSlotIndex]?.win_amount != null
+                          ? `€${Number(topSlots[currentSlotIndex].win_amount).toFixed(0)}`
+                          : '—'}
                       </div>
                       <div
                         className="text-[8px] font-bold uppercase tracking-wide leading-none"
@@ -570,7 +463,9 @@ export function ChatOverlay() {
                     </div>
                     <div className="flex flex-col">
                       <div className="text-sm font-black" style={{ color: '#a855f7' }}>
-                        {(topSlots[currentSlotIndex]?.average_multiplier || 0).toFixed(1)}x
+                        {topSlots[currentSlotIndex]?.max_multiplier != null
+                          ? `${Number(topSlots[currentSlotIndex].max_multiplier).toFixed(1)}x`
+                          : '—'}
                       </div>
                       <div
                         className="text-[8px] font-bold uppercase tracking-wide leading-none"
@@ -587,7 +482,9 @@ export function ChatOverlay() {
                     </div>
                     <div className="flex flex-col">
                       <div className="text-sm font-black" style={{ color: '#22c55e' }}>
-                        €{(topSlots[currentSlotIndex]?.total_bet / topSlots[currentSlotIndex]?.total_bonuses || 0).toFixed(2)}
+                        {topSlots[currentSlotIndex]?.bet_amount != null
+                          ? `€${Number(topSlots[currentSlotIndex].bet_amount).toFixed(2)}`
+                          : '—'}
                       </div>
                       <div
                         className="text-[8px] font-bold uppercase tracking-wide leading-none"

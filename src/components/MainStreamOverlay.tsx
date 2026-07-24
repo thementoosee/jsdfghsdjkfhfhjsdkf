@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import {
+  MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
+  getMainOverlayBackgroundMaskUrl,
+} from '../lib/overlay-layout';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
@@ -299,7 +303,7 @@ export function MainStreamOverlay() {
     }
 
     if (state.type === 'hunt') {
-      return <BonusHuntOverlay huntId={state.id} />;
+      return <BonusHuntOverlay huntId={state.id} embedded />;
     }
 
     if (state.type === 'opening') {
@@ -313,8 +317,24 @@ export function MainStreamOverlay() {
     return null;
   };
 
+  const hasTopBar = Boolean(barOverlayId);
+  const backgroundMask = getMainOverlayBackgroundMaskUrl(hasTopBar);
+  const backgroundMaskStyle = {
+    WebkitMaskImage: backgroundMask,
+    maskImage: backgroundMask,
+    WebkitMaskSize: '100% 100%',
+    maskSize: '100% 100%',
+    WebkitMaskRepeat: 'no-repeat',
+    maskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    maskPosition: 'center',
+  } as const;
+
   return (
-    <div className="w-[1920px] h-[1080px] bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 relative overflow-hidden" style={{ margin: 0, padding: 0 }}>
+    <div
+      className="w-[1920px] h-[1080px] relative overflow-hidden"
+      style={{ margin: 0, padding: 0, background: 'transparent' }}
+    >
       <style>{`
         @keyframes slideInFromRight {
           from {
@@ -354,14 +374,31 @@ export function MainStreamOverlay() {
         }
       `}</style>
 
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute inset-0" style={{
-          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(147, 51, 234, 0.3) 0%, transparent 50%)',
-        }}></div>
+      {/* Full-bleed chrome background with casino window cut out (true alpha hole). */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        aria-hidden
+        style={{
+          ...backgroundMaskStyle,
+          backgroundImage: 'linear-gradient(to bottom right, #111827, #1e3a8a, #111827)',
+        }}
+      />
+      <div
+        className="absolute inset-0 pointer-events-none opacity-20"
+        aria-hidden
+        style={backgroundMaskStyle}
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              'radial-gradient(circle at 20% 50%, rgba(59, 130, 246, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 50%, rgba(147, 51, 234, 0.3) 0%, transparent 50%)',
+          }}
+        />
       </div>
 
-      <div className="relative z-10 h-full flex flex-col">
-        {barOverlayId && (
+      <div className="relative z-10 h-full flex flex-col" style={{ background: 'transparent' }}>
+        {hasTopBar && (
           <div className="w-full">
             <iframe
               src={`/overlay/${barOverlayId}`}
@@ -371,9 +408,15 @@ export function MainStreamOverlay() {
           </div>
         )}
 
-        <div className="flex-1 flex items-start justify-center px-[20px] pt-[10px] pb-[20px]">
-          <div className="flex gap-[8px] h-[720px] w-full">
-            <div className="w-[350px] flex-shrink-0 h-full relative">
+        <div
+          className="flex-1 flex items-start justify-center px-[20px] pt-[10px] pb-[20px]"
+          style={{ background: 'transparent' }}
+        >
+          <div className="flex gap-[8px] h-[720px] w-full" style={{ background: 'transparent' }}>
+            <div
+              className="flex-shrink-0 h-full relative"
+              style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
+            >
               {leavingOverlay && (
                 <div className="overlay-layer slide-out-overlay h-full">
                   <div className="h-full no-overlay-effects">
@@ -399,19 +442,26 @@ export function MainStreamOverlay() {
               )}
             </div>
 
-            <div className="flex-1 h-full flex items-center justify-center relative">
+            <div
+              className="flex-1 h-full flex items-center justify-center relative"
+              style={{ background: 'transparent' }}
+            >
               <div
                 className="w-full h-full"
                 style={{
                   background: 'transparent',
+                  backgroundImage: 'none',
                   border: '2px solid rgba(59, 130, 246, 0.5)',
                   borderRadius: '16px',
+                  boxShadow: 'none',
                 }}
-              >
-              </div>
+              />
             </div>
 
-            <div className="w-[350px] flex-shrink-0 h-full relative overflow-visible">
+            <div
+              className="flex-shrink-0 h-full relative overflow-visible"
+              style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
+            >
               {chatOverlayId && (
                 <iframe
                   src={`/overlay/${chatOverlayId}`}
