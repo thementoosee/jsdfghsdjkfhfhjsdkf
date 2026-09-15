@@ -491,7 +491,7 @@ export function Dashboard() {
                 onClick={() => setFullscreenView(null)}
                 className="hover:opacity-80 transition-opacity"
               >
-                <img src="/logofever.png" alt="Fever Logo" className="h-6" />
+                <img src="/logo-jigadores.jpg" alt="Jigadores Logo" className="h-8 w-auto object-contain" />
               </button>
             </div>
 
@@ -604,7 +604,7 @@ export function Dashboard() {
               onClick={() => window.location.href = '/'}
               className="hover:opacity-80 transition-opacity"
             >
-              <img src="/logofever.png" alt="Fever Logo" className="h-7" />
+              <img src="/logo-jigadores.jpg" alt="Jigadores Logo" className="h-9 w-auto object-contain" />
             </button>
           </div>
         </header>
@@ -625,7 +625,7 @@ export function Dashboard() {
               onClick={() => window.location.href = '/'}
               className="hover:opacity-80 transition-opacity"
             >
-              <img src="/logofever.png" alt="Fever Logo" className="h-8" />
+              <img src="/logo-jigadores.jpg" alt="Jigadores Logo" className="h-10 w-auto object-contain" />
             </button>
           </div>
 

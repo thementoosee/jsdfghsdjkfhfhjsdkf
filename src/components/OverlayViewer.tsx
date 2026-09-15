@@ -44,9 +44,9 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
   const [showWagerText, setShowWagerText] = useState(false);
 
   const socialLinks = [
-    { platform: 'Instagram', handle: 'OFICIALFEVERB', icon: Instagram },
-    { platform: 'TikTok', handle: 'OFICIALFEVERB', icon: Music },
-    { platform: 'YouTube', handle: 'FEVEROFICIAL', icon: Youtube }
+    { platform: 'Instagram', handle: 'JIGADORES', icon: Instagram },
+    { platform: 'TikTok', handle: 'JIGADORES', icon: Music },
+    { platform: 'YouTube', handle: 'JIGADORES', icon: Youtube }
   ];
 
   useEffect(() => {
@@ -394,8 +394,8 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
               <div className="h-full flex items-center justify-center min-w-[180px]">
                 <div className="w-full h-full flex items-center justify-center">
                   <img
-                    src="/logofever.png"
-                    alt="Fever Logo"
+                    src="/logo-jigadores.jpg"
+                    alt="Jigadores Logo"
                     className="w-auto object-contain"
                     style={{
                       height: '56px',
@@ -597,7 +597,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
 
               <div className="flex items-center gap-2">
                 <Search size={16} className="text-white/70 flex-shrink-0" />
-                <span className="text-white/80 text-[13px] font-medium whitespace-nowrap" style={{fontFamily: 'Rubik, sans-serif'}}>OFICIALFEVER.COM</span>
+                <span className="text-white/80 text-[13px] font-medium whitespace-nowrap" style={{fontFamily: 'Rubik, sans-serif'}}>UNDER CONSTRUCTION</span>
               </div>
 
               <div className="w-px h-6 bg-white/20"></div>
