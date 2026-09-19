@@ -1068,7 +1068,7 @@ export function Dashboard() {
 
             <div className="space-y-2">
               <p className="text-xs uppercase tracking-wide" style={{ color: '#8a8a8a' }}>
-                Stream Deck — copia e cola no botão (Website / Open URL)
+                Stream Deck — usa o plugin API Request (GET). Website abre sempre o browser.
               </p>
               {([
                 { action: 'show' as const, label: 'Mostrar 2ª slot', hint: '/second_slot/show' },

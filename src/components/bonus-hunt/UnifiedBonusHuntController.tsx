@@ -160,12 +160,51 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     }
   };
 
+  /** Keep BONUS LIST ordered by bet: lowest → highest. */
+  const reorderItemsByBetAsc = async (huntId: string) => {
+    const { data, error } = await supabase
+      .from('bonus_hunt_items')
+      .select('id, bet_amount, order_index')
+      .eq('hunt_id', huntId);
+
+    if (error) throw error;
+    if (!data?.length) return;
+
+    const sorted = [...data].sort((a, b) => {
+      const betDiff = Number(a.bet_amount) - Number(b.bet_amount);
+      if (betDiff !== 0) return betDiff;
+      return a.order_index - b.order_index;
+    });
+
+    const updates = sorted
+      .map((item, index) => ({ item, index }))
+      .filter(({ item, index }) => item.order_index !== index);
+
+    if (!updates.length) return;
+
+    await Promise.all(
+      updates.map(({ item, index }) =>
+        supabase
+          .from('bonus_hunt_items')
+          .update({ order_index: index })
+          .eq('id', item.id)
+      )
+    );
+  };
+
   useEffect(() => {
     selectedHuntIdRef.current = selectedHunt?.id ?? null;
-    if (selectedHunt) {
-      loadHuntItems();
+    if (!selectedHunt) return;
+
+    void (async () => {
+      try {
+        await reorderItemsByBetAsc(selectedHunt.id);
+      } catch (error) {
+        console.error('Error auto-sorting hunt by bet:', error);
+      }
+      await loadHuntItems();
       setStartValue(selectedHunt.total_invested ?? 0);
-    }
+    })();
   }, [selectedHunt?.id]);
 
   useEffect(() => {
@@ -243,6 +282,9 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
         .eq('id', itemId);
 
       if (error) throw error;
+      if (selectedHuntIdRef.current) {
+        await reorderItemsByBetAsc(selectedHuntIdRef.current);
+      }
       await loadHuntItems();
     } catch (error) {
       console.error('Error removing bonus:', error);
@@ -304,6 +346,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
       setNewItem({ slot_name: '', bet_amount: '', is_super_bonus: false, is_extreme_bonus: false });
       setSelectedSlot(null);
       setSlotSearchQuery('');
+      await reorderItemsByBetAsc(selectedHunt.id);
       await loadHuntItems();
     } catch (error) {
       console.error('Error adding bonus:', error);
@@ -628,13 +671,8 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
             <div className="grid grid-cols-3 gap-2 pt-2">
               <button
                 onClick={async () => {
-                  const sortedItems = [...items].sort((a, b) => (b.payment_amount || b.bet_amount) - (a.payment_amount || a.bet_amount));
-                  for (let i = 0; i < sortedItems.length; i++) {
-                    await supabase
-                      .from('bonus_hunt_items')
-                      .update({ order_index: i })
-                      .eq('id', sortedItems[i].id);
-                  }
+                  if (!selectedHunt) return;
+                  await reorderItemsByBetAsc(selectedHunt.id);
                   await loadHuntItems();
                 }}
                 className="flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-xs font-medium uppercase"

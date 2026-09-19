@@ -19,17 +19,11 @@ function json(body: unknown, status = 200) {
   });
 }
 
-function htmlOk(message: string, payload: Record<string, unknown>) {
-  const body = `<!doctype html><html><head><meta charset="utf-8"><title>OK</title>
-<style>body{font-family:system-ui,sans-serif;background:#0b1220;color:#e2e8f0;display:grid;place-items:center;min-height:100vh;margin:0}
-.card{padding:1.25rem 1.5rem;border:1px solid #334155;border-radius:12px;background:#111827;text-align:center}
-.ok{color:#4ade80;font-weight:700;letter-spacing:.04em}</style></head>
-<body><div class="card"><div class="ok">OK</div><p>${message}</p>
-<pre style="text-align:left;font-size:12px;opacity:.8">${JSON.stringify(payload, null, 2)}</pre>
-<script>setTimeout(()=>window.close(),800)</script></div></body></html>`;
-  return new Response(body, {
-    status: 200,
-    headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+/** Silent response for Stream Deck Website / Open URL (no OK page). */
+function silentOk() {
+  return new Response(null, {
+    status: 204,
+    headers: corsHeaders,
   });
 }
 
@@ -149,20 +143,17 @@ Deno.serve(async (req) => {
       previous: current,
     };
 
-    const wantsJson = url.searchParams.get('format') === 'json';
-    const wantsHtml =
-      !wantsJson &&
-      ((req.headers.get('accept') || '').includes('text/html') || req.method === 'GET');
-
-    if (wantsHtml) {
-      // Stream Deck "Website" / Open URL → quick visual OK
-      return htmlOk(
-        next ? 'Second slot ON' : 'Second slot OFF',
-        payload,
+    const format = (url.searchParams.get('format') || '').toLowerCase();
+    if (format === 'json') return json(payload);
+    if (format === 'html') {
+      return new Response(
+        `<!doctype html><meta charset="utf-8"><title>OK</title><body style="font-family:system-ui;background:#0b1220;color:#e2e8f0;display:grid;place-items:center;min-height:100vh;margin:0"><p>Second slot ${next ? 'ON' : 'OFF'}</p></body>`,
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' } },
       );
     }
 
-    return json(payload);
+    // Default: silent 204 so Stream Deck Website / API Request don't show a page body.
+    return silentOk();
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return json({ error: 'internal_error', message }, 500);
