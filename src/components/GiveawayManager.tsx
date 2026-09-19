@@ -30,7 +30,17 @@ export function GiveawayManager() {
   const [selectedGiveaway, setSelectedGiveaway] = useState<Giveaway | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(false);
+  const [dashboardTimeRemaining, setDashboardTimeRemaining] = useState('--:--');
   const [newGiveaway, setNewGiveaway] = useState({ name: '', command: '!sorteio', duration_minutes: 30 });
+
+  const formatTimeRemaining = (endTime: string | null) => {
+    if (!endTime) return '--:--';
+    const diff = new Date(endTime).getTime() - Date.now();
+    if (diff <= 0) return '00:00';
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
 
   useEffect(() => {
     loadGiveaways();
@@ -54,6 +64,21 @@ export function GiveawayManager() {
       supabase.removeChannel(giveawayChannel);
     };
   }, [selectedGiveaway]);
+
+  useEffect(() => {
+    if (!selectedGiveaway?.end_time || selectedGiveaway.status !== 'active') {
+      setDashboardTimeRemaining(selectedGiveaway?.end_time ? '00:00' : '--:--');
+      return;
+    }
+
+    const tick = () => {
+      setDashboardTimeRemaining(formatTimeRemaining(selectedGiveaway.end_time));
+    };
+
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [selectedGiveaway?.end_time, selectedGiveaway?.status, selectedGiveaway?.id]);
 
   const loadGiveaways = async () => {
     const { data, error } = await supabase
@@ -244,15 +269,6 @@ export function GiveawayManager() {
     setLoading(false);
   };
 
-  const formatTimeRemaining = (endTime: string | null) => {
-    if (!endTime) return '--:--';
-    const diff = new Date(endTime).getTime() - Date.now();
-    if (diff <= 0) return '00:00';
-    const minutes = Math.floor(diff / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  };
-
   const drawWinner = async () => {
     if (!selectedGiveaway || participants.length === 0) {
       alert('Não há participantes para sortear');
@@ -401,7 +417,7 @@ export function GiveawayManager() {
                   <h3 className="text-lg font-semibold text-white">Timer</h3>
                 </div>
                 <p className="text-3xl font-bold text-amber-400 font-mono">
-                  {formatTimeRemaining(selectedGiveaway.end_time)}
+                  {dashboardTimeRemaining}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   Fim: {selectedGiveaway.end_time
