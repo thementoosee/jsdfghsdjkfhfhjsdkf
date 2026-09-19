@@ -10,6 +10,7 @@ import { FeverChampionsOverlay } from './FeverChampionsOverlay';
 import { FeverBracketOverlay } from './FeverBracketOverlay';
 import FeverGroupsOverlay from './FeverGroupsOverlay';
 import { MainStreamOverlay } from './MainStreamOverlay';
+import { fetchSpotifyNowPlaying, type SpotifyNowPlaying } from '../lib/spotify';
 
 interface OverlayViewerProps {
   overlayId: string;
@@ -21,18 +22,14 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
   const [error, setError] = useState<string | null>(null);
   const [, setRawWager] = useState<'raw' | 'wager'>('raw');
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [cryptoPrices, setCryptoPrices] = useState({
-    BTC: '...',
-    ETH: '...',
-    LTC: '...',
-    BNB: '...',
-    SOL: '...',
-    XRP: '...',
-    ADA: '...',
-    DOGE: '...'
+  const [spotifyNow, setSpotifyNow] = useState<SpotifyNowPlaying>({
+    connected: false,
+    is_playing: false,
+    track: null,
+    artist: null,
+    album_art: null,
   });
   const [currentSocial, setCurrentSocial] = useState(0);
-  const [cryptoOffset, setCryptoOffset] = useState(0);
   const [, setNowActivity] = useState('Playing Casino');
   const [, setNextActivity] = useState('Opening Cases');
   const [, setShowNowNext] = useState<'now' | 'next'>('now');
@@ -144,46 +141,15 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
       setShowWagerText((prev) => !prev);
     }, 10000);
 
-    const fetchCryptoPrices = async () => {
-      try {
-        const response = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,litecoin,binancecoin,solana,ripple,cardano,dogecoin&vs_currencies=usd');
-        const data = await response.json();
-        setCryptoPrices({
-          BTC: data.bitcoin?.usd ? Math.round(data.bitcoin.usd).toLocaleString('en-US') : '...',
-          ETH: data.ethereum?.usd ? Math.round(data.ethereum.usd).toLocaleString('en-US') : '...',
-          LTC: data.litecoin?.usd ? Math.round(data.litecoin.usd).toLocaleString('en-US') : '...',
-          BNB: data.binancecoin?.usd ? Math.round(data.binancecoin.usd).toLocaleString('en-US') : '...',
-          SOL: data.solana?.usd ? Math.round(data.solana.usd).toLocaleString('en-US') : '...',
-          XRP: data.ripple?.usd ? data.ripple.usd.toFixed(2) : '...',
-          ADA: data.cardano?.usd ? data.cardano.usd.toFixed(2) : '...',
-          DOGE: data.dogecoin?.usd ? data.dogecoin.usd.toFixed(3) : '...'
-        });
-      } catch (error) {
-        console.error('Error fetching crypto prices:', error);
-        setCryptoPrices({
-          BTC: 'N/A',
-          ETH: 'N/A',
-          LTC: 'N/A',
-          BNB: 'N/A',
-          SOL: 'N/A',
-          XRP: 'N/A',
-          ADA: 'N/A',
-          DOGE: 'N/A'
-        });
-      }
+    const pollSpotify = async () => {
+      const now = await fetchSpotifyNowPlaying();
+      setSpotifyNow(now);
     };
 
-    fetchCryptoPrices();
-    const cryptoInterval = setInterval(fetchCryptoPrices, 60000);
-
-    const cryptoScrollInterval = setInterval(() => {
-      setCryptoOffset(prev => {
-        if (prev <= -1500) {
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 30);
+    void pollSpotify();
+    const spotifyInterval = setInterval(() => {
+      void pollSpotify();
+    }, 8000);
 
     return () => {
       overlayChannel.unsubscribe();
@@ -193,8 +159,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
       clearInterval(socialInterval);
       clearInterval(wagerSlideInterval);
       clearInterval(nowNextInterval);
-      clearInterval(cryptoInterval);
-      clearInterval(cryptoScrollInterval);
+      clearInterval(spotifyInterval);
     };
   }, [overlayId]);
 
@@ -544,52 +509,34 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
 
               <div className="w-px h-6 bg-white/20"></div>
 
-              <div className="overflow-hidden relative w-[380px]">
-                <div
-                  className="flex items-center gap-4 whitespace-nowrap"
-                  style={{
-                    transform: `translateX(${cryptoOffset}px)`,
-                    willChange: 'transform'
-                  }}
-                >
-                  {[...Array(3)].map((_, repeatIndex) => (
-                    <div key={repeatIndex} className="flex items-center gap-4">
-                      <div className="w-px h-4 bg-white/20"></div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-orange-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>BTC</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.BTC}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-blue-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>ETH</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.ETH}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-gray-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>LTC</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.LTC}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-yellow-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>BNB</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.BNB}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-purple-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>SOL</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.SOL}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-blue-300 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>XRP</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.XRP}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-cyan-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>ADA</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.ADA}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-amber-400 font-bold text-xs" style={{fontFamily: 'Rubik, sans-serif'}}>DOGE</span>
-                        <span className="text-white text-xs font-medium min-w-[60px]" style={{fontFamily: 'Rubik, sans-serif'}}>${cryptoPrices.DOGE}</span>
-                      </div>
-                      <div className="w-px h-4 bg-white/20"></div>
+              <div className="flex items-center gap-2 min-w-0 flex-1 max-w-[420px] overflow-hidden">
+                <Music className="w-4 h-4 text-[#1DB954] flex-shrink-0" />
+                {spotifyNow.album_art ? (
+                  <img
+                    src={spotifyNow.album_art}
+                    alt=""
+                    className="w-6 h-6 rounded object-cover flex-shrink-0"
+                  />
+                ) : null}
+                <div className="min-w-0 overflow-hidden">
+                  <div
+                    className="text-white text-[13px] font-medium whitespace-nowrap truncate"
+                    style={{ fontFamily: 'Rubik, sans-serif' }}
+                  >
+                    {!spotifyNow.connected
+                      ? 'Spotify offline'
+                      : spotifyNow.track
+                        ? `${spotifyNow.is_playing ? '' : 'Paused · '}${spotifyNow.track}`
+                        : 'Nada a tocar'}
+                  </div>
+                  {spotifyNow.artist ? (
+                    <div
+                      className="text-white/60 text-[11px] whitespace-nowrap truncate"
+                      style={{ fontFamily: 'Rubik, sans-serif' }}
+                    >
+                      {spotifyNow.artist}
                     </div>
-                  ))}
+                  ) : null}
                 </div>
               </div>
 

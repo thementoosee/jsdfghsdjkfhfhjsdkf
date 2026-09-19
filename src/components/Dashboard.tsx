@@ -1,6 +1,7 @@
-import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft } from 'lucide-react';
+import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft, Music2 } from 'lucide-react';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase, Overlay, OverlayType } from '../lib/supabase';
+import { exchangeSpotifyCode } from '../lib/spotify';
 
 const OverlayBarManager = lazy(() => import('./OverlayBarManager').then((m) => ({ default: m.OverlayBarManager })));
 const BonusHuntWorkspace = lazy(() => import('./bonus-hunt/BonusHuntWorkspace').then((m) => ({ default: m.BonusHuntWorkspace })));
@@ -10,11 +11,12 @@ const Statistics = lazy(() => import('./Statistics').then((m) => ({ default: m.S
 const FeverChampionsManager = lazy(() => import('./FeverChampionsManager').then((m) => ({ default: m.FeverChampionsManager })));
 const StreamElementsIntegration = lazy(() => import('./StreamElementsIntegration').then((m) => ({ default: m.StreamElementsIntegration })));
 const TwitchIntegration = lazy(() => import('./TwitchIntegration').then((m) => ({ default: m.TwitchIntegration })));
+const SpotifyIntegration = lazy(() => import('./SpotifyIntegration').then((m) => ({ default: m.SpotifyIntegration })));
 const GiveawayManager = lazy(() => import('./GiveawayManager').then((m) => ({ default: m.GiveawayManager })));
 const CasinoManager = lazy(() => import('./CasinoManager'));
 
 type FullscreenView = 'bar' | 'chill' | 'bonus' | 'fever' | 'giveaway' | null;
-type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'twitch' | 'streamelements' | 'database' | 'stats' | 'live_preview' | null;
+type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'twitch' | 'streamelements' | 'spotify' | 'database' | 'stats' | 'live_preview' | null;
 
 export function Dashboard() {
   const [overlaysByType, setOverlaysByType] = useState<Record<string, Overlay[]>>({});
@@ -109,6 +111,22 @@ export function Dashboard() {
 
   useEffect(() => {
     loadAllOverlays();
+
+    // Complete Spotify OAuth on dashboard root (before Twitch panel steals ?code=)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    const verifier = sessionStorage.getItem('spotify_pkce_verifier');
+    const savedState = sessionStorage.getItem('spotify_pkce_state');
+    if (code && state && verifier && savedState && state === savedState) {
+      const redirectUri = `${window.location.origin}/`;
+      sessionStorage.removeItem('spotify_pkce_verifier');
+      sessionStorage.removeItem('spotify_pkce_state');
+      window.history.replaceState({}, document.title, window.location.pathname);
+      void exchangeSpotifyCode({ code, redirectUri, codeVerifier: verifier })
+        .then(() => setActivePanelPage('spotify'))
+        .catch((err) => console.error('[Spotify OAuth]', err));
+    }
 
     const channel = supabase
       .channel('overlays_dashboard_changes')
@@ -285,6 +303,7 @@ export function Dashboard() {
     chill: 'Chill',
     twitch: 'Twitch Integration',
     streamelements: 'StreamElements',
+    spotify: 'Spotify Now Playing',
     database: 'Slots Database',
     stats: 'Statistics',
     live_preview: 'Live Preview (OBS)'
@@ -310,6 +329,9 @@ export function Dashboard() {
     }
     if (activePanelPage === 'streamelements') {
       return <Suspense fallback={sectionLoader}><StreamElementsIntegration /></Suspense>;
+    }
+    if (activePanelPage === 'spotify') {
+      return <Suspense fallback={sectionLoader}><SpotifyIntegration /></Suspense>;
     }
     if (activePanelPage === 'twitch') {
       return <Suspense fallback={sectionLoader}><TwitchIntegration /></Suspense>;
@@ -782,6 +804,21 @@ export function Dashboard() {
                     <Zap className="w-4 h-4" style={{ color: '#b89968' }} />
                   </div>
                   <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>StreamElements</h3>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setActivePanelPage('spotify')}
+                className="rounded-lg p-3 transition-all text-left"
+                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
+                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
+                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(29, 185, 84, 0.2)', border: '1px solid rgba(29, 185, 84, 0.35)' }}>
+                    <Music2 className="w-4 h-4" style={{ color: '#1DB954' }} />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Spotify</h3>
                 </div>
               </button>
 
