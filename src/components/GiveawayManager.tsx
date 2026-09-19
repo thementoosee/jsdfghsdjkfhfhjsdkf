@@ -149,15 +149,48 @@ export function GiveawayManager() {
   };
 
   const toggleVisibility = async (giveaway: Giveaway) => {
-    await supabase
-      .from('giveaways')
-      .update({ is_visible: false })
-      .neq('id', giveaway.id);
+    const makingVisible = !giveaway.is_visible;
 
-    await supabase
-      .from('giveaways')
-      .update({ is_visible: !giveaway.is_visible })
-      .eq('id', giveaway.id);
+    if (makingVisible) {
+      // Only touch currently-visible rows to reduce realtime race noise.
+      await supabase
+        .from('giveaways')
+        .update({ is_visible: false })
+        .eq('is_visible', true)
+        .neq('id', giveaway.id);
+
+      const { data, error } = await supabase
+        .from('giveaways')
+        .update({ is_visible: true })
+        .eq('id', giveaway.id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error showing giveaway:', error);
+        return;
+      }
+      if (selectedGiveaway?.id === giveaway.id && data) {
+        setSelectedGiveaway(data);
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('giveaways')
+        .update({ is_visible: false })
+        .eq('id', giveaway.id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('Error hiding giveaway:', error);
+        return;
+      }
+      if (selectedGiveaway?.id === giveaway.id && data) {
+        setSelectedGiveaway(data);
+      }
+    }
+
+    await loadGiveaways();
   };
 
   const endGiveaway = async () => {

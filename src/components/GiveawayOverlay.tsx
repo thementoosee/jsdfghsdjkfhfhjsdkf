@@ -1,4 +1,4 @@
-import { useState, useEffect, CSSProperties } from 'react';
+import { useState, useEffect, useRef, CSSProperties } from 'react';
 import { Gift, Trophy, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -30,6 +30,10 @@ export function GiveawayOverlay() {
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
   const [isVisible, setIsVisible] = useState(false);
 
+  const loadGenRef = useRef(0);
+  const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const giveawayIdRef = useRef<string | null>(null);
+
   const popupBaseStyle: CSSProperties = {
     left: 0,
     right: 0,
@@ -38,25 +42,141 @@ export function GiveawayOverlay() {
     transition: 'opacity 280ms ease, transform 280ms ease',
   };
 
+  const loadActiveGiveaway = async () => {
+    const gen = ++loadGenRef.current;
+
+    const { data, error } = await supabase
+      .from('giveaways')
+      .select('*')
+      .eq('is_visible', true)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (gen !== loadGenRef.current) return;
+
+    if (error) {
+      console.error('Error loading giveaway:', error);
+      return;
+    }
+
+    if (data) {
+      giveawayIdRef.current = data.id;
+      setGiveaway(data as Giveaway);
+      setIsVisible(true);
+      return;
+    }
+
+    const { data: completedData } = await supabase
+      .from('giveaways')
+      .select('*')
+      .eq('is_visible', true)
+      .eq('status', 'completed')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (gen !== loadGenRef.current) return;
+
+    if (completedData) {
+      giveawayIdRef.current = completedData.id;
+      setGiveaway(completedData as Giveaway);
+      setIsVisible(true);
+      return;
+    }
+
+    setIsVisible(false);
+    giveawayIdRef.current = null;
+    setTimeout(() => {
+      if (gen === loadGenRef.current) {
+        setGiveaway(null);
+      }
+    }, 280);
+  };
+
+  const scheduleReload = () => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => {
+      void loadActiveGiveaway();
+    }, 120);
+  };
+
+  const startRolling = async (giveawayId: string) => {
+    const { data: participantData } = await supabase
+      .from('giveaway_participants')
+      .select('*')
+      .eq('giveaway_id', giveawayId);
+
+    if (!participantData || participantData.length === 0) return;
+
+    setParticipants(participantData);
+    setIsRolling(true);
+
+    let rollCount = 0;
+    const maxRolls = 40;
+    const rollInterval = setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * participantData.length);
+      setCurrentParticipant(participantData[randomIndex]);
+      rollCount++;
+
+      if (rollCount >= maxRolls) {
+        clearInterval(rollInterval);
+      }
+    }, 100);
+
+    setTimeout(() => {
+      setIsRolling(false);
+    }, 5000);
+  };
+
   useEffect(() => {
-    loadActiveGiveaway();
+    void loadActiveGiveaway();
 
     const channel = supabase
-      .channel('giveaway_overlay')
+      .channel(`giveaway_overlay_${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'giveaways' }, (payload) => {
-        if (payload.new && (payload.new as { status?: string }).status === 'drawing') {
-          startRolling((payload.new as { id: string }).id);
-        } else {
-          loadActiveGiveaway();
+        const row = payload.new as Giveaway | null;
+
+        if (row?.status === 'drawing' && row.id) {
+          void startRolling(row.id);
+          return;
         }
+
+        // Apply visible active giveaway immediately from the event (avoids hide/show race).
+        if (row && row.is_visible && row.status === 'active') {
+          loadGenRef.current += 1;
+          giveawayIdRef.current = row.id;
+          setGiveaway(row);
+          setIsVisible(true);
+          return;
+        }
+
+        // If the currently shown giveaway was hidden/completed, or any other change, reload.
+        if (!row || row.id === giveawayIdRef.current || payload.eventType === 'DELETE') {
+          scheduleReload();
+          return;
+        }
+
+        scheduleReload();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'giveaway_participants' }, () => {
+        // Keep participant count fresh on the bar.
+        scheduleReload();
       })
       .subscribe();
 
+    // Safety net for OBS browser sources where realtime can miss the first event.
+    const poll = setInterval(() => {
+      void loadActiveGiveaway();
+    }, 4000);
+
     return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      clearInterval(poll);
       supabase.removeChannel(channel);
     };
   }, []);
-
 
   useEffect(() => {
     if (giveaway?.winner_username) {
@@ -91,70 +211,6 @@ export function GiveawayOverlay() {
 
     return () => clearInterval(interval);
   }, [giveaway?.end_time]);
-
-  const loadActiveGiveaway = async () => {
-    const { data, error } = await supabase
-      .from('giveaways')
-      .select('*')
-      .eq('is_visible', true)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error loading giveaway:', error);
-      return;
-    }
-
-    if (!data) {
-      const { data: completedData } = await supabase
-        .from('giveaways')
-        .select('*')
-        .eq('is_visible', true)
-        .eq('status', 'completed')
-        .order('completed_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (completedData) {
-        setGiveaway(completedData);
-        setTimeout(() => setIsVisible(true), 50);
-      } else {
-        setIsVisible(false);
-        setTimeout(() => setGiveaway(null), 1000);
-      }
-    } else {
-      setGiveaway(data);
-      setTimeout(() => setIsVisible(true), 50);
-    }
-  };
-
-  const startRolling = async (giveawayId: string) => {
-    const { data: participantData } = await supabase
-      .from('giveaway_participants')
-      .select('*')
-      .eq('giveaway_id', giveawayId);
-
-    if (!participantData || participantData.length === 0) return;
-
-    setParticipants(participantData);
-    setIsRolling(true);
-
-    let rollCount = 0;
-    const maxRolls = 40;
-    const rollInterval = setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * participantData.length);
-      setCurrentParticipant(participantData[randomIndex]);
-      rollCount++;
-
-      if (rollCount >= maxRolls) {
-        clearInterval(rollInterval);
-      }
-    }, 100);
-
-    setTimeout(() => {
-      setIsRolling(false);
-    }, 5000);
-  };
 
   if (!giveaway && !isRolling) return null;
 
