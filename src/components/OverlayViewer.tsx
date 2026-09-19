@@ -394,7 +394,7 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
               <div className="h-full flex items-center justify-center min-w-[180px]">
                 <div className="w-full h-full flex items-center justify-center">
                   <img
-                    src="/logo-jigadores-wordmark.png"
+                    src="/logo-jigadores-wordmark.png?v=2"
                     alt="Jigadores Logo"
                     className="w-auto object-contain"
                     style={{
