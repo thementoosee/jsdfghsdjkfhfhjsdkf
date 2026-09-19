@@ -3,7 +3,9 @@ import { supabase } from '../lib/supabase';
 import {
   MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
   getMainOverlayBackgroundMaskUrl,
+  getMainOverlaySecondSlotCutout,
 } from '../lib/overlay-layout';
+import { parseShowSecondSlot } from '../lib/overlay-modules';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
@@ -19,6 +21,7 @@ interface OverlayState {
 export function MainStreamOverlay() {
   const [barOverlayId, setBarOverlayId] = useState<string | null>(null);
   const [chatOverlayId, setChatOverlayId] = useState<string | null>(null);
+  const [showSecondSlot, setShowSecondSlot] = useState(true);
   const [overlayState, setOverlayState] = useState<OverlayState>({
     type: null,
     id: null,
@@ -44,6 +47,10 @@ export function MainStreamOverlay() {
     };
   }, []);
 
+  const applyMainStreamConfig = (config: Record<string, unknown> | null | undefined) => {
+    setShowSecondSlot(parseShowSecondSlot(config));
+  };
+
   const initializeOverlays = async () => {
     const { data: barRows, error: barError } = await supabase
       .from('overlays')
@@ -62,6 +69,15 @@ export function MainStreamOverlay() {
       .limit(1);
     if (chatError) console.error('[Main Init] Error loading chat overlay:', chatError);
     if (chatRows?.[0]) setChatOverlayId(chatRows[0].id);
+
+    const { data: mainRows, error: mainError } = await supabase
+      .from('overlays')
+      .select('id, config')
+      .eq('type', 'main_stream')
+      .order('created_at', { ascending: true })
+      .limit(1);
+    if (mainError) console.error('[Main Init] Error loading main_stream config:', mainError);
+    if (mainRows?.[0]) applyMainStreamConfig(mainRows[0].config as Record<string, unknown>);
 
     const { data: activeOpening } = await supabase
       .from('bonus_openings')
@@ -229,7 +245,13 @@ export function MainStreamOverlay() {
 
     const overlaysChannel = supabase
       .channel('overlay_changes_overlays')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'overlays' }, handleChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'overlays' }, (payload) => {
+        const row = (payload.new || payload.old) as { type?: string; config?: Record<string, unknown> } | undefined;
+        if (row?.type === 'main_stream' && payload.new && 'config' in (payload.new as object)) {
+          applyMainStreamConfig((payload.new as { config?: Record<string, unknown> }).config);
+        }
+        handleChange(payload);
+      })
       .subscribe((status) => {
         console.log('[Main] Overlays channel status:', status);
       });
@@ -318,7 +340,8 @@ export function MainStreamOverlay() {
   };
 
   const hasTopBar = Boolean(barOverlayId);
-  const backgroundMask = getMainOverlayBackgroundMaskUrl(hasTopBar);
+  const backgroundMask = getMainOverlayBackgroundMaskUrl(hasTopBar, { showSecondSlot });
+  const secondSlot = getMainOverlaySecondSlotCutout(hasTopBar);
   const backgroundMaskStyle = {
     WebkitMaskImage: backgroundMask,
     maskImage: backgroundMask,
@@ -472,6 +495,24 @@ export function MainStreamOverlay() {
           </div>
         </div>
       </div>
+
+      {/* Second slot capture guide — transparent hole + blue border for OBS. */}
+      {showSecondSlot && (
+        <div
+          className="absolute pointer-events-none z-20"
+          aria-hidden
+          style={{
+            left: secondSlot.x,
+            top: secondSlot.y,
+            width: secondSlot.width,
+            height: secondSlot.height,
+            background: 'transparent',
+            border: '2px solid rgba(59, 130, 246, 0.5)',
+            borderRadius: secondSlot.radius,
+            boxShadow: 'none',
+          }}
+        />
+      )}
 
     </div>
   );

@@ -1,7 +1,12 @@
-import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft, Music2 } from 'lucide-react';
+import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft, Music2, Copy, MonitorSmartphone } from 'lucide-react';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase, Overlay, OverlayType } from '../lib/supabase';
 import { exchangeSpotifyCode } from '../lib/spotify';
+import {
+  getOverlayModuleDeckUrl,
+  parseShowSecondSlot,
+  setSecondSlotVisible,
+} from '../lib/overlay-modules';
 
 const OverlayBarManager = lazy(() => import('./OverlayBarManager').then((m) => ({ default: m.OverlayBarManager })));
 const BonusHuntWorkspace = lazy(() => import('./bonus-hunt/BonusHuntWorkspace').then((m) => ({ default: m.BonusHuntWorkspace })));
@@ -24,6 +29,9 @@ export function Dashboard() {
   const [fullscreenView, setFullscreenView] = useState<FullscreenView>(null);
   const [activePanelPage, setActivePanelPage] = useState<PanelPage>(null);
   const [previewOverlayType, setPreviewOverlayType] = useState<OverlayType>('main_stream');
+  const [showSecondSlot, setShowSecondSlot] = useState(true);
+  const [secondSlotBusy, setSecondSlotBusy] = useState(false);
+  const [copiedDeckLink, setCopiedDeckLink] = useState<string | null>(null);
 
   const sectionLoader = (
     <div className="py-10 text-center text-sm text-slate-400 uppercase tracking-wide">A carregar...</div>
@@ -163,6 +171,11 @@ export function Dashboard() {
 
       setOverlaysByType(grouped);
 
+      const mainStream = grouped.main_stream?.[0];
+      if (mainStream) {
+        setShowSecondSlot(parseShowSecondSlot(mainStream.config as Record<string, unknown>));
+      }
+
       await ensureDefaultOverlaysExist();
     } catch (error) {
       console.error('Error loading overlays:', error);
@@ -293,6 +306,33 @@ export function Dashboard() {
     if (overlay) {
       const url = getOverlayUrl(overlay.id);
       window.open(url, '_blank');
+    }
+  };
+
+  const toggleSecondSlot = async () => {
+    if (secondSlotBusy) return;
+    setSecondSlotBusy(true);
+    const next = !showSecondSlot;
+    setShowSecondSlot(next);
+    try {
+      await setSecondSlotVisible(next);
+    } catch (err) {
+      console.error('[Dashboard] second slot toggle failed', err);
+      setShowSecondSlot(!next);
+      alert('Não foi possível atualizar a 2ª slot.');
+    } finally {
+      setSecondSlotBusy(false);
+    }
+  };
+
+  const copyDeckUrl = async (action: 'show' | 'hide' | 'toggle') => {
+    const url = getOverlayModuleDeckUrl('second_slot', action);
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedDeckLink(action);
+      setTimeout(() => setCopiedDeckLink(null), 1500);
+    } catch {
+      prompt('Copia este link para o Stream Deck:', url);
     }
   };
 
@@ -994,6 +1034,73 @@ export function Dashboard() {
                   <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Fever Champions Groups</h3>
                 </div>
               </button>
+            </div>
+          </div>
+
+          <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
+            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
+                  <MonitorSmartphone className="w-4 h-4" style={{ color: '#60a5fa' }} />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>2ª Slot (canto)</h2>
+                  <p className="text-xs" style={{ color: '#6b7280' }}>Buraco transparente no canto inferior esquerdo da Main Overlay</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void toggleSecondSlot()}
+                disabled={secondSlotBusy}
+                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all"
+                style={{
+                  background: showSecondSlot
+                    ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'
+                    : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
+                  border: `1px solid ${showSecondSlot ? '#3b82f6' : '#3d3d3d'}`,
+                  color: '#fff',
+                  opacity: secondSlotBusy ? 0.6 : 1,
+                }}
+              >
+                {showSecondSlot ? 'ON na stream' : 'OFF na stream'}
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-xs uppercase tracking-wide" style={{ color: '#8a8a8a' }}>
+                Stream Deck — copia e cola no botão (Website / Open URL)
+              </p>
+              {([
+                { action: 'show' as const, label: 'Mostrar 2ª slot', hint: '/second_slot/show' },
+                { action: 'hide' as const, label: 'Esconder 2ª slot', hint: '/second_slot/hide' },
+                { action: 'toggle' as const, label: 'Toggle 2ª slot', hint: '/second_slot/toggle' },
+              ]).map(({ action, label, hint }) => (
+                <div
+                  key={action}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2"
+                  style={{ background: '#1f1f1f', border: '1px solid #3a3a3a' }}
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-bold uppercase" style={{ color: '#d4d4d4' }}>{label}</div>
+                    <div className="text-[11px] truncate font-mono" style={{ color: '#6b7280' }} title={getOverlayModuleDeckUrl('second_slot', action)}>
+                      …{hint}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyDeckUrl(action)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold uppercase flex-shrink-0"
+                    style={{
+                      background: copiedDeckLink === action ? 'rgba(34,197,94,0.2)' : '#2a2a2a',
+                      border: '1px solid #3d3d3d',
+                      color: copiedDeckLink === action ? '#4ade80' : '#d4d4d4',
+                    }}
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    {copiedDeckLink === action ? 'Copiado' : 'Copiar'}
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
 
