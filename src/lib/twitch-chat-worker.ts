@@ -88,12 +88,16 @@ export async function startTwitchChatListener(channelName = DEFAULT_TWITCH_CHANN
         const { data: giveaways } = await supabase
           .from('giveaways')
           .select('*')
-          .eq('command', trimmedMessage.split(' ')[0])
           .eq('status', 'active')
           .eq('is_visible', true);
 
-        if (giveaways && giveaways.length > 0) {
-          const giveaway = giveaways[0];
+        const commandToken = trimmedMessage.split(/\s+/)[0]?.toLowerCase() || '';
+        const matched = (giveaways || []).filter(
+          (g) => String(g.command || '').trim().toLowerCase() === commandToken
+        );
+
+        if (matched.length > 0) {
+          const giveaway = matched[0];
           console.log('[Twitch Chat] 🎁 Sorteio ativo encontrado:', giveaway.name);
 
           // Try to add participant (will be ignored if already exists due to unique constraint)

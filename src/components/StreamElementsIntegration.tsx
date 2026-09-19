@@ -199,6 +199,32 @@ export function StreamElementsIntegration() {
         } catch (e) {
           console.warn('[Chat IRC] Insert error:', e);
         }
+
+        // Giveaway command entry (backup path if EventSub also fires, unique constraint prevents dupes)
+        const commandToken = message.trim().split(/\s+/)[0]?.toLowerCase() || '';
+        if (commandToken.startsWith('!')) {
+          try {
+            const { data: giveaways } = await supabase
+              .from('giveaways')
+              .select('id, command')
+              .eq('status', 'active')
+              .eq('is_visible', true);
+            const match = (giveaways || []).find(
+              (g) => String(g.command || '').trim().toLowerCase() === commandToken
+            );
+            if (match) {
+              await supabase.from('giveaway_participants').insert({
+                giveaway_id: match.id,
+                username: tags['display-name'] || username,
+                user_id: tags['user-id'] || username,
+                profile_image_url:
+                  'https://static-cdn.jtvnw.net/user-default-pictures-uv/13e5fa74-defa-11e9-809c-784f43822e80-profile_image-70x70.png',
+              });
+            }
+          } catch (giveawayErr) {
+            console.warn('[Chat IRC] Giveaway entry error:', giveawayErr);
+          }
+        }
       };
 
       ws.onclose = () => {

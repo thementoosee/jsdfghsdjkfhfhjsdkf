@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Gift, Plus, Trash2, Trophy, Eye, EyeOff, Users, StopCircle, Shuffle } from 'lucide-react';
+import { Gift, Plus, Trash2, Trophy, Eye, EyeOff, Users, StopCircle, Shuffle, Clock, Minus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface Giveaway {
@@ -173,6 +173,53 @@ export function GiveawayManager() {
     alert('Sorteio terminado! Agora podes sortear o vencedor.');
   };
 
+  const adjustTimer = async (deltaMinutes: number) => {
+    if (!selectedGiveaway || selectedGiveaway.status !== 'active') return;
+
+    const now = Date.now();
+    const currentEnd = selectedGiveaway.end_time
+      ? new Date(selectedGiveaway.end_time).getTime()
+      : now + Math.max(1, selectedGiveaway.duration_minutes || 1) * 60_000;
+
+    // If timer already expired, start from now when adding time
+    const base = currentEnd > now ? currentEnd : now;
+    let nextEnd = base + deltaMinutes * 60_000;
+    const minEnd = now + 30_000;
+    if (nextEnd < minEnd) nextEnd = minEnd;
+
+    const remainingMs = Math.max(0, nextEnd - now);
+    const newDurationMinutes = Math.max(1, Math.ceil(remainingMs / 60_000));
+
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('giveaways')
+      .update({
+        end_time: new Date(nextEnd).toISOString(),
+        duration_minutes: newDurationMinutes,
+      })
+      .eq('id', selectedGiveaway.id)
+      .select('*')
+      .single();
+
+    if (error) {
+      console.error('Error adjusting giveaway timer:', error);
+      alert('Erro ao ajustar o timer');
+    } else if (data) {
+      setSelectedGiveaway(data);
+      await loadGiveaways();
+    }
+    setLoading(false);
+  };
+
+  const formatTimeRemaining = (endTime: string | null) => {
+    if (!endTime) return '--:--';
+    const diff = new Date(endTime).getTime() - Date.now();
+    if (diff <= 0) return '00:00';
+    const minutes = Math.floor(diff / 60000);
+    const seconds = Math.floor((diff % 60000) / 1000);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
   const drawWinner = async () => {
     if (!selectedGiveaway || participants.length === 0) {
       alert('Não há participantes para sortear');
@@ -312,6 +359,50 @@ export function GiveawayManager() {
               </div>
             </div>
           )}
+
+          <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Clock className="text-amber-400" size={20} />
+                  <h3 className="text-lg font-semibold text-white">Timer</h3>
+                </div>
+                <p className="text-3xl font-bold text-amber-400 font-mono">
+                  {formatTimeRemaining(selectedGiveaway.end_time)}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Fim: {selectedGiveaway.end_time
+                    ? new Date(selectedGiveaway.end_time).toLocaleTimeString('pt-PT')
+                    : '—'}
+                </p>
+              </div>
+
+              {selectedGiveaway.status === 'active' && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void adjustTimer(-5)}
+                    disabled={loading}
+                    className="px-4 py-3 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                    title="Remover 5 minutos"
+                  >
+                    <Minus size={18} />
+                    −5 MIN
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void adjustTimer(5)}
+                    disabled={loading}
+                    className="px-4 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-bold transition-all disabled:opacity-50 flex items-center gap-2"
+                    title="Adicionar 5 minutos"
+                  >
+                    <Plus size={18} />
+                    +5 MIN
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="bg-slate-900/50 rounded-lg p-4 mb-6">
             <div className="flex items-center gap-2 mb-2">

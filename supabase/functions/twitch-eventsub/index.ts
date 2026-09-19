@@ -488,6 +488,60 @@ async function insertChatMessageFromNotification(
     username: row.username,
   });
 
+  // Giveaway keyword / command entry (!command)
+  const commandToken = text.trim().split(/\s+/)[0]?.toLowerCase() || '';
+  if (commandToken.startsWith('!')) {
+    try {
+      const { data: giveaways, error: giveawayError } = await supabase
+        .from('giveaways')
+        .select('id, name, command')
+        .eq('status', 'active')
+        .eq('is_visible', true);
+
+      if (giveawayError) {
+        console.error('[twitch-eventsub] giveaway lookup failed', giveawayError.message);
+      } else {
+        const match = (giveaways || []).find(
+          (g) => String(g.command || '').trim().toLowerCase() === commandToken
+        );
+        if (match) {
+          const chatterId = String(event.chatter_user_id ?? row.username);
+          const { error: participantError } = await supabase
+            .from('giveaway_participants')
+            .insert({
+              giveaway_id: match.id,
+              username: row.display_name || row.username,
+              user_id: chatterId,
+              profile_image_url:
+                'https://static-cdn.jtvnw.net/user-default-pictures-uv/13e5fa74-defa-11e9-809c-784f43822e80-profile_image-70x70.png',
+            });
+
+          if (participantError) {
+            if (participantError.code === '23505') {
+              console.log('[twitch-eventsub] giveaway already entered', {
+                giveaway: match.name,
+                username: row.username,
+              });
+            } else {
+              console.error('[twitch-eventsub] giveaway insert failed', participantError.message);
+            }
+          } else {
+            console.log('[twitch-eventsub] giveaway entry ok', {
+              giveaway: match.name,
+              username: row.username,
+              command: commandToken,
+            });
+          }
+        }
+      }
+    } catch (giveawayErr) {
+      console.error(
+        '[twitch-eventsub] giveaway processing error',
+        giveawayErr instanceof Error ? giveawayErr.message : String(giveawayErr)
+      );
+    }
+  }
+
   return { inserted: true, twitch_message_id: twitchMessageId };
 }
 
