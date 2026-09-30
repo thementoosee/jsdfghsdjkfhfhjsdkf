@@ -10,6 +10,7 @@ import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
 import { FeverChampionsOverlay } from './FeverChampionsOverlay';
+import { ShopHighlightsOverlay, SHOP_HIGHLIGHT_CARD_HEIGHT_PX } from './ShopHighlightsOverlay';
 
 type OverlayType = 'chill' | 'hunt' | 'opening' | 'tournament' | null;
 
@@ -484,10 +485,22 @@ export function MainStreamOverlay() {
               className="flex-shrink-0 h-full relative overflow-visible"
               style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
             >
+              {/* Shop drawer sits behind the chat and slides out below its bottom edge. */}
+              <div
+                className="absolute left-0 right-0 pointer-events-none"
+                style={{
+                  top: '100%',
+                  height: SHOP_HIGHLIGHT_CARD_HEIGHT_PX,
+                  zIndex: 0,
+                }}
+              >
+                <ShopHighlightsOverlay />
+              </div>
+
               {chatOverlayId && (
                 <iframe
                   src={`/overlay/${chatOverlayId}`}
-                  className="w-full h-full border-0"
+                  className="relative z-10 w-full h-full border-0"
                   style={{ pointerEvents: 'none' }}
                 />
               )}
