@@ -687,75 +687,23 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
           >
             <Carousel3D
               id="opening-c3d"
-              height="200px"
-              cardWidth={110}
-              gap={14}
+              height="120px"
+              cardWidth={88}
+              gap={10}
               speed={42}
-              items={carouselItems.map((item) => {
-                const payment = item.payment;
-                const isOpened = item.status === 'opened';
-                const isWin = isOpened && item.payout && item.payout > payment;
-                return {
+              items={carouselItems.map((item) => ({
                   id: item.id,
                   render: () => (
-                    <>
-                      {/* Blurred parallax background */}
-                      <div
-                        className="absolute inset-0"
-                        style={{
-                          backgroundImage: `url("${openingItemImageUrl(item)}")`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          filter: 'blur(10px) brightness(0.3)',
-                          transform: 'scale(1.15)',
-                        }}
+                    <div className="absolute inset-0 overflow-hidden rounded-xl">
+                      <img
+                        src={openingItemImageUrl(item)}
+                        alt={item.slot_name}
+                        className="absolute inset-0 w-full h-full object-cover"
+                        onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                       />
-                      {/* Super / Extreme neon border overlay */}
-                      {item.super_bonus === true && (
-                        <div className="absolute inset-0 rounded-xl pointer-events-none" style={{
-                          boxShadow: 'inset 0 0 12px rgba(255,215,0,0.4), 0 0 18px rgba(255,215,0,0.35)',
-                          border: '2px solid rgba(255, 215, 0, 0.9)',
-                        }} />
-                      )}
-                      {item.super_bonus === false && (
-                        <div className="absolute inset-0 rounded-xl pointer-events-none" style={{
-                          boxShadow: 'inset 0 0 12px rgba(239,68,68,0.4), 0 0 18px rgba(239,68,68,0.35)',
-                          border: '2px solid rgba(239, 68, 68, 0.9)',
-                        }} />
-                      )}
-                      {/* Top bar – name + bet */}
-                      <div className="relative z-10 flex items-center justify-between gap-1 bg-black/55 px-1.5 py-1 flex-shrink-0 backdrop-blur-sm">
-                        <span className="text-[8px] font-black text-white truncate uppercase">{item.slot_name}</span>
-                        <span className="text-[8px] font-bold text-sky-300 whitespace-nowrap">€{payment.toFixed(2)}</span>
-                      </div>
-                      {/* Slot image */}
-                      <div className="relative z-10 flex-1 overflow-hidden">
-                        <img
-                          src={openingItemImageUrl(item)}
-                          alt={item.slot_name}
-                          className="w-full h-full object-cover"
-                          onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
-                        />
-                        {item.super_bonus === false && (
-                          <span className="absolute bottom-1 left-1 rounded bg-red-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">EXTREME</span>
-                        )}
-                        {item.super_bonus === true && (
-                          <span className="absolute bottom-1 left-1 rounded bg-yellow-500 px-1 py-0.5 text-[7px] font-black uppercase text-white z-10 shadow-lg">SUPER</span>
-                        )}
-                      </div>
-                      {/* Bottom bar – payout / index */}
-                      <div className="relative z-10 flex items-center justify-between bg-black/60 px-1.5 py-1 flex-shrink-0 backdrop-blur-sm">
-                        <span className="text-[8px] font-bold" style={{ color: isOpened ? (isWin ? '#4ade80' : '#f87171') : '#fbbf24' }}>
-                          {isOpened ? `€${(item.payout || 0).toFixed(0)}` : 'PENDING'}
-                        </span>
-                        <span className="rounded bg-black/50 px-1 py-0.5 text-[8px] font-black text-amber-300">
-                          {isOpened ? `${(item.multiplier || 0).toFixed(1)}x` : `#${(carouselItems.indexOf(item) + 1)}`}
-                        </span>
-                      </div>
-                    </>
+                    </div>
                   ),
-                } as Carousel3DItem;
-              })}
+                } as Carousel3DItem))}
             />
 
             <div className="flex items-center gap-2 mb-2 px-4 pt-1 flex-shrink-0">
@@ -811,11 +759,11 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                       />
 
                       <div className="flex items-center relative z-10 h-full">
-                        <div className="w-12 h-full flex-shrink-0 overflow-hidden">
+                        <div className="w-12 h-full flex-shrink-0 overflow-hidden relative">
                           <img
                             src={imageUrl}
                             alt={item.slot_name}
-                            className="w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover"
                             onError={(e) => {
                               e.currentTarget.src = SLOT_FALLBACK_IMAGE;
                             }}

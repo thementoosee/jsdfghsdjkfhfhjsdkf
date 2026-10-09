@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase, Overlay } from '../lib/supabase';
-import { Search, Instagram, Music, Youtube } from 'lucide-react';
+import { Instagram, Music, Youtube } from 'lucide-react';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
@@ -542,9 +542,8 @@ export function OverlayViewer({ overlayId }: OverlayViewerProps) {
 
               <div className="w-px h-6 bg-white/20"></div>
 
-              <div className="flex items-center gap-2">
-                <Search size={16} className="text-white/70 flex-shrink-0" />
-                <span className="text-white/80 text-[13px] font-medium whitespace-nowrap" style={{fontFamily: 'Rubik, sans-serif'}}>UNDER CONSTRUCTION</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-white text-[15px] font-black uppercase whitespace-nowrap tracking-wide" style={{fontFamily: 'Rubik, sans-serif'}}>www.jigadores.com</span>
               </div>
 
               <div className="w-px h-6 bg-white/20"></div>
