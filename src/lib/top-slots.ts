@@ -1,4 +1,4 @@
-import { SLOT_FALLBACK_IMAGE } from './slot-image';
+import { TOP_SLOT_FALLBACK_IMAGE } from './slot-image';
 
 /** Shape prepared for future historical max-multiplier ranking. */
 export interface TopSlotEntry {
@@ -18,7 +18,7 @@ export const TOP_SLOTS_LIMIT = 5;
 export function createEmptyTopSlotsPlaceholders(count = TOP_SLOTS_LIMIT): TopSlotEntry[] {
   return Array.from({ length: count }, (_, index) => ({
     rank: index + 1,
-    slot_image: SLOT_FALLBACK_IMAGE,
+    slot_image: TOP_SLOT_FALLBACK_IMAGE,
     slot_name: null,
     provider: null,
     max_multiplier: null,

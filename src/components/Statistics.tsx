@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, DollarSign, Target, Percent, Gift, Coffee } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import { TOP_SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 import {
   createEmptyTopSlotsPlaceholders,
   isTopSlotFilled,
@@ -359,11 +359,11 @@ export function Statistics() {
                       <td className="py-3 px-2">
                         <div className="flex items-center gap-3">
                           <img
-                            src={slot.slot_image || SLOT_FALLBACK_IMAGE}
-                            alt={filled ? String(slot.slot_name) : ''}
+                            src={slot.slot_image || TOP_SLOT_FALLBACK_IMAGE}
+                            alt={filled ? String(slot.slot_name) : 'Jigadores'}
                             className="w-10 h-14 object-cover rounded"
                             style={{ border: '1px solid #3d3d3d' }}
-                            onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
+                            onError={(e) => { e.currentTarget.src = TOP_SLOT_FALLBACK_IMAGE; }}
                           />
                           <span className="font-semibold text-sm uppercase" style={{ color: filled ? '#d4d4d4' : '#8a8a8a' }}>
                             {filled ? slot.slot_name : '—'}

@@ -37,7 +37,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
-  publicDir: false,
+  // Serve /public in dev (logos, slot fallbacks, etc.). Build still uses the filtered copy plugin above.
+  publicDir: 'public',
   build: {
     copyPublicDir: false,
     rollupOptions: {

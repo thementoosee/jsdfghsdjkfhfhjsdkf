@@ -16,7 +16,7 @@ import {
   RECENT_EVENTS_LIMIT,
   type NormalizedRecentEvent,
 } from '../lib/recent-events';
-import { SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
+import { TOP_SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 import {
   createEmptyTopSlotsPlaceholders,
   isTopSlotFilled,
@@ -404,22 +404,42 @@ export function ChatOverlay() {
             {topSlots.length > 0 ? (
               <div className="flex gap-3">
                 {topSlots[currentSlotIndex] ? (
-                  <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden">
+                  <div
+                    className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden"
+                    style={{
+                      boxShadow: 'inset 0 0 0 1px rgba(212,175,70,0.35)',
+                      background: 'rgba(8,12,24,0.9)',
+                    }}
+                  >
                     <img
-                      src={topSlots[currentSlotIndex].slot_image || SLOT_FALLBACK_IMAGE}
+                      src={topSlots[currentSlotIndex].slot_image || TOP_SLOT_FALLBACK_IMAGE}
                       alt={
                         isTopSlotFilled(topSlots[currentSlotIndex])
                           ? String(topSlots[currentSlotIndex].slot_name)
-                          : ''
+                          : 'Jigadores'
                       }
-                      className="min-w-full min-h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover rounded-lg"
                       style={{ objectPosition: 'center center' }}
-                      onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
+                      onError={(e) => {
+                        if (e.currentTarget.dataset.fallbackApplied === '1') return;
+                        e.currentTarget.dataset.fallbackApplied = '1';
+                        e.currentTarget.src = TOP_SLOT_FALLBACK_IMAGE;
+                      }}
                     />
                   </div>
                 ) : (
-                  <div className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(251, 191, 36, 0.2)' }}>
-                    <span className="text-4xl font-black" style={{ color: '#fbbf24' }}>?</span>
+                  <div
+                    className="w-[72px] h-[104px] flex items-center justify-center rounded-lg flex-shrink-0 overflow-hidden"
+                    style={{
+                      boxShadow: 'inset 0 0 0 1px rgba(212,175,70,0.35)',
+                      background: 'rgba(8,12,24,0.9)',
+                    }}
+                  >
+                    <img
+                      src={TOP_SLOT_FALLBACK_IMAGE}
+                      alt="Jigadores"
+                      className="w-full h-full object-cover rounded-lg"
+                    />
                   </div>
                 )}
 

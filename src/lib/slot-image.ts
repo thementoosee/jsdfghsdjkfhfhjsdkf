@@ -6,6 +6,8 @@
  */
 
 export const SLOT_FALLBACK_IMAGE = '/slot-fallback.svg';
+/** Portrait card with Jigadores mascot — used for empty / missing TOP 5 slots. */
+export const TOP_SLOT_FALLBACK_IMAGE = '/slot-card-jigadores.png?v=8';
 export const SLOT_IMAGES_BUCKET = 'slot-images';
 
 export type SlotImageFields = {
