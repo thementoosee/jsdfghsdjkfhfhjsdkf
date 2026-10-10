@@ -52,9 +52,16 @@ function openingItemImageUrl(item: BonusOpeningItem): string {
   });
 }
 
+/** Slot already has an entered pay/earning value — advance carousel past it. */
+function isOpeningSlotResolved(item: BonusOpeningItem): boolean {
+  return item.status === 'opened';
+}
+
 /** Same height as the first list card (short / even index). */
 const BONUS_LIST_CARD_HEIGHT_PX = 66;
 const BONUS_LIST_CARD_GAP_PX = 8;
+/** Last N slots: pin list to bottom so the lower area stays filled. */
+const OPENING_LIST_TAIL_COUNT = 3;
 
 interface BonusOpeningOverlayProps {
   openingId?: string;
@@ -66,7 +73,6 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
   const [opening, setOpening] = useState<BonusOpening | null>(null);
   const [items, setItems] = useState<BonusOpeningItem[]>([]);
   const [showInitialBE, setShowInitialBE] = useState(true);
-  const [listOverflows, setListOverflows] = useState(false);
   const listViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,18 +89,21 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
           if (payload.eventType === 'UPDATE' && payload.new) {
             const newData = payload.new as BonusOpening;
             if (newData.show_on_main_overlay) {
-              setOpening({ ...newData });
-              if (newData.id) {
-                await loadOpeningItems(newData.id);
-              }
-            } else {
-              setOpening(prev => {
-                if (prev && prev.id === newData.id) {
+              setOpening((prev) => {
+                if (prev?.id === newData.id) {
                   return { ...prev, ...newData };
                 }
-                return prev;
+                return { ...newData };
               });
+              return;
             }
+            setOpening(prev => {
+              if (prev && prev.id === newData.id) {
+                return { ...prev, ...newData };
+              }
+              return prev;
+            });
+            return;
           }
           await loadActiveOpening();
         }
@@ -111,10 +120,14 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
           if (payload.eventType === 'UPDATE' && payload.new) {
             const newData = payload.new as BonusOpening;
             if (newData.status === 'opening' || newData.show_on_main_overlay) {
-              setOpening({ ...newData, isHunt: true });
-              if (newData.id) {
-                await loadHuntItems(newData.id);
-              }
+              setOpening((prev) => {
+                if (prev?.id === newData.id) {
+                  // Same hunt — merge stats only (no remount / item reload).
+                  return { ...prev, ...newData, isHunt: true };
+                }
+                return { ...newData, isHunt: true };
+              });
+              return;
             }
           }
           await loadActiveOpening();
@@ -144,33 +157,40 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                 id: string;
                 slot_name: string;
                 slot_image_url?: string;
-                payment_amount?: number;
+                payment_amount?: number | null;
                 bet_amount?: number;
-                result_amount?: number;
-                multiplier?: number;
+                result_amount?: number | null;
+                multiplier?: number | null;
                 status: 'pending' | 'opened';
                 order_index: number;
                 is_super_bonus?: boolean | null;
               };
+              const hasEarning =
+                updatedItem.payment_amount != null && Number.isFinite(Number(updatedItem.payment_amount));
               setItems(prev => prev.map(item =>
                 item.id === updatedItem.id
                   ? {
                       id: updatedItem.id,
                       bonus_opening_id: opening.id,
                       slot_name: updatedItem.slot_name,
-                      slot_image: updatedItem.slot_image_url || '',
-                      payment: updatedItem.payment_amount || updatedItem.bet_amount || 0,
-                      payout: updatedItem.result_amount || 0,
-                      multiplier: updatedItem.multiplier || 0,
-                      status: updatedItem.status,
+                      slot_image: updatedItem.slot_image_url || item.slot_image,
+                      // Keep bet on payment badge; earning goes to payout (matches controller "EARNING").
+                      payment: updatedItem.bet_amount ?? item.payment,
+                      payout: hasEarning
+                        ? Number(updatedItem.payment_amount)
+                        : (updatedItem.result_amount || 0),
+                      multiplier: updatedItem.multiplier ?? 0,
+                      status: hasEarning || updatedItem.status === 'opened' ? 'opened' : 'pending',
                       order_index: updatedItem.order_index,
                       super_bonus: updatedItem.is_super_bonus ?? null
                     }
                   : item
               ));
+              return;
             }
-            loadHuntItems(opening.id);
-            loadActiveOpening();
+            if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+              loadHuntItems(opening.id);
+            }
           }
         )
         .subscribe();
@@ -189,7 +209,7 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
             if (payload.eventType === 'UPDATE' && payload.new) {
               const updatedItem = payload.new as BonusOpeningItem;
               setItems(prev => prev.map(item =>
-                item.id === updatedItem.id ? updatedItem : item
+                item.id === updatedItem.id ? { ...item, ...updatedItem } : item
               ));
 
               const { data } = await supabase
@@ -201,8 +221,11 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
               if (data) {
                 setOpening(prev => prev ? { ...prev, ...data } : data);
               }
+              return;
             }
-            loadOpeningItems(opening.id);
+            if (payload.eventType === 'INSERT' || payload.eventType === 'DELETE') {
+              loadOpeningItems(opening.id);
+            }
           }
         )
         .subscribe();
@@ -220,38 +243,6 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
 
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    const viewport = listViewportRef.current;
-    if (!viewport) return;
-
-    const updateOverflow = () => {
-      const count = items.length;
-      if (count === 0) {
-        setListOverflows(false);
-        return;
-      }
-
-      // clientHeight includes padding; cards live inside the content box.
-      const styles = getComputedStyle(viewport);
-      const padY =
-        (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0);
-      const availableHeight = Math.max(0, viewport.clientHeight - padY);
-      const contentHeight =
-        count * BONUS_LIST_CARD_HEIGHT_PX + Math.max(0, count - 1) * BONUS_LIST_CARD_GAP_PX;
-
-      setListOverflows(contentHeight > availableHeight);
-    };
-
-    updateOverflow();
-    const rafId = requestAnimationFrame(updateOverflow);
-    const observer = new ResizeObserver(updateOverflow);
-    observer.observe(viewport);
-    return () => {
-      cancelAnimationFrame(rafId);
-      observer.disconnect();
-    };
-  }, [items.length, opening?.id]);
 
   const loadActiveOpening = async () => {
     try {
@@ -360,20 +351,24 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
       if (error) throw error;
 
       if (data) {
-        const mappedData = data.map(item => ({
-          id: item.id,
-          bonus_opening_id: huntId,
-          slot_id: item.slot_id,
-          slot_name: item.slot_name,
-          slot_image: item.slot_image_url || '',
-          slots: item.slots,
-          payment: item.payment_amount || item.bet_amount || 0,
-          payout: item.result_amount || 0,
-          multiplier: item.multiplier || 0,
-          status: item.status,
-          order_index: item.order_index,
-          super_bonus: item.is_super_bonus ?? null
-        }));
+        const mappedData = data.map(item => {
+          const hasEarning =
+            item.payment_amount != null && Number.isFinite(Number(item.payment_amount));
+          return {
+            id: item.id,
+            bonus_opening_id: huntId,
+            slot_id: item.slot_id,
+            slot_name: item.slot_name,
+            slot_image: item.slot_image_url || '',
+            slots: item.slots,
+            payment: item.bet_amount || 0,
+            payout: hasEarning ? Number(item.payment_amount) : (item.result_amount || 0),
+            multiplier: item.multiplier ?? 0,
+            status: (hasEarning || item.status === 'opened' ? 'opened' : 'pending') as 'pending' | 'opened',
+            order_index: item.order_index,
+            super_bonus: item.is_super_bonus ?? null
+          };
+        });
 
         setItems(mappedData);
       }
@@ -432,7 +427,33 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
   })();
 
   const carouselItems = items.length > 0 ? items : openedItems;
-  const scrollingItems = listOverflows ? [...items, ...items] : items;
+  const focusSlotIndex = (() => {
+    if (carouselItems.length === 0) return 0;
+    const nextPending = carouselItems.findIndex((item) => !isOpeningSlotResolved(item));
+    return nextPending === -1 ? carouselItems.length - 1 : nextPending;
+  })();
+  const remainingSlots = Math.max(0, items.length - focusSlotIndex);
+  const pinListToBottom = remainingSlots <= OPENING_LIST_TAIL_COUNT;
+
+  // Center the active opening row (or pin to bottom for the last 3).
+  useEffect(() => {
+    const viewport = listViewportRef.current;
+    if (!viewport || items.length === 0) return;
+
+    const rowStep = BONUS_LIST_CARD_HEIGHT_PX + BONUS_LIST_CARD_GAP_PX;
+    const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+
+    let nextTop: number;
+    if (pinListToBottom) {
+      nextTop = maxScroll;
+    } else {
+      const rowCenter = focusSlotIndex * rowStep + BONUS_LIST_CARD_HEIGHT_PX / 2;
+      nextTop = rowCenter - viewport.clientHeight / 2;
+      nextTop = Math.max(0, Math.min(maxScroll, nextTop));
+    }
+
+    viewport.scrollTo({ top: nextTop, behavior: 'smooth' });
+  }, [focusSlotIndex, items.length, pinListToBottom]);
 
   return (
     <div
@@ -455,14 +476,6 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
             transform: translateX(0);
           }
         }
-        @keyframes scroll {
-          0% {
-            transform: translateY(0);
-          }
-          100% {
-            transform: translateY(-50%);
-          }
-        }
         @keyframes slideInFromRight {
           0% {
             opacity: 0;
@@ -472,6 +485,17 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
             opacity: 1;
             transform: translateX(0);
           }
+        }
+        @keyframes openingActivePulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.035); }
+        }
+        .opening-list-scroll {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .opening-list-scroll::-webkit-scrollbar {
+          display: none;
         }
         @keyframes slideOut {
           0% {
@@ -691,6 +715,9 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
               cardWidth={88}
               gap={10}
               speed={42}
+              autoScroll={false}
+              activeIndex={focusSlotIndex}
+              slideDurationMs={520}
               items={carouselItems.map((item) => ({
                   id: item.id,
                   render: () => (
@@ -713,43 +740,58 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
               </span>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-hidden px-4 pb-4" ref={listViewportRef}>
-              <div
-                className="space-y-2"
-                style={{
-                  animation: listOverflows ? 'scroll 28s linear infinite' : 'none'
-                }}
-              >
-                {scrollingItems.map((item, index) => {
-                  const actualIndex = items.length > 0 ? (index % items.length) : 0;
+            <div
+              className="opening-list-scroll flex-1 min-h-0 overflow-y-auto px-4 pb-4"
+              ref={listViewportRef}
+            >
+              <div className="flex flex-col" style={{ gap: BONUS_LIST_CARD_GAP_PX }}>
+                {items.map((item, index) => {
+                  const actualIndex = index;
                   const payment = item.payment;
                   const isOpened = item.status === 'opened';
+                  const isActive = index === focusSlotIndex && !isOpened;
+                  const isPast = isOpened || index < focusSlotIndex;
                   const isWin = isOpened && item.payout && item.payout > payment;
                   const imageUrl = openingItemImageUrl(item);
 
                   return (
                     <div
-                      key={`${item.id}-${index}`}
+                      key={item.id}
+                      data-opening-row={index}
                       className="rounded-xl overflow-hidden relative flex-shrink-0"
                       style={{
                         height: BONUS_LIST_CARD_HEIGHT_PX,
                         minHeight: BONUS_LIST_CARD_HEIGHT_PX,
                         maxHeight: BONUS_LIST_CARD_HEIGHT_PX,
-                        background: isOpened
-                          ? (isWin ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)')
-                          : 'rgba(251, 191, 36, 0.15)',
-                        border: item.super_bonus === true
-                          ? '2px solid rgba(255, 215, 0, 0.95)'
+                        transformOrigin: 'center center',
+                        animation: isActive ? 'openingActivePulse 1.35s ease-in-out infinite' : 'none',
+                        filter: isPast ? 'grayscale(0.55) brightness(0.88)' : 'none',
+                        opacity: isPast ? 0.82 : 1,
+                        zIndex: isActive ? 2 : 1,
+                        background: isPast
+                          ? 'rgba(100, 110, 130, 0.28)'
+                          : isActive
+                          ? 'rgba(251, 191, 36, 0.22)'
+                          : 'rgba(251, 191, 36, 0.12)',
+                        border: isActive
+                          ? '2px solid rgba(251, 191, 36, 0.95)'
+                          : item.super_bonus === true
+                          ? '2px solid rgba(255, 215, 0, 0.55)'
                           : item.super_bonus === false
-                          ? '2px solid rgba(239, 68, 68, 0.95)'
-                          : isOpened
-                          ? `1px solid ${isWin ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`
-                          : '1px solid rgba(251, 191, 36, 0.35)'
+                          ? '2px solid rgba(239, 68, 68, 0.55)'
+                          : isPast
+                          ? '1px solid rgba(180, 190, 210, 0.4)'
+                          : '1px solid rgba(251, 191, 36, 0.35)',
+                        boxShadow: isActive
+                          ? '0 0 14px rgba(251, 191, 36, 0.28)'
+                          : 'none',
+                        transition: 'filter 0.35s ease, opacity 0.35s ease, border-color 0.35s ease',
                       }}
                     >
                       <div
-                        className="absolute inset-0 opacity-20"
+                        className="absolute inset-0"
                         style={{
+                          opacity: isPast ? 0.18 : 0.2,
                           backgroundImage: `url("${imageUrl}"), url("${SLOT_FALLBACK_IMAGE}")`,
                           backgroundSize: 'cover',
                           backgroundPosition: 'center',
@@ -771,17 +813,44 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                         </div>
 
                         <div className="flex-1 min-w-0 px-2.5 py-2">
-                          <div className="text-white text-xs font-black truncate mb-1">{item.slot_name}</div>
+                          <div
+                            className="text-xs font-black truncate mb-1"
+                            style={{ color: isPast ? 'rgba(226,232,240,0.88)' : '#fff' }}
+                          >
+                            {item.slot_name}
+                          </div>
                           <div className="flex items-center gap-1.5 text-[10px]">
-                            <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(251, 191, 36, 0.2)', color: '#fbbf24' }}>
+                            <span
+                              className="font-bold px-1.5 py-0.5 rounded"
+                              style={{
+                                background: isPast ? 'rgba(180,190,210,0.22)' : 'rgba(251, 191, 36, 0.2)',
+                                color: isPast ? '#cbd5e1' : '#fbbf24',
+                              }}
+                            >
                               €{payment.toFixed(2)}
                             </span>
                             {isOpened && (
                               <>
-                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: isWin ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)', color: isWin ? '#10b981' : '#ef4444' }}>
+                                <span
+                                  className="font-bold px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: isPast
+                                      ? 'rgba(180,190,210,0.2)'
+                                      : isWin
+                                      ? 'rgba(16, 185, 129, 0.2)'
+                                      : 'rgba(239, 68, 68, 0.2)',
+                                    color: isPast ? '#cbd5e1' : isWin ? '#10b981' : '#ef4444',
+                                  }}
+                                >
                                   €{item.payout?.toFixed(0) || '0'}
                                 </span>
-                                <span className="font-bold px-1.5 py-0.5 rounded" style={{ background: 'rgba(168, 85, 247, 0.2)', color: '#a855f7' }}>
+                                <span
+                                  className="font-bold px-1.5 py-0.5 rounded"
+                                  style={{
+                                    background: isPast ? 'rgba(180,190,210,0.2)' : 'rgba(168, 85, 247, 0.2)',
+                                    color: isPast ? '#cbd5e1' : '#a855f7',
+                                  }}
+                                >
                                   {item.multiplier?.toFixed(1) || '0.0'}x
                                 </span>
                               </>
@@ -789,7 +858,10 @@ export function BonusOpeningOverlay({ openingId, huntId }: BonusOpeningOverlayPr
                           </div>
                         </div>
 
-                        <div className="pr-2 text-[10px] font-black" style={{ color: 'rgba(251, 191, 36, 0.55)' }}>
+                        <div
+                          className="pr-2 text-[10px] font-black"
+                          style={{ color: isPast ? 'rgba(203,213,225,0.7)' : 'rgba(251, 191, 36, 0.55)' }}
+                        >
                           #{actualIndex + 1}
                         </div>
                       </div>

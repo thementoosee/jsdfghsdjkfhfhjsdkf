@@ -40,6 +40,12 @@ interface Carousel3DProps {
   height?: string;
   /** Unique prefix for CSS classes to avoid collisions */
   id?: string;
+  /** When false, track stays on activeIndex (Opening mode). Default true. */
+  autoScroll?: boolean;
+  /** Centered card index when autoScroll is false */
+  activeIndex?: number;
+  /** Slide duration (ms) when activeIndex changes in Opening mode */
+  slideDurationMs?: number;
 }
 
 export function Carousel3D({
@@ -49,20 +55,55 @@ export function Carousel3D({
   gap = 14,
   height = '200px',
   id = 'c3d',
+  autoScroll = true,
+  activeIndex = 0,
+  slideDurationMs = 480,
 }: Carousel3DProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const offsetRef = useRef(0);
+  const targetOffsetRef = useRef(0);
+  const slideFromRef = useRef(0);
+  const slideStartRef = useRef(0);
+  const slidingRef = useRef(false);
   const pausedRef = useRef(false);
   const rafRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const initializedFocusRef = useRef(false);
 
   // Total width of one full set of items
   const step = cardWidth + gap;
   const singleSetWidth = items.length * step;
 
-  // Duplicate for infinite loop
-  const loopItems = items.length > 1 ? [...items, ...items] : items;
+  // Duplicate for infinite loop only while auto-scrolling
+  const loopItems = autoScroll && items.length > 1 ? [...items, ...items] : items;
+
+  const clampedActiveIndex =
+    items.length === 0 ? 0 : Math.max(0, Math.min(activeIndex, items.length - 1));
+
+  // Opening: slide track to the next focused slot (ease-out)
+  useEffect(() => {
+    if (autoScroll || items.length === 0) return;
+    const nextOffset = clampedActiveIndex * step;
+    targetOffsetRef.current = nextOffset;
+
+    if (!initializedFocusRef.current) {
+      offsetRef.current = nextOffset;
+      initializedFocusRef.current = true;
+      slidingRef.current = false;
+      return;
+    }
+
+    if (Math.abs(offsetRef.current - nextOffset) < 0.5) {
+      offsetRef.current = nextOffset;
+      slidingRef.current = false;
+      return;
+    }
+
+    slideFromRef.current = offsetRef.current;
+    slideStartRef.current = performance.now();
+    slidingRef.current = true;
+  }, [autoScroll, clampedActiveIndex, step, items.length]);
 
   // ─── Per-frame update ───
   const tick = useCallback(
@@ -76,12 +117,23 @@ export function Carousel3D({
       const dt = lastTimeRef.current ? (now - lastTimeRef.current) / 1000 : 0;
       lastTimeRef.current = now;
 
-      // Advance offset when not paused
-      if (!pausedRef.current && items.length > 1) {
+      // Advance offset when not paused (hunt carousel only)
+      if (autoScroll && !pausedRef.current && items.length > 1) {
         offsetRef.current += speed * dt;
         // Seamless wrap: snap back by exactly one set width
         if (offsetRef.current >= singleSetWidth) {
           offsetRef.current -= singleSetWidth;
+        }
+      } else if (!autoScroll && slidingRef.current) {
+        const elapsed = now - slideStartRef.current;
+        const t = Math.min(1, elapsed / Math.max(1, slideDurationMs));
+        // easeOutCubic
+        const eased = 1 - (1 - t) ** 3;
+        offsetRef.current =
+          slideFromRef.current + (targetOffsetRef.current - slideFromRef.current) * eased;
+        if (t >= 1) {
+          offsetRef.current = targetOffsetRef.current;
+          slidingRef.current = false;
         }
       }
 
@@ -121,7 +173,7 @@ export function Carousel3D({
 
       rafRef.current = requestAnimationFrame(tick);
     },
-    [items.length, singleSetWidth, speed],
+    [items.length, singleSetWidth, speed, autoScroll, slideDurationMs],
   );
 
   // ─── Start / stop rAF loop ───
@@ -181,8 +233,8 @@ export function Carousel3D({
           WebkitMaskImage:
             'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)',
         }}
-        onMouseEnter={() => { pausedRef.current = true; }}
-        onMouseLeave={() => { pausedRef.current = false; }}
+        onMouseEnter={() => { if (autoScroll) pausedRef.current = true; }}
+        onMouseLeave={() => { if (autoScroll) pausedRef.current = false; }}
       >
         {/* Track – translated each frame by rAF */}
         <div

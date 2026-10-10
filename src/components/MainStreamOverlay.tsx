@@ -32,9 +32,15 @@ export function MainStreamOverlay() {
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enterStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Always-current overlay — transitionTo is closed over by a mount-only subscription. */
+  const overlayStateRef = useRef<OverlayState>({ type: null, id: null });
   const EXIT_DURATION_MS = 450;
   const SWITCH_DELAY_MS = 2000;
   const ENTER_DURATION_MS = 450;
+
+  useEffect(() => {
+    overlayStateRef.current = overlayState;
+  }, [overlayState]);
 
   useEffect(() => {
     initializeOverlays();
@@ -90,7 +96,9 @@ export function MainStreamOverlay() {
 
     if (activeOpening) {
       console.log('[Main Init] Setting overlay to opening:', activeOpening.id);
-      setOverlayState({ type: 'opening', id: activeOpening.id });
+      const next = { type: 'opening' as const, id: activeOpening.id };
+      overlayStateRef.current = next;
+      setOverlayState(next);
       return;
     }
 
@@ -104,7 +112,9 @@ export function MainStreamOverlay() {
 
     if (activeHunt) {
       console.log('[Main Init] Setting overlay to hunt:', activeHunt.id);
-      setOverlayState({ type: 'hunt', id: activeHunt.id });
+      const next = { type: 'hunt' as const, id: activeHunt.id };
+      overlayStateRef.current = next;
+      setOverlayState(next);
       return;
     }
 
@@ -119,7 +129,9 @@ export function MainStreamOverlay() {
 
     if (activeTournament) {
       console.log('[Main Init] Setting overlay to tournament:', activeTournament.id);
-      setOverlayState({ type: 'tournament', id: activeTournament.id });
+      const next = { type: 'tournament' as const, id: activeTournament.id };
+      overlayStateRef.current = next;
+      setOverlayState(next);
       return;
     }
 
@@ -154,7 +166,9 @@ export function MainStreamOverlay() {
 
     if (chillSession) {
       console.log('[Main Init] Setting overlay to chill:', chillSession.id);
-      setOverlayState({ type: 'chill', id: chillSession.id });
+      const next = { type: 'chill' as const, id: chillSession.id };
+      overlayStateRef.current = next;
+      setOverlayState(next);
     }
   };
 
@@ -276,8 +290,9 @@ export function MainStreamOverlay() {
 
   const transitionTo = (type: OverlayType, id: string | null) => {
     const nextOverlay: OverlayState = { type, id };
+    const current = overlayStateRef.current;
 
-    if (overlayState.type === nextOverlay.type && overlayState.id === nextOverlay.id) {
+    if (current.type === nextOverlay.type && current.id === nextOverlay.id) {
       return;
     }
 
@@ -285,7 +300,10 @@ export function MainStreamOverlay() {
     if (enterStartTimerRef.current) clearTimeout(enterStartTimerRef.current);
     if (cleanupTimerRef.current) clearTimeout(cleanupTimerRef.current);
 
-    const currentOverlay = overlayState.type ? overlayState : null;
+    const currentOverlay = current.type ? current : null;
+
+    // Lock target immediately so debounced realtime events don't re-trigger enter/exit.
+    overlayStateRef.current = nextOverlay;
 
     if (!currentOverlay && nextOverlay.type) {
       setEnteringOverlay(nextOverlay);
