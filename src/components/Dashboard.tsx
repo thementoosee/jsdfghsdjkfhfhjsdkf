@@ -1,4 +1,26 @@
-import { LayoutDashboard, Layers, Gift, Package, Coffee, MessageSquare, ExternalLink, Database, BarChart3, Trophy, Brackets, Zap, ArrowLeft, Music2, Copy, MonitorSmartphone } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Layers,
+  Gift,
+  Package,
+  Coffee,
+  MessageSquare,
+  ExternalLink,
+  Database,
+  BarChart3,
+  Trophy,
+  Brackets,
+  Zap,
+  Music2,
+  Copy,
+  MonitorSmartphone,
+  Swords,
+  Settings,
+  Home,
+  Menu,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { useState, useEffect, Suspense, lazy } from 'react';
 import { supabase, Overlay, OverlayType } from '../lib/supabase';
 import { exchangeSpotifyCode } from '../lib/spotify';
@@ -8,20 +30,65 @@ import {
   setSecondSlotVisible,
 } from '../lib/overlay-modules';
 
+/** Admin-only visual tokens — do not use on OBS overlays. */
+const dash = {
+  page: '#0f0f12',
+  sidebar: '#141418',
+  sidebarBorder: 'rgba(63, 63, 70, 0.55)',
+  card: '#1c1c22',
+  cardHover: '#22222a',
+  cardBorder: 'rgba(82, 82, 91, 0.55)',
+  text: '#f8fafc',
+  muted: '#94a3b8',
+  accent: '#3b82f6',
+  accentSoft: '#60a5fa',
+  accentMuted: 'rgba(59, 130, 246, 0.16)',
+  accentBorder: 'rgba(96, 165, 250, 0.35)',
+} as const;
+
 const OverlayBarManager = lazy(() => import('./OverlayBarManager').then((m) => ({ default: m.OverlayBarManager })));
 const BonusHuntWorkspace = lazy(() => import('./bonus-hunt/BonusHuntWorkspace').then((m) => ({ default: m.BonusHuntWorkspace })));
 const SlotDatabase = lazy(() => import('./SlotDatabase').then((m) => ({ default: m.SlotDatabase })));
 const ChillSessionManager = lazy(() => import('./ChillSessionManager').then((m) => ({ default: m.ChillSessionManager })));
 const Statistics = lazy(() => import('./Statistics').then((m) => ({ default: m.Statistics })));
 const FeverChampionsManager = lazy(() => import('./FeverChampionsManager').then((m) => ({ default: m.FeverChampionsManager })));
+const BonusTournamentManager = lazy(() =>
+  import('./bonus-tournament/BonusTournamentManager').then((m) => ({ default: m.BonusTournamentManager })),
+);
 const StreamElementsIntegration = lazy(() => import('./StreamElementsIntegration').then((m) => ({ default: m.StreamElementsIntegration })));
 const TwitchIntegration = lazy(() => import('./TwitchIntegration').then((m) => ({ default: m.TwitchIntegration })));
 const SpotifyIntegration = lazy(() => import('./SpotifyIntegration').then((m) => ({ default: m.SpotifyIntegration })));
 const GiveawayManager = lazy(() => import('./GiveawayManager').then((m) => ({ default: m.GiveawayManager })));
-const CasinoManager = lazy(() => import('./CasinoManager'));
 
 type FullscreenView = 'bar' | 'chill' | 'bonus' | 'fever' | 'giveaway' | null;
-type PanelPage = 'bonus' | 'fever' | 'giveaway' | 'chill' | 'twitch' | 'streamelements' | 'spotify' | 'database' | 'stats' | 'live_preview' | null;
+type PanelPage =
+  | 'bonus'
+  | 'fever'
+  | 'bonus_tournament'
+  | 'giveaway'
+  | 'chill'
+  | 'twitch'
+  | 'streamelements'
+  | 'spotify'
+  | 'database'
+  | 'stats'
+  | 'live_preview'
+  | 'settings'
+  | null;
+
+type NavId =
+  | 'home'
+  | 'bonus'
+  | 'bonus_tournament'
+  | 'chill'
+  | 'fever'
+  | 'giveaway'
+  | 'twitch'
+  | 'streamelements'
+  | 'spotify'
+  | 'database'
+  | 'stats'
+  | 'settings';
 
 export function Dashboard() {
   const [overlaysByType, setOverlaysByType] = useState<Record<string, Overlay[]>>({});
@@ -32,9 +99,12 @@ export function Dashboard() {
   const [showSecondSlot, setShowSecondSlot] = useState(true);
   const [secondSlotBusy, setSecondSlotBusy] = useState(false);
   const [copiedDeckLink, setCopiedDeckLink] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const sectionLoader = (
-    <div className="py-10 text-center text-sm text-slate-400 uppercase tracking-wide">A carregar...</div>
+    <div className="py-10 text-center text-sm uppercase tracking-wide" style={{ color: dash.muted }}>
+      A carregar...
+    </div>
   );
 
   const overlayTypes = [
@@ -339,6 +409,7 @@ export function Dashboard() {
   const panelPageTitles: Record<Exclude<PanelPage, null>, string> = {
     bonus: 'Bonus Hunt / Opening',
     fever: 'Fever Champions League',
+    bonus_tournament: 'Bonus Tournament (DEMO)',
     giveaway: 'Giveaways',
     chill: 'Chill',
     twitch: 'Twitch Integration',
@@ -346,12 +417,197 @@ export function Dashboard() {
     spotify: 'Spotify Now Playing',
     database: 'Slots Database',
     stats: 'Statistics',
-    live_preview: 'Live Preview (OBS)'
+    live_preview: 'Live Preview (OBS)',
+    settings: 'Definições',
   };
+
+  const goHome = () => {
+    setFullscreenView(null);
+    setActivePanelPage(null);
+    setSidebarOpen(false);
+  };
+
+  const goPanel = (page: Exclude<PanelPage, null>) => {
+    setFullscreenView(null);
+    setActivePanelPage(page);
+    setSidebarOpen(false);
+  };
+
+  const activeNav: NavId = (() => {
+    if (activePanelPage === 'settings') return 'settings';
+    if (fullscreenView === 'bonus' || activePanelPage === 'bonus') return 'bonus';
+    if (fullscreenView === 'chill' || activePanelPage === 'chill') return 'chill';
+    if (fullscreenView === 'fever' || activePanelPage === 'fever') return 'fever';
+    if (fullscreenView === 'giveaway' || activePanelPage === 'giveaway') return 'giveaway';
+    if (activePanelPage === 'bonus_tournament') return 'bonus_tournament';
+    if (activePanelPage === 'twitch') return 'twitch';
+    if (activePanelPage === 'streamelements') return 'streamelements';
+    if (activePanelPage === 'spotify') return 'spotify';
+    if (activePanelPage === 'database') return 'database';
+    if (activePanelPage === 'stats') return 'stats';
+    if (fullscreenView === 'bar') return 'settings';
+    return 'home';
+  })();
+
+  const mainNavItems: { id: NavId; label: string; icon: LucideIcon; onClick: () => void }[] = [
+    { id: 'home', label: 'Início', icon: Home, onClick: goHome },
+    {
+      id: 'bonus',
+      label: 'Bonus Hunt / Opening',
+      icon: Gift,
+      onClick: () => goPanel('bonus'),
+    },
+    {
+      id: 'bonus_tournament',
+      label: 'Bonus Tournament',
+      icon: Swords,
+      onClick: () => goPanel('bonus_tournament'),
+    },
+    { id: 'chill', label: 'Chill', icon: Coffee, onClick: () => goPanel('chill') },
+    { id: 'giveaway', label: 'Giveaways', icon: Package, onClick: () => goPanel('giveaway') },
+    {
+      id: 'twitch',
+      label: 'Twitch Integration',
+      icon: MessageSquare,
+      onClick: () => goPanel('twitch'),
+    },
+    {
+      id: 'streamelements',
+      label: 'StreamElements',
+      icon: Zap,
+      onClick: () => goPanel('streamelements'),
+    },
+    { id: 'spotify', label: 'Spotify', icon: Music2, onClick: () => goPanel('spotify') },
+    {
+      id: 'database',
+      label: 'Slots Database',
+      icon: Database,
+      onClick: () => goPanel('database'),
+    },
+    { id: 'stats', label: 'Statistics', icon: BarChart3, onClick: () => goPanel('stats') },
+  ];
 
   const previewOverlay = overlaysByType[previewOverlayType]?.[0] || null;
 
+  const renderSettingsPage = () => (
+    <div className="space-y-5">
+      <div
+        className="rounded-2xl border p-5 sm:p-6"
+        style={{ background: dash.card, borderColor: dash.cardBorder }}
+      >
+        <div className="mb-5">
+          <p className="text-xs font-bold uppercase tracking-[0.28em]" style={{ color: dash.accentSoft }}>
+            Stream bar
+          </p>
+          <h2 className="text-xl font-black uppercase mt-1" style={{ color: dash.text }}>
+            Definições
+          </h2>
+          <p className="text-sm mt-1" style={{ color: dash.muted }}>
+            Wager ou Raw, marca, tamanhos de logótipo e modo de jogo.
+          </p>
+        </div>
+        <Suspense
+          fallback={
+            <div className="py-6 text-center text-sm uppercase" style={{ color: dash.muted }}>
+              A carregar definições…
+            </div>
+          }
+        >
+          <OverlayBarManager showOnlySelects={true} />
+        </Suspense>
+      </div>
+
+      <div
+        className="rounded-2xl border p-5 sm:p-6"
+        style={{ background: dash.card, borderColor: dash.cardBorder }}
+      >
+        <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: dash.accentMuted, border: `1px solid ${dash.accentBorder}` }}
+            >
+              <MonitorSmartphone className="w-4 h-4" style={{ color: dash.accentSoft }} />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold uppercase" style={{ color: dash.text }}>
+                2ª Slot (canto)
+              </h2>
+              <p className="text-xs" style={{ color: dash.muted }}>
+                Buraco transparente no canto inferior esquerdo da Main Overlay
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => void toggleSecondSlot()}
+            disabled={secondSlotBusy}
+            className="px-4 py-2 rounded-xl text-xs font-bold uppercase transition-all"
+            style={{
+              background: showSecondSlot
+                ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'
+                : '#1e1e24',
+              border: `1px solid ${showSecondSlot ? dash.accent : dash.cardBorder}`,
+              color: '#fff',
+              opacity: secondSlotBusy ? 0.6 : 1,
+            }}
+          >
+            {showSecondSlot ? 'ON na stream' : 'OFF na stream'}
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-wide" style={{ color: dash.muted }}>
+            Stream Deck — usa o plugin API Request (GET). Website abre sempre o browser.
+          </p>
+          {(
+            [
+              { action: 'show' as const, label: 'Mostrar 2ª slot', hint: '/second_slot/show' },
+              { action: 'hide' as const, label: 'Esconder 2ª slot', hint: '/second_slot/hide' },
+              { action: 'toggle' as const, label: 'Toggle 2ª slot', hint: '/second_slot/toggle' },
+            ] as const
+          ).map(({ action, label, hint }) => (
+            <div
+              key={action}
+              className="flex items-center gap-2 rounded-xl px-3 py-2"
+              style={{ background: '#141418', border: `1px solid ${dash.cardBorder}` }}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-bold uppercase" style={{ color: dash.text }}>
+                  {label}
+                </div>
+                <div
+                  className="text-[11px] truncate font-mono"
+                  style={{ color: '#64748b' }}
+                  title={getOverlayModuleDeckUrl('second_slot', action)}
+                >
+                  …{hint}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => void copyDeckUrl(action)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase flex-shrink-0"
+                style={{
+                  background: copiedDeckLink === action ? 'rgba(34,197,94,0.2)' : '#1e1e24',
+                  border: `1px solid ${dash.cardBorder}`,
+                  color: copiedDeckLink === action ? '#4ade80' : dash.text,
+                }}
+              >
+                <Copy className="w-3.5 h-3.5" />
+                {copiedDeckLink === action ? 'Copiado' : 'Copiar'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   const renderPanelPage = () => {
+    if (activePanelPage === 'settings') {
+      return renderSettingsPage();
+    }
     if (activePanelPage === 'bonus') {
       return <Suspense fallback={sectionLoader}><BonusHuntWorkspace /></Suspense>;
     }
@@ -360,6 +616,9 @@ export function Dashboard() {
     }
     if (activePanelPage === 'fever') {
       return <Suspense fallback={sectionLoader}><FeverChampionsManager /></Suspense>;
+    }
+    if (activePanelPage === 'bonus_tournament') {
+      return <Suspense fallback={sectionLoader}><BonusTournamentManager /></Suspense>;
     }
     if (activePanelPage === 'database') {
       return <Suspense fallback={sectionLoader}><SlotDatabase /></Suspense>;
@@ -543,568 +802,416 @@ export function Dashboard() {
     }
   }, [loading]);
 
-  if (fullscreenView) {
+
+  const renderHomePage = () => {
+    const featured: {
+      title: string;
+      description: string;
+      icon: LucideIcon;
+      onClick: () => void;
+    }[] = [
+      {
+        title: 'Bonus Hunt / Opening',
+        description: 'Gere hunts, openings e o overlay principal de bónus.',
+        icon: Gift,
+        onClick: () => goPanel('bonus'),
+      },
+      {
+        title: 'Bonus Tournament',
+        description: 'Torneio DEMO — inscrições, sorteio e confrontos.',
+        icon: Swords,
+        onClick: () => goPanel('bonus_tournament'),
+      },
+      {
+        title: 'Chill',
+        description: 'Sessões relaxadas e overlay chill para a stream.',
+        icon: Coffee,
+        onClick: () => goPanel('chill'),
+      },
+      {
+        title: 'Giveaways',
+        description: 'Cria e gere giveaways para a tua audiência.',
+        icon: Package,
+        onClick: () => goPanel('giveaway'),
+      },
+    ];
+
+    const tools: {
+      title: string;
+      icon: LucideIcon;
+      onClick: () => void;
+    }[] = [
+      { title: 'Twitch Integration', icon: MessageSquare, onClick: () => goPanel('twitch') },
+      { title: 'StreamElements', icon: Zap, onClick: () => goPanel('streamelements') },
+      { title: 'Spotify', icon: Music2, onClick: () => goPanel('spotify') },
+      { title: 'Slots Database', icon: Database, onClick: () => goPanel('database') },
+      { title: 'Statistics', icon: BarChart3, onClick: () => goPanel('stats') },
+      { title: 'Live Preview (OBS)', icon: LayoutDashboard, onClick: () => goPanel('live_preview') },
+    ];
+
+    const overlayCards: { type: OverlayType; title: string; icon: LucideIcon }[] = [
+      { type: 'main_stream', title: 'Main Overlay', icon: LayoutDashboard },
+      { type: 'bar', title: 'Stream Bar', icon: LayoutDashboard },
+      { type: 'bonus_hunt', title: 'Bonus Hunt', icon: Gift },
+      { type: 'bonus_opening', title: 'Bonus Opening', icon: Package },
+      { type: 'chill', title: 'Chill', icon: Coffee },
+      { type: 'fever_champions', title: 'Fever Champions League', icon: Trophy },
+      { type: 'fever_bracket', title: 'Fever Champions Bracket', icon: Brackets },
+      { type: 'fever_groups', title: 'Fever Champions Groups', icon: Trophy },
+    ];
+
     return (
-      <div className="min-h-screen h-screen overflow-y-auto" style={{ background: 'linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%)' }}>
-        <header className="sticky top-0 z-50 px-6 py-3 border-b" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center">
-              <button
-                onClick={() => setFullscreenView(null)}
-                className="hover:opacity-80 transition-opacity"
-              >
-                <img src="/logo-jigadores-wordmark.png?v=2" alt="Jigadores Logo" className="h-8 w-auto object-contain" />
-              </button>
-            </div>
+      <div className="space-y-8">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.3em]" style={{ color: dash.accentSoft }}>
+            Stream Control Center
+          </p>
+          <h1 className="text-3xl sm:text-4xl font-black uppercase mt-2" style={{ color: dash.text }}>
+            Dashboard
+          </h1>
+          <p className="text-sm sm:text-base mt-2 max-w-2xl" style={{ color: dash.muted }}>
+            Gere as tuas overlays e ferramentas de streaming num único lugar.
+          </p>
+        </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setFullscreenView('bar')}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-                style={{
-                  background: fullscreenView === 'bar' ? 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)' : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
-                  border: '1px solid #3d3d3d',
-                  color: fullscreenView === 'bar' ? '#ffffff' : '#d4d4d4'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <LayoutDashboard className="w-4 h-4" />
-                Barra
-              </button>
-
-              <button
-                onClick={() => {
-                  setFullscreenView('chill');
-                  activateOverlay('chill');
-                }}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-                style={{
-                  background: fullscreenView === 'chill' ? 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)' : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
-                  border: '1px solid #3d3d3d',
-                  color: fullscreenView === 'chill' ? '#ffffff' : '#d4d4d4'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <Coffee className="w-4 h-4" />
-                Chill
-              </button>
-
-              <button
-                onClick={() => {
-                  setFullscreenView('bonus');
-                  activateOverlay('bonus_hunt');
-                }}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-                style={{
-                  background: fullscreenView === 'bonus' ? 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)' : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
-                  border: '1px solid #3d3d3d',
-                  color: fullscreenView === 'bonus' ? '#ffffff' : '#d4d4d4'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <Gift className="w-4 h-4" />
-                Hunt
-              </button>
-
-              <button
-                onClick={() => {
-                  setFullscreenView('fever');
-                  activateOverlay('fever_champions');
-                }}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-                style={{
-                  background: fullscreenView === 'fever' ? 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)' : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
-                  border: '1px solid #3d3d3d',
-                  color: fullscreenView === 'fever' ? '#ffffff' : '#d4d4d4'
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <Trophy className="w-4 h-4" />
-                Fever
-              </button>
-            </div>
+        <div
+          className="rounded-2xl border p-5 sm:p-6"
+          style={{ background: dash.card, borderColor: dash.cardBorder }}
+        >
+          <div className="mb-4">
+            <p className="text-xs font-bold uppercase tracking-[0.28em]" style={{ color: dash.accentSoft }}>
+              Stream bar
+            </p>
+            <h2 className="text-lg font-black uppercase mt-1" style={{ color: dash.text }}>
+              Top Bar
+            </h2>
+            <p className="text-sm mt-1" style={{ color: dash.muted }}>
+              Wager ou Raw, marca e tamanhos de logótipo da barra.
+            </p>
           </div>
-        </header>
+          <Suspense
+            fallback={
+              <div className="py-4 text-center text-sm uppercase" style={{ color: dash.muted }}>
+                A carregar Top Bar…
+              </div>
+            }
+          >
+            <OverlayBarManager showOnlySelects={true} />
+          </Suspense>
+        </div>
 
-        <div className="max-w-7xl mx-auto px-3 md:px-6 py-4 md:py-8">
-          <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
-            {fullscreenView === 'bar' && <Suspense fallback={sectionLoader}><OverlayBarManager /></Suspense>}
-            {fullscreenView === 'chill' && <Suspense fallback={sectionLoader}><ChillSessionManager /></Suspense>}
-            {fullscreenView === 'bonus' && <Suspense fallback={sectionLoader}><BonusHuntWorkspace /></Suspense>}
-            {fullscreenView === 'fever' && <Suspense fallback={sectionLoader}><FeverChampionsManager /></Suspense>}
-            {fullscreenView === 'giveaway' && <Suspense fallback={sectionLoader}><GiveawayManager /></Suspense>}
+        <div>
+          <h2 className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: dash.muted }}>
+            Módulos principais
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {featured.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={item.onClick}
+                  className="rounded-2xl border p-5 text-left transition-all group"
+                  style={{ background: dash.card, borderColor: dash.cardBorder }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = dash.accentBorder;
+                    e.currentTarget.style.background = dash.cardHover;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = dash.cardBorder;
+                    e.currentTarget.style.background = dash.card;
+                  }}
+                >
+                  <div
+                    className="w-11 h-11 rounded-xl flex items-center justify-center mb-4"
+                    style={{ background: dash.accentMuted, border: `1px solid ${dash.accentBorder}` }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: dash.accentSoft }} />
+                  </div>
+                  <h3 className="text-base font-black uppercase" style={{ color: dash.text }}>
+                    {item.title}
+                  </h3>
+                  <p className="text-sm mt-2" style={{ color: dash.muted }}>
+                    {item.description}
+                  </p>
+                </button>
+              );
+            })}
           </div>
         </div>
-      </div>
-    );
-  }
 
-  if (activePanelPage) {
-    return (
-      <div className="min-h-screen h-screen overflow-y-auto" style={{ background: 'linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%)' }}>
-        <header className="sticky top-0 z-50 px-3 md:px-6 py-3 border-b" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setActivePanelPage(null)}
-                className="px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Main Page
-              </button>
-              <h1 className="text-sm md:text-base font-bold uppercase" style={{ color: '#d4d4d4' }}>
-                {panelPageTitles[activePanelPage]}
-              </h1>
-            </div>
+        <div>
+          <h2 className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: dash.muted }}>
+            Outras ferramentas
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {tools.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.title}
+                  type="button"
+                  onClick={item.onClick}
+                  className="rounded-xl border px-4 py-3.5 text-left transition-all flex items-center gap-3"
+                  style={{ background: dash.card, borderColor: dash.cardBorder }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = dash.accentBorder;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = dash.cardBorder;
+                  }}
+                >
+                  <div
+                    className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: dash.accentMuted, border: `1px solid ${dash.accentBorder}` }}
+                  >
+                    <Icon className="w-4 h-4" style={{ color: dash.accentSoft }} />
+                  </div>
+                  <h3 className="text-sm font-bold uppercase" style={{ color: dash.text }}>
+                    {item.title}
+                  </h3>
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
-            <button
-              onClick={() => window.location.href = '/'}
-              className="hover:opacity-80 transition-opacity"
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-black uppercase tracking-widest" style={{ color: dash.muted }}>
+              Overlays OBS
+            </h2>
+            <span
+              className="text-[10px] font-bold uppercase px-2.5 py-1 rounded-full"
+              style={{ background: '#141418', color: dash.muted, border: `1px solid ${dash.cardBorder}` }}
             >
-              <img src="/logo-jigadores-wordmark.png?v=2" alt="Jigadores Logo" className="h-9 w-auto object-contain" />
-            </button>
+              Browser Sources
+            </span>
           </div>
-        </header>
-
-        <div className="px-3 md:px-6 py-4 md:py-8">
-          {renderPanelPage()}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {overlayCards.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.type}
+                  type="button"
+                  onClick={(e) => handleOpenOverlay(item.type, item.title, e)}
+                  className="rounded-xl border p-3.5 text-left transition-all"
+                  style={{ background: dash.card, borderColor: dash.cardBorder }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = dash.accentBorder;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = dash.cardBorder;
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ background: dash.accentMuted, border: `1px solid ${dash.accentBorder}` }}
+                    >
+                      <Icon className="w-4 h-4" style={{ color: dash.accentSoft }} />
+                    </div>
+                    <h3 className="text-xs font-bold uppercase" style={{ color: dash.text }}>
+                      {item.title}
+                    </h3>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
-  }
+  };
+
+  const renderMainContent = () => {
+    if (fullscreenView === 'bar') {
+      return (
+        <Suspense fallback={sectionLoader}>
+          <OverlayBarManager />
+        </Suspense>
+      );
+    }
+    if (fullscreenView === 'chill') {
+      return (
+        <Suspense fallback={sectionLoader}>
+          <ChillSessionManager />
+        </Suspense>
+      );
+    }
+    if (fullscreenView === 'bonus') {
+      return (
+        <Suspense fallback={sectionLoader}>
+          <BonusHuntWorkspace />
+        </Suspense>
+      );
+    }
+    if (fullscreenView === 'fever') {
+      return (
+        <Suspense fallback={sectionLoader}>
+          <FeverChampionsManager />
+        </Suspense>
+      );
+    }
+    if (fullscreenView === 'giveaway') {
+      return (
+        <Suspense fallback={sectionLoader}>
+          <GiveawayManager />
+        </Suspense>
+      );
+    }
+    if (activePanelPage) {
+      return renderPanelPage();
+    }
+    return renderHomePage();
+  };
+
+  const contentTitle = fullscreenView
+    ? ({
+        bar: 'Barra',
+        chill: 'Chill',
+        bonus: 'Bonus Hunt / Opening',
+        fever: 'Fever Champions League',
+        giveaway: 'Giveaways',
+      } as const)[fullscreenView]
+    : activePanelPage
+      ? panelPageTitles[activePanelPage]
+      : 'Dashboard';
+
+  const sidebarNavBtn = (item: { id: NavId; label: string; icon: LucideIcon; onClick: () => void }) => {
+    const Icon = item.icon;
+    const on = activeNav === item.id;
+    return (
+      <button
+        key={item.id}
+        type="button"
+        onClick={item.onClick}
+        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left text-sm font-semibold transition-colors"
+        style={{
+          background: on ? dash.accentMuted : 'transparent',
+          color: on ? dash.text : dash.muted,
+          border: on ? `1px solid ${dash.accentBorder}` : '1px solid transparent',
+        }}
+      >
+        <Icon className="w-4 h-4 flex-shrink-0" style={{ color: on ? dash.accentSoft : dash.muted }} />
+        <span className="truncate">{item.label}</span>
+      </button>
+    );
+  };
 
   return (
-    <div className="min-h-screen h-screen overflow-y-auto" style={{ background: 'linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%)' }}>
-      <header className="sticky top-0 z-50 px-3 md:px-6 py-3 border-b" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          <div className="flex items-center">
-            <button
-              onClick={() => window.location.href = '/'}
-              className="hover:opacity-80 transition-opacity"
-            >
-              <img src="/logo-jigadores-wordmark.png?v=2" alt="Jigadores Logo" className="h-10 w-auto object-contain" />
-            </button>
-          </div>
+    <div className="h-screen flex overflow-hidden" style={{ background: dash.page, color: dash.text }}>
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{ background: 'rgba(0,0,0,0.55)' }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <button
-              onClick={() => {
-                setFullscreenView('bonus');
-                activateOverlay('bonus_hunt');
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-            >
-              <Gift className="w-4 h-4" />
-              Bonus Hunt
-            </button>
-
-            <button
-              onClick={() => {
-                setFullscreenView('chill');
-                activateOverlay('chill');
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-            >
-              <Coffee className="w-4 h-4" />
-              Chill
-            </button>
-
-            <button
-              onClick={() => {
-                setFullscreenView('fever');
-                activateOverlay('fever_champions');
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-              onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-              onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-            >
-              <Trophy className="w-4 h-4" />
-              Fever Champions
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-3 md:px-6 py-4 md:py-8">
-
-        <div className="mb-6 rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>Settings</h2>
-            <div className="flex items-center gap-2">
-              <Suspense fallback={null}><CasinoManager /></Suspense>
-              <Suspense fallback={null}><OverlayBarManager showOnlyButtons={true} /></Suspense>
-            </div>
-          </div>
-          <Suspense fallback={sectionLoader}><OverlayBarManager showOnlySelects={true} /></Suspense>
+      <aside
+        className={`fixed lg:sticky top-0 left-0 z-50 h-screen w-[272px] flex flex-col border-r transition-transform duration-200 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+        style={{ background: dash.sidebar, borderColor: dash.sidebarBorder }}
+      >
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-2 border-b" style={{ borderColor: dash.sidebarBorder }}>
+          <button type="button" onClick={goHome} className="hover:opacity-90 transition-opacity min-w-0">
+            <img
+              src="/logo-jigadores-wordmark.png?v=2"
+              alt="Jigadores Logo"
+              className="h-9 w-auto max-w-[180px] object-contain"
+            />
+          </button>
+          <button
+            type="button"
+            className="lg:hidden p-2 rounded-lg"
+            style={{ color: dash.muted }}
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Fechar sidebar"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>Panels</h2>
-              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>9</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                onClick={() => setActivePanelPage('bonus')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Gift className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Bonus Hunt / Opening</h3>
-                </div>
-              </button>
+        <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
+          {mainNavItems.map(sidebarNavBtn)}
+        </nav>
 
-              <button
-                onClick={() => setActivePanelPage('fever')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Trophy className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Fever Champions League</h3>
-                </div>
-              </button>
+        <div className="px-3 pb-5 pt-2 border-t" style={{ borderColor: dash.sidebarBorder }}>
+          {sidebarNavBtn({
+            id: 'settings',
+            label: 'Definições',
+            icon: Settings,
+            onClick: () => goPanel('settings'),
+          })}
+        </div>
+      </aside>
 
-              <button
-                onClick={() => setActivePanelPage('giveaway')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Package className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Giveaways</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('chill')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Coffee className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Chill</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('twitch')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <MessageSquare className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Twitch Integration</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('streamelements')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Zap className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>StreamElements</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('spotify')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(29, 185, 84, 0.2)', border: '1px solid rgba(29, 185, 84, 0.35)' }}>
-                    <Music2 className="w-4 h-4" style={{ color: '#1DB954' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Spotify</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('database')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Database className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Slots Database</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('stats')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <BarChart3 className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Statistics</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={() => setActivePanelPage('live_preview')}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <LayoutDashboard className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Live Preview (OBS)</h3>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>Overlays</h2>
-              <span className="text-xs px-3 py-1 rounded-full" style={{ background: '#1f1f1f', color: '#8a8a8a', border: '1px solid #3a3a3a' }}>8</span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                onClick={(e) => handleOpenOverlay('main_stream', 'Main Overlay', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <LayoutDashboard className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Main Overlay</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('bar', 'Stream Bar', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <LayoutDashboard className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Stream Bar</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('bonus_hunt', 'Bonus Hunt', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Gift className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Bonus Hunt</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('bonus_opening', 'Bonus Opening', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Package className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Bonus Opening</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('chill', 'Chill', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Coffee className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Chill</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('fever_champions', 'Fever Champions League', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Trophy className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Fever Champions League</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('fever_bracket', 'Fever Champions Bracket', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Brackets className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Fever Champions Bracket</h3>
-                </div>
-              </button>
-
-              <button
-                onClick={(e) => handleOpenOverlay('fever_groups', 'Fever Champions Groups', e)}
-                className="rounded-lg p-3 transition-all text-left"
-                style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}
-                onMouseEnter={(e) => e.currentTarget.style.borderColor = '#5a5a5a'}
-                onMouseLeave={(e) => e.currentTarget.style.borderColor = '#3d3d3d'}
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(139, 116, 96, 0.2)', border: '1px solid rgba(139, 116, 96, 0.3)' }}>
-                    <Trophy className="w-4 h-4" style={{ color: '#b89968' }} />
-                  </div>
-                  <h3 className="text-sm font-bold uppercase" style={{ color: '#d4d4d4' }}>Fever Champions Groups</h3>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-6" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', border: '1px solid #3a3a3a' }}>
-            <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59, 130, 246, 0.15)', border: '1px solid rgba(59, 130, 246, 0.35)' }}>
-                  <MonitorSmartphone className="w-4 h-4" style={{ color: '#60a5fa' }} />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold uppercase" style={{ color: '#a8a8a8' }}>2ª Slot (canto)</h2>
-                  <p className="text-xs" style={{ color: '#6b7280' }}>Buraco transparente no canto inferior esquerdo da Main Overlay</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => void toggleSecondSlot()}
-                disabled={secondSlotBusy}
-                className="px-4 py-2 rounded-lg text-xs font-bold uppercase transition-all"
-                style={{
-                  background: showSecondSlot
-                    ? 'linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%)'
-                    : 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)',
-                  border: `1px solid ${showSecondSlot ? '#3b82f6' : '#3d3d3d'}`,
-                  color: '#fff',
-                  opacity: secondSlotBusy ? 0.6 : 1,
-                }}
-              >
-                {showSecondSlot ? 'ON na stream' : 'OFF na stream'}
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <p className="text-xs uppercase tracking-wide" style={{ color: '#8a8a8a' }}>
-                Stream Deck — usa o plugin API Request (GET). Website abre sempre o browser.
+      <div className="flex-1 min-w-0 flex flex-col min-h-0 h-full">
+        <header
+          className="flex-shrink-0 z-30 px-4 sm:px-6 py-3.5 border-b flex items-center justify-between gap-3"
+          style={{ background: 'rgba(15,15,18,0.92)', borderColor: dash.sidebarBorder, backdropFilter: 'blur(10px)' }}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <button
+              type="button"
+              className="lg:hidden p-2 rounded-xl"
+              style={{ background: dash.card, border: `1px solid ${dash.cardBorder}`, color: dash.text }}
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.22em]" style={{ color: dash.accentSoft }}>
+                Jigadores
               </p>
-              {([
-                { action: 'show' as const, label: 'Mostrar 2ª slot', hint: '/second_slot/show' },
-                { action: 'hide' as const, label: 'Esconder 2ª slot', hint: '/second_slot/hide' },
-                { action: 'toggle' as const, label: 'Toggle 2ª slot', hint: '/second_slot/toggle' },
-              ]).map(({ action, label, hint }) => (
-                <div
-                  key={action}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2"
-                  style={{ background: '#1f1f1f', border: '1px solid #3a3a3a' }}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold uppercase" style={{ color: '#d4d4d4' }}>{label}</div>
-                    <div className="text-[11px] truncate font-mono" style={{ color: '#6b7280' }} title={getOverlayModuleDeckUrl('second_slot', action)}>
-                      …{hint}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void copyDeckUrl(action)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-md text-[11px] font-bold uppercase flex-shrink-0"
-                    style={{
-                      background: copiedDeckLink === action ? 'rgba(34,197,94,0.2)' : '#2a2a2a',
-                      border: '1px solid #3d3d3d',
-                      color: copiedDeckLink === action ? '#4ade80' : '#d4d4d4',
-                    }}
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                    {copiedDeckLink === action ? 'Copiado' : 'Copiar'}
-                  </button>
-                </div>
-              ))}
+              <h1 className="text-sm sm:text-base font-bold uppercase truncate" style={{ color: dash.text }}>
+                {contentTitle}
+              </h1>
             </div>
           </div>
 
-        </div>
+          {(fullscreenView || activePanelPage) && (
+            <button
+              type="button"
+              onClick={goHome}
+              className="px-3 py-2 rounded-xl text-xs font-bold uppercase flex-shrink-0"
+              style={{ background: dash.card, border: `1px solid ${dash.cardBorder}`, color: dash.muted }}
+            >
+              Início
+            </button>
+          )}
+        </header>
+
+        <main
+          data-dashboard-main
+          className="flex-1 min-h-0 px-4 sm:px-6 py-5 sm:py-8 overflow-x-hidden overflow-y-auto"
+        >
+          <div
+            className={`mx-auto w-full ${
+              activePanelPage === 'bonus' || fullscreenView === 'bonus'
+                ? 'max-w-[1600px]'
+                : 'max-w-6xl'
+            }`}
+          >
+            {fullscreenView ? (
+              <div
+                className="rounded-2xl border p-4 sm:p-6"
+                style={{ background: dash.card, borderColor: dash.cardBorder }}
+              >
+                {renderMainContent()}
+              </div>
+            ) : (
+              renderMainContent()
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
