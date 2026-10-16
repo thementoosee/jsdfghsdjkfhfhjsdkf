@@ -10,7 +10,12 @@ interface Casino {
   order_index: number;
 }
 
-export default function CasinoManager() {
+interface CasinoManagerProps {
+  /** Label do botão que abre o gestor (ex.: Adicionar Marca). */
+  buttonLabel?: string;
+}
+
+export function CasinoManager({ buttonLabel = 'Adicionar Marca' }: CasinoManagerProps = {}) {
   const [isOpen, setIsOpen] = useState(false);
   const [casinos, setCasinos] = useState<Casino[]>([]);
   const [editingCasino, setEditingCasino] = useState<Casino | null>(null);
@@ -187,10 +192,16 @@ export default function CasinoManager() {
   if (!isOpen) {
     return (
       <button
+        type="button"
         onClick={() => setIsOpen(true)}
-        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+        className="w-full px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors whitespace-nowrap"
+        style={{
+          background: 'rgba(59, 130, 246, 0.16)',
+          color: '#60a5fa',
+          border: '1px solid rgba(96, 165, 250, 0.35)',
+        }}
       >
-        Manage Casinos
+        {buttonLabel}
       </button>
     );
   }

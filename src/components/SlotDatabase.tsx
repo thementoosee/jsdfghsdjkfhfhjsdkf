@@ -1,7 +1,48 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import { Plus, Search, Star, TrendingUp, DollarSign, Zap, Award, Edit2, Trash2, Save, X } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Star,
+  TrendingUp,
+  DollarSign,
+  Zap,
+  Award,
+  Edit2,
+  Trash2,
+  Save,
+  X,
+  Database,
+  LayoutGrid,
+  Gamepad2,
+  ArrowLeft,
+  Filter,
+  Coins,
+} from 'lucide-react';
 import { getSlotProviders, isValidHttpUrl, resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slots-search';
+
+/** Local admin visual tokens — isolated to Slot Database (do not reuse on OBS overlays). */
+const sd = {
+  page: '#0f0f12',
+  panel: '#141418',
+  card: '#1c1c22',
+  cardHover: '#22222a',
+  cardBorder: 'rgba(82, 82, 91, 0.55)',
+  input: '#121218',
+  inputBorder: 'rgba(63, 63, 70, 0.75)',
+  text: '#f8fafc',
+  muted: '#94a3b8',
+  accent: '#3b82f6',
+  accentSoft: '#60a5fa',
+  accentMuted: 'rgba(59, 130, 246, 0.16)',
+  accentBorder: 'rgba(96, 165, 250, 0.35)',
+  gold: '#fbbf24',
+  goldMuted: 'rgba(251, 191, 36, 0.14)',
+  goldBorder: 'rgba(251, 191, 36, 0.4)',
+  danger: '#ef4444',
+  dangerMuted: 'rgba(239, 68, 68, 0.14)',
+  dangerBorder: 'rgba(239, 68, 68, 0.35)',
+} as const;
 
 interface Slot {
   id: string;
@@ -103,6 +144,22 @@ export function SlotDatabase() {
       supabase.removeChannel(channel);
     };
   }, [currentPage, searchTerm, filterProvider, filterVolatility]);
+
+  // Lock dashboard main scroll while slot modal is open; restore on close.
+  useEffect(() => {
+    const modalOpen = showAddModal || !!editingSlot;
+    const main = document.querySelector<HTMLElement>('[data-dashboard-main]');
+    if (!main || !modalOpen) return;
+
+    const prevOverflowY = main.style.overflowY;
+    const prevScrollTop = main.scrollTop;
+    main.style.overflowY = 'hidden';
+
+    return () => {
+      main.style.overflowY = prevOverflowY;
+      main.scrollTop = prevScrollTop;
+    };
+  }, [showAddModal, editingSlot]);
 
   const loadSlots = async () => {
     try {
@@ -579,72 +636,161 @@ export function SlotDatabase() {
 
   const [providers, setProviders] = useState<string[]>([]);
 
+  const rangeStart = slots.length > 0 ? (currentPage - 1) * ITEMS_PER_PAGE + 1 : 0;
+  const rangeEnd = Math.min(currentPage * ITEMS_PER_PAGE, totalCount);
+  const modalImageUrl = editingSlot
+    ? editingSlot.image_url || ''
+    : newSlot.image_url;
+  const closeModal = () => {
+    setShowAddModal(false);
+    setEditingSlot(null);
+  };
+
+  const fieldStyle: CSSProperties = {
+    background: sd.input,
+    border: `1px solid ${sd.inputBorder}`,
+    color: sd.text,
+  };
+
   return (
-    <div className="p-8 min-h-screen" style={{ background: 'linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%)' }}>
-      <div className="max-w-7xl mx-auto">
-        <div className="rounded-2xl overflow-hidden mb-8" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
-          <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderBottom: '1px solid #3d3d3d' }}>
-            <div>
-              <h1 className="text-2xl font-bold uppercase" style={{ color: '#d4d4d4' }}>Slot Database</h1>
-              <p className="text-sm uppercase mt-1" style={{ color: '#8a8a8a' }}>Gestão completa de slots e estatísticas</p>
-            </div>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-4 py-2 rounded-lg font-semibold uppercase text-sm transition-all"
-              style={{ background: 'rgba(139, 116, 96, 0.2)', color: '#b89968', border: '1px solid rgba(139, 116, 96, 0.3)' }}
+    <div className="min-h-full p-4 sm:p-6 lg:p-8" style={{ background: sd.page, color: sd.text }}>
+      <div className="max-w-7xl mx-auto space-y-5">
+        {/* Header */}
+        <header
+          className="rounded-2xl px-5 py-4 sm:px-6 sm:py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}` }}
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: sd.goldMuted, border: `1px solid ${sd.goldBorder}` }}
             >
-              Voltar ao Dashboard
+              <Coins className="w-5 h-5" style={{ color: sd.gold }} />
+            </div>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-black uppercase tracking-wide" style={{ color: sd.text }}>
+                Slot Database
+              </h1>
+              <p className="text-sm mt-0.5" style={{ color: sd.muted }}>
+                Gestão de slots, imagens e estatísticas
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-colors flex-shrink-0"
+            style={{
+              background: 'transparent',
+              color: sd.gold,
+              border: `1px solid ${sd.goldBorder}`,
+            }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Voltar ao Dashboard
+          </button>
+        </header>
+
+        {/* Stats — only metrics already available locally */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <StatCard icon={<LayoutGrid className="w-4 h-4" />} label="Total de slots" value={String(totalCount)} />
+          <StatCard icon={<Gamepad2 className="w-4 h-4" />} label="Providers" value={String(providers.length)} />
+          <StatCard icon={<Zap className="w-4 h-4" />} label="Volatilidades" value={String(volatilities.length)} />
+        </div>
+
+        {/* Filters + actions */}
+        <section
+          className="rounded-2xl p-4 sm:p-5 space-y-4"
+          style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}` }}
+        >
+          <div className="flex flex-col xl:flex-row gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                style={{ color: sd.muted }}
+              />
+              <input
+                type="text"
+                placeholder="Pesquisar slot..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm outline-none"
+                style={fieldStyle}
+              />
+            </div>
+
+            <select
+              value={filterProvider}
+              onChange={(e) => {
+                setFilterProvider(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-3 rounded-xl text-sm min-w-[160px]"
+              style={fieldStyle}
+            >
+              <option value="all">Todos os Providers</option>
+              {providers.map((provider) => (
+                <option key={provider} value={provider}>
+                  {provider}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filterVolatility}
+              onChange={(e) => {
+                setFilterVolatility(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-4 py-3 rounded-xl text-sm min-w-[160px]"
+              style={fieldStyle}
+            >
+              <option value="all">Todas Volatilidades</option>
+              {volatilities.map((vol) => (
+                <option key={vol} value={vol}>
+                  {vol}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              onClick={() => loadSlots()}
+              className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wide"
+              style={{ background: sd.accent, color: '#fff', border: `1px solid ${sd.accent}` }}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              Filtrar
             </button>
           </div>
 
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row gap-4 mb-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: '#8a8a8a' }} />
-                <input
-                  type="text"
-                  placeholder="Pesquisar slots..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setCurrentPage(1);
-                  }}
-                  className="w-full pl-10 pr-4 py-3 rounded-lg transition-all uppercase text-sm"
-                  style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="text-xs font-semibold uppercase tracking-wide flex items-center gap-2" style={{ color: sd.muted }}>
+              {loading && (
+                <div
+                  className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-t-transparent"
+                  style={{ borderColor: sd.accent, borderTopColor: 'transparent' }}
                 />
-              </div>
+              )}
+              <span>
+                Mostrando {rangeStart} – {rangeEnd} de {totalCount} slots
+              </span>
+            </div>
 
-              <select
-                value={filterProvider}
-                onChange={(e) => {
-                  setFilterProvider(e.target.value);
-                  setCurrentPage(1);
+            <div className="flex flex-wrap gap-2">
+              <label
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide cursor-pointer transition-opacity"
+                style={{
+                  background: sd.card,
+                  color: sd.text,
+                  border: `1px solid ${sd.cardBorder}`,
+                  opacity: importing ? 0.5 : 1,
+                  pointerEvents: importing ? 'none' : 'auto',
                 }}
-                className="px-4 py-3 rounded-lg transition-all uppercase text-sm"
-                style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
               >
-                <option value="all">Todos os Providers</option>
-                {providers.map((provider) => (
-                  <option key={provider} value={provider}>{provider}</option>
-                ))}
-              </select>
-
-              <select
-                value={filterVolatility}
-                onChange={(e) => {
-                  setFilterVolatility(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="px-4 py-3 rounded-lg transition-all uppercase text-sm"
-                style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-              >
-                <option value="all">Todas Volatilidades</option>
-                {volatilities.map((vol) => (
-                  <option key={vol} value={vol}>{vol}</option>
-                ))}
-              </select>
-
-              <label className="px-6 py-3 rounded-lg font-semibold uppercase text-sm flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed" style={{ background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#ffffff', border: '1px solid #3d3d3d' }}>
                 <input
                   type="file"
                   accept=".csv"
@@ -656,425 +802,627 @@ export function SlotDatabase() {
               </label>
 
               <button
+                type="button"
                 onClick={handleRepairMissingImages}
                 disabled={repairingImages || importing}
-                className="px-6 py-3 rounded-lg font-semibold uppercase text-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)', color: '#ffffff', border: '1px solid #3d3d3d' }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: sd.accentMuted, color: sd.accentSoft, border: `1px solid ${sd.accentBorder}` }}
               >
-                <Zap className="w-5 h-5" />
+                <Zap className="w-3.5 h-3.5" />
                 {repairingImages ? 'A reparar...' : 'Reparar Imagens'}
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowAddModal(true)}
-                className="px-6 py-3 rounded-lg font-semibold uppercase text-sm flex items-center justify-center gap-2 transition-all"
-                style={{ background: 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)', color: '#ffffff', border: '1px solid #3d3d3d' }}
+                className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide"
+                style={{ background: sd.gold, color: '#0f0f12', border: `1px solid ${sd.gold}` }}
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-3.5 h-3.5" />
                 Adicionar Slot
               </button>
             </div>
+          </div>
+        </section>
 
-            <div className="flex items-center justify-between mb-4 text-sm" style={{ color: '#8a8a8a' }}>
-              <div className="uppercase flex items-center gap-2">
-                {loading && (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2" style={{ borderBottomColor: '#b89968' }}></div>
-                )}
-                <span>Mostrando {slots.length > 0 ? ((currentPage - 1) * ITEMS_PER_PAGE) + 1 : 0} - {Math.min(currentPage * ITEMS_PER_PAGE, totalCount)} de {totalCount} slots</span>
-              </div>
-              <div className="flex gap-2">
+        {/* Grid */}
+        <div
+          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 transition-opacity ${
+            loading ? 'opacity-50' : 'opacity-100'
+          }`}
+        >
+          {slots.map((slot) => (
+            <article
+              key={slot.id}
+              className="rounded-2xl overflow-hidden flex flex-col"
+              style={{
+                background: sd.card,
+                border: `1px solid ${sd.cardBorder}`,
+                opacity: slot.is_active === false ? 0.65 : 1,
+              }}
+            >
+              <div className="relative" style={{ background: sd.input }}>
+                <img
+                  src={resolveSlotImageUrl(slot)}
+                  alt={slot.name}
+                  loading="lazy"
+                  className="w-full h-36 object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                  }}
+                />
                 <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 rounded-lg font-semibold uppercase text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#1a1a1a', color: '#d4d4d4', border: '1px solid #3d3d3d' }}
+                  type="button"
+                  onClick={() => handleToggleFavorite(slot.id, slot.is_favorite || false)}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg"
+                  style={{
+                    color: slot.is_favorite ? sd.gold : sd.muted,
+                    background: 'rgba(15, 15, 18, 0.72)',
+                    border: `1px solid ${slot.is_favorite ? sd.goldBorder : sd.cardBorder}`,
+                  }}
+                  aria-label={slot.is_favorite ? 'Remover favorito' : 'Marcar favorito'}
                 >
-                  Anterior
-                </button>
-                <div className="flex items-center px-4 py-2 rounded-lg" style={{ background: '#1a1a1a', border: '1px solid #3d3d3d' }}>
-                  <span className="font-bold uppercase" style={{ color: '#b89968' }}>{currentPage} / {totalPages}</span>
-                </div>
-                <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 rounded-lg font-semibold uppercase text-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: '#1a1a1a', color: '#d4d4d4', border: '1px solid #3d3d3d' }}
-                >
-                  Próxima
+                  <Star className="w-4 h-4" fill={slot.is_favorite ? 'currentColor' : 'none'} />
                 </button>
               </div>
-            </div>
 
-            <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 transition-opacity ${loading ? 'opacity-50' : 'opacity-100'}`}>
-              {slots.map((slot) => (
-                <div key={slot.id} className="rounded-xl p-6 transition-all" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', opacity: slot.is_active === false ? 0.65 : 1 }}>
-                  <div className="mb-4 overflow-hidden rounded-lg" style={{ background: '#1a1a1a', border: '1px solid #2d2d2d' }}>
-                    <img
-                      src={resolveSlotImageUrl(slot)}
-                      alt={slot.name}
-                      loading="lazy"
-                      className="w-full h-36 object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = SLOT_FALLBACK_IMAGE;
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex-1">
-                      <h3 className="font-bold uppercase text-lg mb-1" style={{ color: '#d4d4d4' }}>{slot.name}</h3>
-                      <p className="text-sm uppercase" style={{ color: '#8a8a8a' }}>{slot.provider}</p>
-                      {slot.is_active === false && (
-                        <p className="text-xs uppercase mt-1" style={{ color: '#ef4444' }}>Inativa</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleToggleFavorite(slot.id, slot.is_favorite || false)}
-                      className="p-2 rounded-lg transition-colors"
-                      style={{
-                        color: slot.is_favorite ? '#b89968' : '#8a8a8a',
-                        background: slot.is_favorite ? 'rgba(139, 116, 96, 0.2)' : 'transparent'
-                      }}
-                    >
-                      <Star className="w-5 h-5" fill={slot.is_favorite ? 'currentColor' : 'none'} />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(139, 116, 96, 0.1)', border: '1px solid rgba(139, 116, 96, 0.2)' }}>
-                      <div className="flex items-center justify-center gap-1.5 mb-1.5">
-                        <Award className="w-4 h-4" style={{ color: '#b89968' }} />
-                        <span className="text-xs font-semibold uppercase" style={{ color: '#b89968' }}>Max Win</span>
-                      </div>
-                      <p className="text-base font-bold" style={{ color: '#d4d4d4' }}>{slot.max_win}x</p>
-                    </div>
-
-                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(139, 116, 96, 0.1)', border: '1px solid rgba(139, 116, 96, 0.2)' }}>
-                      <div className="flex items-center justify-center gap-1.5 mb-1.5">
-                        <Zap className="w-4 h-4" style={{ color: '#b89968' }} />
-                        <span className="text-xs font-semibold uppercase" style={{ color: '#b89968' }}>Volatilidade</span>
-                      </div>
-                      <p className="text-base font-bold" style={{ color: '#d4d4d4' }}>{slot.volatility}</p>
-                    </div>
-
-                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(139, 116, 96, 0.1)', border: '1px solid rgba(139, 116, 96, 0.2)' }}>
-                      <div className="flex items-center justify-center gap-1.5 mb-1.5">
-                        <TrendingUp className="w-4 h-4" style={{ color: '#b89968' }} />
-                        <span className="text-xs font-semibold uppercase" style={{ color: '#b89968' }}>RTP</span>
-                      </div>
-                      <p className="text-base font-bold" style={{ color: '#d4d4d4' }}>{slot.rtp}%</p>
-                    </div>
-
-                    <div className="rounded-lg p-3 text-center" style={{ background: 'rgba(139, 116, 96, 0.1)', border: '1px solid rgba(139, 116, 96, 0.2)' }}>
-                      <div className="flex items-center justify-center gap-1.5 mb-1.5">
-                        <DollarSign className="w-4 h-4" style={{ color: '#b89968' }} />
-                        <span className="text-xs font-semibold uppercase" style={{ color: '#b89968' }}>Bet Range</span>
-                      </div>
-                      <p className="text-base font-bold" style={{ color: '#d4d4d4' }}>${slot.min_bet}-${slot.max_bet}</p>
-                    </div>
-                  </div>
-
-                  {slot.stats && (
-                    <div className="rounded-lg p-4 mb-4" style={{ background: '#1a1a1a', border: '1px solid #2d2d2d' }}>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="text-center">
-                          <span className="uppercase block" style={{ color: '#8a8a8a' }}>Sessions</span>
-                          <span className="font-bold" style={{ color: '#d4d4d4' }}>{slot.stats.total_sessions}</span>
-                        </div>
-                        <div className="text-center">
-                          <span className="uppercase block" style={{ color: '#8a8a8a' }}>Best Win</span>
-                          <span className="font-bold" style={{ color: '#b89968' }}>{slot.stats.best_win_multi}x</span>
-                        </div>
-                        <div className="text-center">
-                          <span className="uppercase block" style={{ color: '#8a8a8a' }}>Bonus Buys</span>
-                          <span className="font-bold" style={{ color: '#d4d4d4' }}>{slot.stats.total_bonus_buys}</span>
-                        </div>
-                        <div className="text-center">
-                          <span className="uppercase block" style={{ color: '#8a8a8a' }}>Profit/Loss</span>
-                          <span className="font-bold" style={{ color: slot.stats.profit_loss >= 0 ? '#10b981' : '#ef4444' }}>
-                            {slot.stats.profit_loss >= 0 ? '+' : ''}{slot.stats.profit_loss.toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+              <div className="p-4 flex flex-col flex-1 gap-3">
+                <div className="min-w-0">
+                  <h3 className="font-bold text-sm leading-snug truncate" style={{ color: sd.text }} title={slot.name}>
+                    {slot.name}
+                  </h3>
+                  <p className="text-xs mt-0.5 truncate" style={{ color: sd.muted }}>
+                    {slot.provider}
+                  </p>
+                  {slot.is_active === false && (
+                    <p className="text-[10px] font-bold uppercase mt-1" style={{ color: sd.danger }}>
+                      Inativa
+                    </p>
                   )}
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingSlot(slot)}
-                      className="flex-1 px-4 py-2.5 rounded-lg font-semibold uppercase text-xs flex items-center justify-center gap-1.5 transition-all"
-                      style={{ background: '#1a1a1a', color: '#d4d4d4', border: '1px solid #3d3d3d' }}
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Editar
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSlot(slot.id)}
-                      className="px-4 py-2.5 rounded-lg font-semibold uppercase text-xs flex items-center justify-center gap-1.5 transition-all"
-                      style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
-              ))}
-            </div>
 
-            {slots.length === 0 && !loading && (
-              <div className="text-center py-12">
-                <p className="uppercase" style={{ color: '#8a8a8a' }}>Nenhuma slot encontrada</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <MiniStat icon={<Award className="w-3 h-3" />} label="Max Win" value={`${slot.max_win}x`} />
+                  <MiniStat icon={<Zap className="w-3 h-3" />} label="Volatilidade" value={slot.volatility} />
+                  <MiniStat icon={<TrendingUp className="w-3 h-3" />} label="RTP" value={`${slot.rtp}%`} />
+                  <MiniStat
+                    icon={<DollarSign className="w-3 h-3" />}
+                    label="Bet Range"
+                    value={`$${slot.min_bet}-$${slot.max_bet}`}
+                  />
+                </div>
+
+                {slot.stats && (
+                  <div
+                    className="rounded-xl p-3 grid grid-cols-2 gap-2 text-[11px]"
+                    style={{ background: sd.input, border: `1px solid ${sd.inputBorder}` }}
+                  >
+                    <div>
+                      <span className="block" style={{ color: sd.muted }}>
+                        Sessions
+                      </span>
+                      <span className="font-bold" style={{ color: sd.text }}>
+                        {slot.stats.total_sessions}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block" style={{ color: sd.muted }}>
+                        Best Win
+                      </span>
+                      <span className="font-bold" style={{ color: sd.gold }}>
+                        {slot.stats.best_win_multi}x
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block" style={{ color: sd.muted }}>
+                        Bonus Buys
+                      </span>
+                      <span className="font-bold" style={{ color: sd.text }}>
+                        {slot.stats.total_bonus_buys}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="block" style={{ color: sd.muted }}>
+                        Profit/Loss
+                      </span>
+                      <span
+                        className="font-bold"
+                        style={{ color: slot.stats.profit_loss >= 0 ? '#10b981' : sd.danger }}
+                      >
+                        {slot.stats.profit_loss >= 0 ? '+' : ''}
+                        {slot.stats.profit_loss.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 mt-auto pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingSlot(slot)}
+                    className="flex-1 px-3 py-2 rounded-xl text-[11px] font-bold uppercase tracking-wide inline-flex items-center justify-center gap-1.5"
+                    style={{ background: sd.input, color: sd.text, border: `1px solid ${sd.inputBorder}` }}
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    Editar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSlot(slot.id)}
+                    className="px-3 py-2 rounded-xl inline-flex items-center justify-center"
+                    style={{
+                      background: sd.dangerMuted,
+                      color: sd.danger,
+                      border: `1px solid ${sd.dangerBorder}`,
+                    }}
+                    aria-label="Eliminar slot"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-            )}
+            </article>
+          ))}
+        </div>
+
+        {slots.length === 0 && !loading && (
+          <div
+            className="text-center py-14 rounded-2xl"
+            style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}`, color: sd.muted }}
+          >
+            Nenhuma slot encontrada
+          </div>
+        )}
+
+        {/* Pagination */}
+        <div
+          className="rounded-2xl px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}` }}
+        >
+          <div className="text-xs font-semibold uppercase tracking-wide" style={{ color: sd.muted }}>
+            Página {currentPage} / {Math.max(totalPages, 1)} · {ITEMS_PER_PAGE} por página
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: sd.card, color: sd.text, border: `1px solid ${sd.cardBorder}` }}
+            >
+              Anterior
+            </button>
+            <div
+              className="px-4 py-2 rounded-xl text-xs font-black flex items-center"
+              style={{ background: sd.accentMuted, color: sd.accentSoft, border: `1px solid ${sd.accentBorder}` }}
+            >
+              {currentPage}
+            </div>
+            <button
+              type="button"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: sd.card, color: sd.text, border: `1px solid ${sd.cardBorder}` }}
+            >
+              Próxima
+            </button>
           </div>
         </div>
       </div>
 
       {(showAddModal || editingSlot) && (
-        <div className="fixed inset-0 flex items-center justify-center p-4 z-50" style={{ background: 'rgba(0, 0, 0, 0.8)' }}>
-          <div className="rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d' }}>
-            <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderBottom: '1px solid #3d3d3d' }}>
-              <h2 className="text-xl font-bold uppercase" style={{ color: '#d4d4d4' }}>
-                {editingSlot ? 'Editar Slot' : 'Adicionar Slot'}
-              </h2>
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          style={{ background: 'rgba(0, 0, 0, 0.72)' }}
+          onWheel={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
+          <div
+            className="w-full sm:max-w-3xl max-h-[92dvh] sm:max-h-[92vh] flex flex-col min-h-0 rounded-t-2xl sm:rounded-2xl overflow-hidden"
+            style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}` }}
+            onClick={(e) => e.stopPropagation()}
+            onWheel={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex-shrink-0 px-5 py-4 flex items-start justify-between gap-3"
+              style={{ borderBottom: `1px solid ${sd.cardBorder}` }}
+            >
+              <div className="flex items-start gap-3 min-w-0">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: sd.goldMuted, border: `1px solid ${sd.goldBorder}` }}
+                >
+                  {editingSlot ? (
+                    <Edit2 className="w-4 h-4" style={{ color: sd.gold }} />
+                  ) : (
+                    <Plus className="w-4 h-4" style={{ color: sd.gold }} />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black uppercase tracking-wide" style={{ color: sd.text }}>
+                    {editingSlot ? 'Editar Slot' : 'Adicionar Slot'}
+                  </h2>
+                  <p className="text-xs mt-0.5" style={{ color: sd.muted }}>
+                    {editingSlot
+                      ? 'Atualizar dados da slot no catálogo'
+                      : 'Registar uma nova slot no catálogo'}
+                  </p>
+                </div>
+              </div>
               <button
-                onClick={() => {
-                  setShowAddModal(false);
-                  setEditingSlot(null);
-                }}
-                className="rounded-lg p-2 transition-all"
-                style={{ color: '#d4d4d4' }}
+                type="button"
+                onClick={closeModal}
+                className="p-2 rounded-lg"
+                style={{ color: sd.muted }}
+                aria-label="Fechar"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Nome da Slot</label>
-                  <input
-                    type="text"
-                    value={editingSlot ? editingSlot.name : newSlot.name}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, name: e.target.value })
-                      : setNewSlot({ ...newSlot, name: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
+            <div
+              className={`flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 ${
+                editingSlot ? 'py-5 space-y-6' : 'py-4 space-y-4'
+              }`}
+            >
+              <FormSection icon={<Database className="w-3.5 h-3.5" />} title="Informações básicas">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Nome da Slot">
+                    <input
+                      type="text"
+                      value={editingSlot ? editingSlot.name : newSlot.name}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, name: e.target.value })
+                          : setNewSlot({ ...newSlot, name: e.target.value })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  <Field label="Provider">
+                    <input
+                      type="text"
+                      value={editingSlot ? editingSlot.provider : newSlot.provider}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, provider: e.target.value })
+                          : setNewSlot({ ...newSlot, provider: e.target.value })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  <Field label="Max Win">
+                    <input
+                      type="number"
+                      value={editingSlot ? editingSlot.max_win : newSlot.max_win}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, max_win: parseInt(e.target.value) || 0 })
+                          : setNewSlot({ ...newSlot, max_win: parseInt(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  <Field label="Volatilidade">
+                    <select
+                      value={editingSlot ? editingSlot.volatility : newSlot.volatility}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, volatility: e.target.value })
+                          : setNewSlot({ ...newSlot, volatility: e.target.value })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    >
+                      {volatilities.map((vol) => (
+                        <option key={vol} value={vol}>
+                          {vol}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="RTP (%)">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingSlot ? editingSlot.rtp : newSlot.rtp}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, rtp: parseFloat(e.target.value) || 0 })
+                          : setNewSlot({ ...newSlot, rtp: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  {editingSlot && (
+                    <Field label="Theme">
+                      <input
+                        type="text"
+                        value={editingSlot.theme || ''}
+                        onChange={(e) =>
+                          setEditingSlot({ ...editingSlot, theme: e.target.value })
+                        }
+                        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                        style={fieldStyle}
+                      />
+                    </Field>
+                  )}
                 </div>
+              </FormSection>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Provider</label>
-                  <input
-                    type="text"
-                    value={editingSlot ? editingSlot.provider : newSlot.provider}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, provider: e.target.value })
-                      : setNewSlot({ ...newSlot, provider: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
+              <FormSection icon={<DollarSign className="w-3.5 h-3.5" />} title="Apostas">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Min Bet ($)">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingSlot ? editingSlot.min_bet : newSlot.min_bet}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, min_bet: parseFloat(e.target.value) || 0 })
+                          : setNewSlot({ ...newSlot, min_bet: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  <Field label="Max Bet ($)">
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingSlot ? editingSlot.max_bet : newSlot.max_bet}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, max_bet: parseFloat(e.target.value) || 0 })
+                          : setNewSlot({ ...newSlot, max_bet: parseFloat(e.target.value) || 0 })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
                 </div>
+              </FormSection>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Max Win</label>
-                  <input
-                    type="number"
-                    value={editingSlot ? editingSlot.max_win : newSlot.max_win}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, max_win: parseInt(e.target.value) || 0 })
-                      : setNewSlot({ ...newSlot, max_win: parseInt(e.target.value) || 0 })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
+              <FormSection icon={<Award className="w-3.5 h-3.5" />} title="Imagem">
+                <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px] gap-3 items-start">
+                  <Field label="Image URL">
+                    <input
+                      type="text"
+                      value={modalImageUrl}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, image_url: e.target.value })
+                          : setNewSlot({ ...newSlot, image_url: e.target.value })
+                      }
+                      className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                      style={fieldStyle}
+                    />
+                  </Field>
+                  <div>
+                    <div className="text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: sd.muted }}>
+                      Pré-visualização
+                    </div>
+                    <div
+                      className="rounded-xl overflow-hidden h-[72px] flex items-center justify-center"
+                      style={{ background: sd.input, border: `1px solid ${sd.inputBorder}` }}
+                    >
+                      {modalImageUrl.trim() ? (
+                        <img
+                          src={modalImageUrl.trim()}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = SLOT_FALLBACK_IMAGE;
+                          }}
+                        />
+                      ) : (
+                        <span className="text-[10px]" style={{ color: sd.muted }}>
+                          —
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              </FormSection>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Volatilidade</label>
-                  <select
-                    value={editingSlot ? editingSlot.volatility : newSlot.volatility}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, volatility: e.target.value })
-                      : setNewSlot({ ...newSlot, volatility: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  >
-                    {volatilities.map((vol) => (
-                      <option key={vol} value={vol}>{vol}</option>
-                    ))}
-                  </select>
+              <FormSection icon={<Zap className="w-3.5 h-3.5" />} title="Configurações">
+                <div className="flex flex-wrap gap-6">
+                  <label className="flex items-center gap-2.5 text-sm cursor-pointer" style={{ color: sd.text }}>
+                    <input
+                      type="checkbox"
+                      checked={editingSlot ? editingSlot.is_active !== false : newSlot.is_active}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, is_active: e.target.checked })
+                          : setNewSlot({ ...newSlot, is_active: e.target.checked })
+                      }
+                      className="w-4 h-4 rounded accent-blue-500"
+                    />
+                    Ativa
+                  </label>
+                  <label className="flex items-center gap-2.5 text-sm cursor-pointer" style={{ color: sd.text }}>
+                    <input
+                      type="checkbox"
+                      checked={editingSlot ? Boolean(editingSlot.feature_buy) : newSlot.feature_buy}
+                      onChange={(e) =>
+                        editingSlot
+                          ? setEditingSlot({ ...editingSlot, feature_buy: e.target.checked })
+                          : setNewSlot({ ...newSlot, feature_buy: e.target.checked })
+                      }
+                      className="w-4 h-4 rounded accent-blue-500"
+                    />
+                    Feature Buy
+                  </label>
                 </div>
+              </FormSection>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>RTP (%)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editingSlot ? editingSlot.rtp : newSlot.rtp}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, rtp: parseFloat(e.target.value) || 0 })
-                      : setNewSlot({ ...newSlot, rtp: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
+              {editingSlot && (
+                <FormSection icon={<Search className="w-3.5 h-3.5" />} title="Informações avançadas">
+                  <div className="space-y-3">
+                    <Field label="Aliases (separados por vírgula)">
+                      <input
+                        type="text"
+                        value={(editingSlot.aliases || []).join(', ')}
+                        onChange={(e) =>
+                          setEditingSlot({ ...editingSlot, aliases: parseAliases(e.target.value) })
+                        }
+                        className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                        style={fieldStyle}
+                        placeholder="GOO 1000, gates 1000"
+                      />
+                    </Field>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <Field label="Source Name">
+                        <input
+                          type="text"
+                          value={editingSlot.source_name || ''}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, source_name: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                          style={fieldStyle}
+                        />
+                      </Field>
+                      <Field label="Source URL">
+                        <input
+                          type="text"
+                          value={editingSlot.source_url || ''}
+                          onChange={(e) =>
+                            setEditingSlot({ ...editingSlot, source_url: e.target.value })
+                          }
+                          className="w-full px-3 py-2.5 rounded-xl text-sm outline-none focus:ring-2"
+                          style={fieldStyle}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                </FormSection>
+              )}
+            </div>
 
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Theme</label>
-                  <input
-                    type="text"
-                    value={editingSlot ? editingSlot.theme || '' : newSlot.theme}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, theme: e.target.value })
-                      : setNewSlot({ ...newSlot, theme: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Min Bet ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editingSlot ? editingSlot.min_bet : newSlot.min_bet}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, min_bet: parseFloat(e.target.value) || 0 })
-                      : setNewSlot({ ...newSlot, min_bet: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Max Bet ($)</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={editingSlot ? editingSlot.max_bet : newSlot.max_bet}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, max_bet: parseFloat(e.target.value) || 0 })
-                      : setNewSlot({ ...newSlot, max_bet: parseFloat(e.target.value) || 0 })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Image URL</label>
-                <input
-                  type="text"
-                  value={editingSlot ? editingSlot.image_url || '' : newSlot.image_url}
-                  onChange={(e) => editingSlot
-                    ? setEditingSlot({ ...editingSlot, image_url: e.target.value })
-                    : setNewSlot({ ...newSlot, image_url: e.target.value })
-                  }
-                  className="w-full px-4 py-2 rounded-lg transition-all uppercase text-sm"
-                  style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Aliases (separados por vírgula)</label>
-                <input
-                  type="text"
-                  value={editingSlot ? (editingSlot.aliases || []).join(', ') : newSlot.aliasesText}
-                  onChange={(e) => editingSlot
-                    ? setEditingSlot({ ...editingSlot, aliases: parseAliases(e.target.value) })
-                    : setNewSlot({ ...newSlot, aliasesText: e.target.value })
-                  }
-                  className="w-full px-4 py-2 rounded-lg transition-all text-sm"
-                  style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  placeholder="GOO 1000, gates 1000"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Source Name</label>
-                  <input
-                    type="text"
-                    value={editingSlot ? editingSlot.source_name || '' : newSlot.source_name}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, source_name: e.target.value })
-                      : setNewSlot({ ...newSlot, source_name: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold mb-2 uppercase" style={{ color: '#8a8a8a' }}>Source URL</label>
-                  <input
-                    type="text"
-                    value={editingSlot ? editingSlot.source_url || '' : newSlot.source_url}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, source_url: e.target.value })
-                      : setNewSlot({ ...newSlot, source_url: e.target.value })
-                    }
-                    className="w-full px-4 py-2 rounded-lg transition-all text-sm"
-                    style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-6">
-                <label className="flex items-center gap-2 text-sm uppercase" style={{ color: '#d4d4d4' }}>
-                  <input
-                    type="checkbox"
-                    checked={editingSlot ? editingSlot.is_active !== false : newSlot.is_active}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, is_active: e.target.checked })
-                      : setNewSlot({ ...newSlot, is_active: e.target.checked })
-                    }
-                  />
-                  Ativa
-                </label>
-                <label className="flex items-center gap-2 text-sm uppercase" style={{ color: '#d4d4d4' }}>
-                  <input
-                    type="checkbox"
-                    checked={editingSlot ? Boolean(editingSlot.feature_buy) : newSlot.feature_buy}
-                    onChange={(e) => editingSlot
-                      ? setEditingSlot({ ...editingSlot, feature_buy: e.target.checked })
-                      : setNewSlot({ ...newSlot, feature_buy: e.target.checked })
-                    }
-                  />
-                  Feature Buy
-                </label>
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  onClick={() => {
-                    setShowAddModal(false);
-                    setEditingSlot(null);
-                  }}
-                  className="flex-1 px-6 py-3 rounded-lg font-semibold uppercase text-sm transition-all"
-                  style={{ background: '#1a1a1a', color: '#d4d4d4', border: '1px solid #3d3d3d' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={editingSlot ? handleUpdateSlot : handleAddSlot}
-                  className="flex-1 px-6 py-3 rounded-lg font-semibold uppercase text-sm flex items-center justify-center gap-2 transition-all"
-                  style={{ background: 'linear-gradient(135deg, #8b7460 0%, #a0826d 100%)', color: '#ffffff', border: '1px solid #3d3d3d' }}
-                >
-                  <Save className="w-4 h-4" />
-                  {editingSlot ? 'Atualizar' : 'Adicionar'}
-                </button>
-              </div>
+            <div
+              className="flex-shrink-0 px-5 py-4 flex flex-col-reverse sm:flex-row gap-2"
+              style={{ borderTop: `1px solid ${sd.cardBorder}`, background: sd.panel }}
+            >
+              <button
+                type="button"
+                onClick={closeModal}
+                className="flex-1 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wide"
+                style={{ background: sd.card, color: sd.text, border: `1px solid ${sd.cardBorder}` }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={editingSlot ? handleUpdateSlot : handleAddSlot}
+                className="flex-1 px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wide inline-flex items-center justify-center gap-2"
+                style={{ background: sd.gold, color: '#0f0f12', border: `1px solid ${sd.gold}` }}
+              >
+                <Save className="w-3.5 h-3.5" />
+                {editingSlot ? 'Atualizar' : 'Adicionar Slot'}
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
+  );
+}
+
+function StatCard({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      className="rounded-2xl px-4 py-3.5 flex items-center gap-3"
+      style={{ background: sd.panel, border: `1px solid ${sd.cardBorder}` }}
+    >
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+        style={{ background: sd.accentMuted, color: sd.accentSoft, border: `1px solid ${sd.accentBorder}` }}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0">
+        <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: sd.muted }}>
+          {label}
+        </div>
+        <div className="text-xl font-black truncate" style={{ color: sd.text }}>
+          {value}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      className="rounded-xl px-2.5 py-2 text-center"
+      style={{ background: sd.input, border: `1px solid ${sd.inputBorder}` }}
+    >
+      <div className="flex items-center justify-center gap-1 mb-0.5" style={{ color: sd.muted }}>
+        {icon}
+        <span className="text-[9px] font-bold uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-xs font-bold truncate" style={{ color: sd.text }} title={value}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function FormSection({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section>
+      <div className="flex items-center gap-2 mb-3">
+        <span style={{ color: sd.accentSoft }}>{icon}</span>
+        <h3 className="text-[11px] font-black uppercase tracking-widest" style={{ color: sd.accentSoft }}>
+          {title}
+        </h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block min-w-0">
+      <span
+        className="block text-[10px] font-bold uppercase tracking-wide mb-1.5"
+        style={{ color: sd.muted }}
+      >
+        {label}
+      </span>
+      {children}
+    </label>
   );
 }

@@ -161,19 +161,22 @@ export function BonusHuntWorkspace() {
 
   if (view === 'detail' && selectedHuntId) {
     return (
-      <div className="w-full space-y-4">
-        <div className="flex items-center justify-between gap-4 rounded-2xl border px-5 py-4" style={{ background: 'rgba(16, 23, 42, 0.82)', borderColor: 'rgba(51, 65, 85, 0.65)' }}>
+      <div className="w-full space-y-4" style={{ background: '#0f0f12' }}>
+        <div
+          className="flex items-center justify-between gap-4 rounded-2xl border px-5 py-4"
+          style={{ background: '#141418', borderColor: 'rgba(82, 82, 91, 0.55)' }}
+        >
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView('list')}
-              className="px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center gap-2"
-              style={{ background: '#1e293b', border: '1px solid #334155', color: '#e2e8f0' }}
+              className="px-3 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center gap-2"
+              style={{ background: '#1c1c22', border: '1px solid rgba(82, 82, 91, 0.55)', color: '#f8fafc' }}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" style={{ color: '#60a5fa' }} />
               Hunt List
             </button>
             <div>
-              <p className="text-xs uppercase tracking-[0.22em]" style={{ color: '#60a5fa' }}>Management</p>
+              <p className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: '#60a5fa' }}>Management</p>
               <h2 className="text-lg font-black uppercase" style={{ color: '#f8fafc' }}>Bonus Hunt / Opening</h2>
             </div>
           </div>
@@ -237,7 +240,7 @@ export function BonusHuntWorkspace() {
                   <div>
                     <h3 className="text-3xl font-black leading-none" style={{ color: '#3b82f6' }}>#{hunt.hunt_number}</h3>
                     <p className="mt-3 text-sm" style={{ color: '#94a3b8' }}>
-                      Created by: <span className="font-bold" style={{ color: '#f8fafc' }}>{hunt.streamer_name || 'fever'}</span>
+                      Created by: <span className="font-bold" style={{ color: '#f8fafc' }}>{hunt.streamer_name || '—'}</span>
                     </p>
                     <p className="text-sm" style={{ color: '#94a3b8' }}>
                       Date: <span className="font-bold" style={{ color: '#f8fafc' }}>{new Date(hunt.created_at).toLocaleDateString('pt-PT')}</span>

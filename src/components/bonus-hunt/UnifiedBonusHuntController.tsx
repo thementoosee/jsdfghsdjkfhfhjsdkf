@@ -1,8 +1,34 @@
-  import { useState, useEffect, useRef } from 'react';
+  import { useState, useEffect, useRef, type CSSProperties } from 'react';
 import { ArrowLeft, ArrowUpDown, Monitor, Plus, Trash2, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { calculateBE, calculateLiveBE, calculateTotalBetAll, formatMultiplier } from '../../lib/breakEvenCalculations';
 import { searchSlotsCatalog, SLOT_SEARCH_DEBOUNCE_MS, resolveSlotImageUrl, resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slots-search';
+
+/** Local admin visual tokens — Bonus Hunt management only (not OBS overlays). */
+const bh = {
+  page: '#0f0f12',
+  panel: '#141418',
+  card: '#1c1c22',
+  cardBorder: 'rgba(82, 82, 91, 0.55)',
+  input: '#121218',
+  inputBorder: 'rgba(63, 63, 70, 0.75)',
+  text: '#f8fafc',
+  muted: '#94a3b8',
+  accent: '#3b82f6',
+  accentSoft: '#60a5fa',
+  accentMuted: 'rgba(59, 130, 246, 0.16)',
+  accentBorder: 'rgba(96, 165, 250, 0.35)',
+  success: '#22c55e',
+  danger: '#ef4444',
+  dangerMuted: 'rgba(239, 68, 68, 0.14)',
+  dangerBorder: 'rgba(239, 68, 68, 0.35)',
+} as const;
+
+const fieldStyle: CSSProperties = {
+  background: bh.input,
+  border: `1px solid ${bh.inputBorder}`,
+  color: bh.text,
+};
 
 interface BonusHunt {
   id: string;
@@ -250,21 +276,40 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
       ? normalizedPayment / targetItem.bet_amount
       : null;
 
+    // Align with DB trigger update_bonus_hunt_totals: total_won uses result_amount where status='opened'.
+    // Persist opened + result_amount so Statistics/TOP5 update without ending the Opening.
+    const opened = normalizedPayment !== null && normalizedPayment > 0;
+    const nextStatus: 'pending' | 'opened' = opened ? 'opened' : 'pending';
+    const nextResult = opened ? normalizedPayment : null;
+
     // Optimistic update keeps sidebar stats and Live BE responsive while DB update completes.
     setItems((currentItems) => currentItems.map((item) => (
       item.id === itemId
-        ? { ...item, payment_amount: normalizedPayment, multiplier: computedMultiplier }
+        ? {
+            ...item,
+            payment_amount: normalizedPayment,
+            multiplier: computedMultiplier,
+            result_amount: nextResult,
+            status: nextStatus,
+          }
         : item
     )));
 
     try {
       const { error } = await supabase
         .from('bonus_hunt_items')
-        .update({ payment_amount: normalizedPayment, multiplier: computedMultiplier })
+        .update({
+          payment_amount: normalizedPayment,
+          multiplier: computedMultiplier,
+          result_amount: nextResult,
+          status: nextStatus,
+          ...(opened ? { opened_at: new Date().toISOString() } : { opened_at: null }),
+        })
         .eq('id', itemId);
 
       if (error) throw error;
       await loadHuntItems();
+      await loadHunt();
     } catch (error) {
       console.error('Error updating payment:', error);
       alert('Erro ao atualizar pagamento');
@@ -492,10 +537,15 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
 
   if (!selectedHunt) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="min-h-[40vh] flex items-center justify-center" style={{ background: bh.page }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-400 uppercase">A carregar...</p>
+          <div
+            className="animate-spin rounded-full h-10 w-10 border-b-2 mx-auto mb-4"
+            style={{ borderColor: bh.accentSoft }}
+          />
+          <p className="text-xs font-bold uppercase tracking-wide" style={{ color: bh.muted }}>
+            A carregar...
+          </p>
         </div>
       </div>
     );
@@ -523,27 +573,37 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
   const canAddNewBonus = (newItem.slot_name || slotSearchQuery).trim().length > 0 && Number(newItem.bet_amount) > 0;
 
   return (
-    <div className="w-full h-[calc(100vh-88px)] overflow-hidden flex gap-4 p-4" style={{ background: 'linear-gradient(to bottom, #1a1a1a 0%, #0f0f0f 100%)', color: '#d4d4d4' }}>
-        {/* LEFT SIDEBAR */}
-      <div className="w-72 rounded-xl border p-4 flex flex-col overflow-y-auto" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
+    <div
+      className="w-full flex flex-col lg:flex-row lg:items-start gap-5"
+      style={{ background: bh.page, color: bh.text }}
+    >
+      {/* LEFT SIDEBAR — grows naturally; page scroll only (no internal overflow) */}
+      <aside
+        className="w-full lg:w-[22rem] xl:w-96 2xl:max-w-[26rem] 2xl:w-[26rem] shrink-0 rounded-2xl border p-5 flex flex-col"
+        style={{ background: bh.panel, borderColor: bh.cardBorder }}
+      >
           {onBackToList && (
             <button
               onClick={onBackToList}
-              className="mb-4 w-full px-3 py-2 rounded-lg text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
-              style={{ background: 'linear-gradient(135deg, #2d2d2d 0%, #252525 100%)', border: '1px solid #3d3d3d', color: '#d4d4d4' }}
+              className="mb-4 w-full px-3 py-2.5 rounded-xl text-xs font-bold uppercase transition-all flex items-center justify-center gap-2"
+              style={{ background: bh.card, border: `1px solid ${bh.cardBorder}`, color: bh.text }}
             >
-              <ArrowLeft className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" style={{ color: bh.accentSoft }} />
               Hunt List
             </button>
           )}
 
-          
-          <div className="rounded-2xl border p-4 flex flex-col space-y-4" style={{ background: 'linear-gradient(135deg, #252525 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
+          <div
+            className="rounded-2xl border p-5 flex flex-col gap-5"
+            style={{ background: bh.card, borderColor: bh.cardBorder }}
+          >
             <div>
-              <h3 className="text-center text-sm font-bold mb-3 uppercase" style={{ color: '#b89968' }}>Stats</h3>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-xs">Start:</span>
+              <h3 className="text-center text-sm font-black mb-3 uppercase tracking-wide" style={{ color: bh.accentSoft }}>
+                Stats
+              </h3>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase shrink-0" style={{ color: bh.muted }}>Start</span>
                   <input
                     type="number"
                     step="1"
@@ -555,17 +615,17 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
                     }}
-                    className="w-24 px-2 py-1 border rounded font-semibold text-xs text-right focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    style={{ background: '#1f1f1f', borderColor: '#3a3a3a', color: '#d4d4d4' }}
+                    className="w-28 min-w-0 flex-1 max-w-[9rem] px-2.5 py-2 rounded-lg font-semibold text-sm text-right focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    style={fieldStyle}
                   />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400 text-xs">Creator:</span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-semibold uppercase shrink-0" style={{ color: bh.muted }}>Creator</span>
                   <input
                     key={`${selectedHunt.id}-creator-${selectedHunt.streamer_name || ''}`}
                     type="text"
                     defaultValue={selectedHunt.streamer_name || ''}
-                    placeholder="fever"
+                    placeholder=""
                     onBlur={(e) => updateSelectedHuntField('streamer_name', e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
@@ -573,129 +633,133 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                         (e.target as HTMLInputElement).blur();
                       }
                     }}
-                    className="w-24 px-2 py-1 border rounded font-semibold text-xs text-right focus:outline-none"
-                    style={{ background: '#1f1f1f', borderColor: '#3a3a3a', color: '#d4d4d4' }}
+                    className="w-28 min-w-0 flex-1 max-w-[9rem] px-2.5 py-2 rounded-lg font-semibold text-sm text-right focus:outline-none focus:ring-2"
+                    style={fieldStyle}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl p-3 border" style={{ background: '#1f1f1f', borderColor: '#3a3a3a' }}>
-              <h4 className="text-center text-xs font-bold mb-2 uppercase" style={{ color: '#b89968' }}>Bonuses</h4>
-              <div className="grid grid-cols-3 gap-1.5">
+            <div className="rounded-xl p-4 border" style={{ background: bh.panel, borderColor: bh.cardBorder }}>
+              <h4 className="text-center text-[10px] font-black mb-3 uppercase tracking-widest" style={{ color: bh.accentSoft }}>Bonuses</h4>
+              <div className="grid grid-cols-3 gap-2">
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Total</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{totalCount}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Total</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{totalCount}</span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Opened</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{openedCount}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Opened</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{openedCount}</span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Supers</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{items.filter(i => i.is_super_bonus).length}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-1.5 mt-1.5">
-                <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Extreme</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="font-bold text-sm" style={{ color: '#ef4444' }}>{items.filter(i => i.is_extreme_bonus).length}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Supers</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{items.filter(i => i.is_super_bonus).length}</span>
                   </div>
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-xl p-3 border" style={{ background: '#1f1f1f', borderColor: '#3a3a3a' }}>
-              <h4 className="text-center text-xs font-bold mb-2 uppercase" style={{ color: '#b89968' }}>Break Even</h4>
-              <div className="grid grid-cols-2 gap-1.5">
+              <div className="grid grid-cols-1 gap-2 mt-2">
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">BE</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{formatMultiplier(be)}</span>
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Live BE</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{formatMultiplier(liveBE)}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Extreme</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.danger }}>{items.filter(i => i.is_extreme_bonus).length}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl p-3 border" style={{ background: '#1f1f1f', borderColor: '#3a3a3a' }}>
-              <h4 className="text-center text-xs font-bold mb-2 uppercase" style={{ color: '#b89968' }}>Average</h4>
-              <div className="grid grid-cols-2 gap-1.5">
+            <div className="rounded-xl p-4 border" style={{ background: bh.panel, borderColor: bh.cardBorder }}>
+              <h4 className="text-center text-[10px] font-black mb-3 uppercase tracking-widest" style={{ color: bh.accentSoft }}>Break Even</h4>
+              <div className="grid grid-cols-2 gap-2">
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Multi(x)</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">{average}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>BE</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{formatMultiplier(be)}</span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Pay($)</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">${averagePay.toFixed(2)}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Live BE</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{formatMultiplier(liveBE)}</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-xl p-3 border" style={{ background: '#1f1f1f', borderColor: '#3a3a3a' }}>
-              <h4 className="text-center text-xs font-bold mb-2 uppercase" style={{ color: '#b89968' }}>Total Pay</h4>
-              <div className="grid grid-cols-2 gap-1.5">
+            <div className="rounded-xl p-4 border" style={{ background: bh.panel, borderColor: bh.cardBorder }}>
+              <h4 className="text-center text-[10px] font-black mb-3 uppercase tracking-widest" style={{ color: bh.accentSoft }}>Average</h4>
+              <div className="grid grid-cols-2 gap-2">
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Pay($)</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className="text-white font-bold text-sm">${totalWon.toFixed(2)}</span>
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Multi(x)</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>{average}</span>
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-slate-400 text-[10px] mb-0.5">Profit($)</div>
-                  <div className="rounded py-1.5 border" style={{ background: '#2a2a2a', borderColor: '#3a3a3a' }}>
-                    <span className={`font-bold text-sm ${profitLoss >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ${profitLoss >= 0 ? '' : '-'}${Math.abs(profitLoss).toFixed(2)}
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Pay($)</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>${averagePay.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl p-4 border" style={{ background: bh.panel, borderColor: bh.cardBorder }}>
+              <h4 className="text-center text-[10px] font-black mb-3 uppercase tracking-widest" style={{ color: bh.accentSoft }}>Total Pay</h4>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="text-center">
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Pay($)</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: bh.text }}>${totalWon.toFixed(2)}</span>
+                  </div>
+                </div>
+                <div className="text-center">
+                  <div className="text-[10px] mb-1 uppercase" style={{ color: bh.muted }}>Profit($)</div>
+                  <div className="rounded-lg py-2 border" style={{ background: bh.card, borderColor: bh.cardBorder }}>
+                    <span className="font-bold text-sm" style={{ color: profitLoss >= 0 ? bh.success : bh.danger }}>
+                      ${profitLoss >= 0 ? '' : '-'}{Math.abs(profitLoss).toFixed(2)}
                     </span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-2">
+            <div className="grid grid-cols-3 gap-2.5 pt-1">
               <button
                 onClick={async () => {
                   if (!selectedHunt) return;
                   await reorderItemsByBetAsc(selectedHunt.id);
                   await loadHuntItems();
                 }}
-                className="flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-xs font-medium uppercase"
-                style={{ background: '#2a2a2a', borderColor: '#3d3d3d', color: '#a8a8a8' }}
+                className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all text-xs font-bold uppercase"
+                style={{ background: bh.panel, borderColor: bh.cardBorder, color: bh.muted }}
               >
                 <ArrowUpDown size={14} />
                 Order
               </button>
               <button
                 onClick={toggleOverlay}
-                className={`${selectedHunt.show_on_main_overlay ? 'text-red-400' : 'text-[#b89968]'} flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-xs font-medium uppercase`}
-                style={{ background: '#2a2a2a', borderColor: selectedHunt.show_on_main_overlay ? 'rgba(239,68,68,0.45)' : '#3d3d3d' }}
+                className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all text-xs font-bold uppercase"
+                style={{
+                  background: bh.panel,
+                  borderColor: selectedHunt.show_on_main_overlay ? bh.dangerBorder : bh.cardBorder,
+                  color: selectedHunt.show_on_main_overlay ? bh.danger : bh.accentSoft,
+                }}
               >
                 <Monitor size={14} />
                 {selectedHunt.show_on_main_overlay ? 'Active' : 'Activate'}
               </button>
               <button
                 onClick={selectedHunt.status === 'opening' ? stopOpening : startOpening}
-                className="flex flex-col items-center gap-1 p-2 rounded-lg border transition-all text-xs font-medium uppercase"
+                className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl border transition-all text-xs font-bold uppercase"
                 style={{
-                  background: '#2a2a2a',
-                  borderColor: selectedHunt.status === 'opening' ? 'rgba(239,68,68,0.45)' : '#3d3d3d',
-                  color: selectedHunt.status === 'opening' ? '#f87171' : '#b89968'
+                  background: selectedHunt.status === 'opening' ? bh.dangerMuted : bh.accentMuted,
+                  borderColor: selectedHunt.status === 'opening' ? bh.dangerBorder : bh.accentBorder,
+                  color: selectedHunt.status === 'opening' ? bh.danger : bh.accentSoft,
                 }}
               >
                 <BarChart3 size={14} />
@@ -703,32 +767,46 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
               </button>
             </div>
           </div>
-        </div>
+        </aside>
 
         {/* MAIN CONTENT */}
-        <div className="flex-1 overflow-hidden flex flex-col rounded-xl border" style={{ background: 'linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%)', borderColor: '#3a3a3a' }}>
-          <div className="p-4 border-b" style={{ borderBottomColor: '#3a3a3a' }}>
+        <div
+          className="flex-1 min-w-0 w-full flex flex-col rounded-2xl border"
+          style={{ background: bh.panel, borderColor: bh.cardBorder }}
+        >
+          <div className="p-4 sm:p-5 border-b" style={{ borderBottomColor: bh.cardBorder }}>
             <div className="flex items-center gap-3">
-              <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center" style={{ borderColor: '#b89968' }}>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#b89968' }} />
+              <div
+                className="w-9 h-9 rounded-xl flex items-center justify-center"
+                style={{ background: bh.accentMuted, border: `1px solid ${bh.accentBorder}` }}
+              >
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: bh.accentSoft }} />
               </div>
-              <h2 className="text-lg font-bold text-white">Bonus Hunt #{selectedHunt.hunt_number}</h2>
-              <span className="ml-auto text-sm text-slate-400">
-                Status: <span className="text-white font-semibold capitalize">{selectedHunt.status === 'active' ? 'Bonus Hunt' : selectedHunt.status}</span>
-              </span>
+              <div>
+                <h2 className="text-lg font-black uppercase tracking-wide" style={{ color: bh.text }}>
+                  Bonus Hunt #{selectedHunt.hunt_number}
+                </h2>
+                <p className="text-xs mt-0.5" style={{ color: bh.muted }}>
+                  Status:{' '}
+                  <span className="font-bold uppercase" style={{ color: bh.accentSoft }}>
+                    {selectedHunt.status === 'active' ? 'Bonus Hunt' : selectedHunt.status}
+                  </span>
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="min-w-0">
             {selectedHunt.status === 'active' && (
-              <div className="px-4 py-2 border-b" style={{ background: '#1f1f1f', borderBottomColor: '#3a3a3a' }}>
+              <div className="px-4 py-3 border-b" style={{ background: bh.card, borderBottomColor: bh.cardBorder }}>
                 <div className="flex items-center gap-2">
                   {selectedSlot && (
                     <div className="flex-shrink-0">
                       <img
                         src={resolveSlotImageUrl(selectedSlot)}
                         alt={selectedSlot.name}
-                        className="w-6 h-8 rounded object-contain"
+                        className="w-6 h-8 rounded-lg object-contain"
+                        style={{ border: `1px solid ${bh.cardBorder}` }}
                         onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                       />
                     </div>
@@ -752,8 +830,8 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                         }
                       }}
                       placeholder="Select a slot"
-                      className="w-full px-3 py-1.5 text-white rounded text-sm placeholder-slate-500 focus:outline-none"
-                      style={{ background: '#2a2a2a', border: '1px solid #3a3a3a' }}
+                      className="w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2"
+                      style={fieldStyle}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           setShowSlotDropdown(false);
@@ -762,7 +840,10 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                       }}
                     />
                     {showSlotDropdown && slots.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 rounded-lg shadow-lg max-h-60 overflow-y-auto" style={{ background: '#1f1f1f', border: '1px solid #3a3a3a' }}>
+                      <div
+                        className="absolute z-10 w-full mt-1 rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                        style={{ background: bh.panel, border: `1px solid ${bh.cardBorder}` }}
+                      >
                         {slots.map(slot => (
                           <button
                             key={slot.id}
@@ -782,11 +863,13 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                               setShowSlotDropdown(false);
                               setSlots([]);
                             }}
-                            className="w-full text-left px-3 py-2 hover:bg-[#2a2a2a] text-sm border-b last:border-b-0"
-                            style={{ borderBottomColor: '#3a3a3a' }}
+                            className="w-full text-left px-3 py-2 text-sm border-b last:border-b-0 transition-colors"
+                            style={{ borderBottomColor: bh.cardBorder, color: bh.text }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = bh.card; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                           >
-                            <div className="font-semibold text-white">{slot.name}</div>
-                            <div className="text-xs text-slate-400">{slot.provider}</div>
+                            <div className="font-semibold">{slot.name}</div>
+                            <div className="text-xs" style={{ color: bh.muted }}>{slot.provider}</div>
                           </button>
                         ))}
                       </div>
@@ -800,33 +883,31 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                     onChange={(e) => setNewItem((current) => ({ ...current, bet_amount: e.target.value }))}
                     onKeyDown={(e) => { if (e.key === 'Enter') addBonusToHunt(); }}
                     placeholder="-"
-                    className="w-24 px-3 py-1.5 text-white rounded text-sm text-center placeholder-slate-400 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                    style={{ background: '#2a2a2a', border: '1px solid #3a3a3a' }}
+                    className="w-24 px-3 py-2 rounded-xl text-sm text-center focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    style={fieldStyle}
                   />
 
-                  {/* Super toggle */}
                   <button
                     type="button"
                     onClick={() => setNewItem((current) => ({ ...current, is_super_bonus: !current.is_super_bonus }))}
-                    className="px-2 py-1.5 rounded text-xs font-bold uppercase transition-all"
+                    className="px-2.5 py-2 rounded-xl text-xs font-bold uppercase transition-all"
                     style={{
-                      background: newItem.is_super_bonus ? '#b89968' : '#2a2a2a',
-                      border: `1px solid ${newItem.is_super_bonus ? '#b89968' : '#3a3a3a'}`,
-                      color: newItem.is_super_bonus ? '#0f0f0f' : '#8a8a8a',
+                      background: newItem.is_super_bonus ? bh.accentMuted : bh.input,
+                      border: `1px solid ${newItem.is_super_bonus ? bh.accentBorder : bh.inputBorder}`,
+                      color: newItem.is_super_bonus ? bh.accentSoft : bh.muted,
                     }}
                   >
                     Super
                   </button>
 
-                  {/* Extreme toggle */}
                   <button
                     type="button"
                     onClick={() => setNewItem((current) => ({ ...current, is_extreme_bonus: !current.is_extreme_bonus }))}
-                    className="px-2 py-1.5 rounded text-xs font-bold uppercase transition-all"
+                    className="px-2.5 py-2 rounded-xl text-xs font-bold uppercase transition-all"
                     style={{
-                      background: newItem.is_extreme_bonus ? '#ef4444' : '#2a2a2a',
-                      border: `1px solid ${newItem.is_extreme_bonus ? '#ef4444' : '#3a3a3a'}`,
-                      color: newItem.is_extreme_bonus ? '#fff' : '#8a8a8a',
+                      background: newItem.is_extreme_bonus ? bh.dangerMuted : bh.input,
+                      border: `1px solid ${newItem.is_extreme_bonus ? bh.dangerBorder : bh.inputBorder}`,
+                      color: newItem.is_extreme_bonus ? bh.danger : bh.muted,
                     }}
                   >
                     Extreme
@@ -835,7 +916,8 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   <button
                     onClick={addBonusToHunt}
                     disabled={loading || !canAddNewBonus}
-                    className="p-1.5 bg-green-600/90 hover:bg-green-500 border border-green-500/50 text-white rounded transition-colors flex items-center justify-center disabled:opacity-50"
+                    className="p-2 rounded-xl transition-colors flex items-center justify-center disabled:opacity-50"
+                    style={{ background: bh.success, color: '#fff' }}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
@@ -843,25 +925,30 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
               </div>
             )}
 
-            <div style={{ background: '#1f1f1f' }}>
-              <div className="grid grid-cols-[60px_1fr_120px_140px_140px_50px] gap-3 px-4 py-3 border-b sticky top-0" style={{ background: '#1f1f1f', borderBottomColor: '#3a3a3a' }}>
-                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: '#8a8a8a' }}>#</div>
-                <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#8a8a8a' }}>SLOT</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: '#8a8a8a' }}>BET</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: '#8a8a8a' }}>EARNING</div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: '#8a8a8a' }}>MULTI</div>
+            <div className="min-w-0 overflow-x-auto" style={{ background: bh.panel }}>
+              <div className="min-w-[640px]">
+              <div
+                className="grid grid-cols-[52px_minmax(0,1fr)_110px_130px_120px_48px] gap-3 px-4 sm:px-5 py-3 border-b sticky top-0 z-10"
+                style={{ background: bh.card, borderBottomColor: bh.cardBorder }}
+              >
+                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: bh.muted }}>#</div>
+                <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: bh.muted }}>Slot</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: bh.muted }}>Bet</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: bh.muted }}>Earning</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-center" style={{ color: bh.muted }}>Multi</div>
                 <div></div>
               </div>
 
               {items.map((item, index) => (
                 <div
                   key={item.id}
-                  className={`grid grid-cols-[60px_1fr_120px_140px_140px_50px] gap-3 px-4 py-2 border-b items-center transition-colors ${
-                    item.payment_amount && item.payment_amount > 0 ? 'bg-[#2a2a2a]' : 'hover:bg-[#2a2a2a]'
-                  }`}
-                  style={{ borderBottomColor: '#333333' }}
+                  className="grid grid-cols-[52px_minmax(0,1fr)_110px_130px_120px_48px] gap-3 px-4 sm:px-5 py-2.5 border-b items-center transition-colors"
+                  style={{
+                    borderBottomColor: bh.cardBorder,
+                    background: item.payment_amount && item.payment_amount > 0 ? bh.card : 'transparent',
+                  }}
                 >
-                  <div className="text-xs font-bold text-center" style={{ color: '#8a8a8a' }}>#{index + 1}</div>
+                  <div className="text-xs font-bold text-center" style={{ color: bh.muted }}>#{index + 1}</div>
 
                   <div className="flex items-center gap-3">
                     <img
@@ -870,15 +957,16 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                         snapshotUrl: item.slot_image_url,
                       })}
                       alt={item.slot_name}
-                      className="w-8 h-10 rounded object-contain"
+                      className="w-8 h-10 rounded-lg object-cover flex-shrink-0"
+                      style={{ border: `1px solid ${bh.cardBorder}` }}
                       onError={(e) => { e.currentTarget.src = SLOT_FALLBACK_IMAGE; }}
                     />
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-white text-sm font-medium">{item.slot_name}</span>
+                      <span className="text-sm font-semibold" style={{ color: bh.text }}>{item.slot_name}</span>
                       {item.is_super_bonus && (
                         <span
                           className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-                          style={{ background: 'rgba(184,153,104,0.2)', border: '1px solid #b89968', color: '#b89968' }}
+                          style={{ background: bh.accentMuted, border: `1px solid ${bh.accentBorder}`, color: bh.accentSoft }}
                         >
                           Super
                         </span>
@@ -886,7 +974,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                       {item.is_extreme_bonus && (
                         <span
                           className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
-                          style={{ background: 'rgba(239,68,68,0.16)', border: '1px solid #ef4444', color: '#ef4444' }}
+                          style={{ background: bh.dangerMuted, border: `1px solid ${bh.dangerBorder}`, color: bh.danger }}
                         >
                           Extreme
                         </span>
@@ -895,7 +983,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   </div>
 
                   <div className="text-center">
-                    <span className="text-white text-sm font-semibold">${item.bet_amount.toFixed(2)}</span>
+                    <span className="text-sm font-semibold" style={{ color: bh.text }}>${item.bet_amount.toFixed(2)}</span>
                   </div>
 
                   <div className="text-center">
@@ -913,18 +1001,18 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                             (e.target as HTMLInputElement).blur();
                           }
                         }}
-                        className="w-20 px-2 py-1 text-white rounded text-sm text-center focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        style={{ background: '#2a2a2a', border: '1px solid #3a3a3a' }}
+                        className="w-20 px-2 py-1.5 rounded-lg text-sm text-center focus:outline-none focus:ring-2 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        style={fieldStyle}
                       />
                     ) : (
-                      <span className="text-white text-sm font-semibold">
+                      <span className="text-sm font-semibold" style={{ color: bh.text }}>
                         {item.payment_amount ? `$${item.payment_amount.toFixed(2)}` : '-'}
                       </span>
                     )}
                   </div>
 
                   <div className="text-center">
-                    <span className="text-white text-sm font-semibold">
+                    <span className="text-sm font-semibold" style={{ color: bh.accentSoft }}>
                       {item.multiplier !== null && item.multiplier !== undefined ? `${item.multiplier.toFixed(2)}x` : '-'}
                     </span>
                   </div>
@@ -933,7 +1021,10 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                     {selectedHunt.status === 'active' && (
                       <button
                         onClick={() => removeBonus(item.id)}
-                        className="text-slate-500 hover:text-red-400 transition-colors p-1 rounded hover:bg-red-500/10"
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ color: bh.muted }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = bh.danger; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = bh.muted; }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -941,6 +1032,7 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                   </div>
                 </div>
               ))}
+              </div>
             </div>
           </div>
         </div>

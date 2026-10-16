@@ -19,6 +19,7 @@ import {
 import { TOP_SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 import {
   createEmptyTopSlotsPlaceholders,
+  fetchTopSlotsRanking,
   isTopSlotFilled,
   type TopSlotEntry,
 } from '../lib/top-slots';
@@ -42,16 +43,26 @@ export function ChatOverlay() {
   const [giveawayWinner, setGiveawayWinner] = useState<string | null>(null);
   const [winnerSelectedAt, setWinnerSelectedAt] = useState<string | null>(null);
 
-  // Visual scaffold only — ranking by historical max multiplier comes later.
-  const [topSlots] = useState<TopSlotEntry[]>(() => createEmptyTopSlotsPlaceholders());
+  const [topSlots, setTopSlots] = useState<TopSlotEntry[]>(() => createEmptyTopSlotsPlaceholders());
   const [currentSlotIndex, setCurrentSlotIndex] = useState(0);
   const [badgeCatalog, setBadgeCatalog] = useState<Record<string, { set_id: string; id: string; title: string; image_url_1x: string; image_url_2x: string; image_url_4x: string; source?: 'channel' | 'global' }> | null>(null);
+
+  const loadTopSlots = async () => {
+    try {
+      const ranked = await fetchTopSlotsRanking();
+      setTopSlots(ranked);
+      setCurrentSlotIndex(0);
+    } catch (error) {
+      console.error('[ChatOverlay] top slots load failed:', error);
+    }
+  };
 
   useEffect(() => {
     console.log('🚀 ChatOverlay: Initializing...');
     loadMessages();
     loadAlerts();
     loadActiveGiveawayWinner();
+    void loadTopSlots();
     void loadTwitchBadgeCatalog()
       .then((catalog) => setBadgeCatalog(catalog))
       .catch((error) => console.warn('[ChatOverlay] badge catalog load failed:', error));
@@ -92,6 +103,12 @@ export function ChatOverlay() {
       .channel(`chat-data-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'giveaways' }, () => {
         loadActiveGiveawayWinner();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_hunt_items' }, () => {
+        void loadTopSlots();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'chill_bonuses' }, () => {
+        void loadTopSlots();
       })
       .subscribe((status) => {
         console.log('📡 Data channel status:', status);
