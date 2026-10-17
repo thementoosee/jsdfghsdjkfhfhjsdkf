@@ -32,9 +32,9 @@ import {
   requestDrawAdminMagicLink,
   signOutDrawAdmin,
 } from './draw-admin-auth';
+import { hasOperatorSecret } from './bt-operator-session';
 import { invokeDrawCommand } from './draw-cmd-client';
 import {
-  DEMO_DRAW_TOURNAMENT_ID,
   asObsSnapshot,
   fetchDrawState,
   probeDrawSync,
@@ -62,6 +62,7 @@ const SIDEBAR_W = MAIN_OVERLAY_SIDEBAR_WIDTH_PX;
 const SIDEBAR_H = 720;
 
 export function DrawManagerPanel({
+  tournamentId,
   tournamentName,
   entries,
   entriesOpen,
@@ -72,7 +73,10 @@ export function DrawManagerPanel({
   requireEntriesClosed = false,
   showInlinePreview = true,
   showObsLinks = true,
+  forceLocal = false,
 }: {
+  /** Live tournament UUID — used for draw presentations + Edge GENERATE. */
+  tournamentId: string;
   tournamentName: string;
   entries: BonusTournamentEntry[];
   entriesOpen: boolean;
@@ -89,16 +93,31 @@ export function DrawManagerPanel({
   showInlinePreview?: boolean;
   /** When false, OBS URLs live in the Overlays tab. */
   showObsLinks?: boolean;
+  /** DEMO / offline sandbox — never hit Edge GENERATE. */
+  forceLocal?: boolean;
 }) {
   const unique = uniqueEntriesByTwitchId(entries);
   const [state, setState] = useState<DrawPresentationState>(() =>
     createIdleDrawState({
-      tournamentId: DEMO_DRAW_TOURNAMENT_ID,
+      tournamentId,
       tournamentName,
       uniqueEntryCount: unique.length,
       entriesClosed: !entriesOpen,
     }),
   );
+
+  useEffect(() => {
+    setState(
+      createIdleDrawState({
+        tournamentId,
+        tournamentName,
+        uniqueEntryCount: unique.length,
+        entriesClosed: !entriesOpen,
+      }),
+    );
+    // Reset draw machine when switching tournament identity only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional identity gate
+  }, [tournamentId]);
   const [syncStatus, setSyncStatus] = useState<DrawSyncStatus>('unknown');
   const [syncDetail, setSyncDetail] = useState<string | undefined>();
   const [adminOk, setAdminOk] = useState(false);
@@ -112,7 +131,8 @@ export function DrawManagerPanel({
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const localOnly = syncStatus === 'missing_table' || syncStatus === 'unknown';
+  const localOnly =
+    forceLocal || syncStatus === 'missing_table' || syncStatus === 'unknown';
   const snapshot = useMemo(() => asObsSnapshot(state), [state]);
   const confirmed = countConfirmedSlots(state.result);
   const awaitingPlayer = currentRevealPlayer(state);
@@ -163,13 +183,15 @@ export function DrawManagerPanel({
         }
 
         const admin = await refreshAdmin();
-        if (!admin.ok) {
-          setLastError('Desbloqueie os comandos do sorteio (magic link) antes de gravar no servidor.');
+        if (!admin.ok && !hasOperatorSecret()) {
+          setLastError(
+            'Desbloqueia o Operator Secret na visão geral (ou magic link legado) antes de gravar no servidor.',
+          );
           return;
         }
 
         const res = await invokeDrawCommand({
-          tournamentId: DEMO_DRAW_TOURNAMENT_ID,
+          tournamentId: tournamentId,
           expectedVersion: prev.version,
           command,
         });
@@ -204,7 +226,7 @@ export function DrawManagerPanel({
       setSyncStatus(probe.status);
       setSyncDetail(probe.detail);
       if (probe.status !== 'ready') return;
-      const remote = await fetchDrawState(DEMO_DRAW_TOURNAMENT_ID);
+      const remote = await fetchDrawState(tournamentId);
       if (cancelled) return;
       setSyncStatus(remote.status);
       setSyncDetail(remote.detail);
@@ -217,7 +239,7 @@ export function DrawManagerPanel({
 
   useEffect(() => {
     if (syncStatus !== 'ready') return;
-    const sub = subscribeDrawState(DEMO_DRAW_TOURNAMENT_ID, (snap) => {
+    const sub = subscribeDrawState(tournamentId, (snap) => {
       setState((local) =>
         mergeRemoteIfNewer(local, {
           ...local,
@@ -227,7 +249,7 @@ export function DrawManagerPanel({
       );
     });
     const poll = setInterval(() => {
-      void fetchDrawState(DEMO_DRAW_TOURNAMENT_ID).then((remote) => {
+      void fetchDrawState(tournamentId).then((remote) => {
         if (remote.state) setState((local) => mergeRemoteIfNewer(local, remote.state!));
       });
     }, 4000);
@@ -314,7 +336,7 @@ export function DrawManagerPanel({
             return;
           }
           const res = await invokeDrawCommand({
-            tournamentId: DEMO_DRAW_TOURNAMENT_ID,
+            tournamentId: tournamentId,
             expectedVersion: prev.version,
             command: { type: 'CLOSE_ENTRIES' },
           });
@@ -339,7 +361,7 @@ export function DrawManagerPanel({
             return;
           }
           const res = await invokeDrawCommand({
-            tournamentId: DEMO_DRAW_TOURNAMENT_ID,
+            tournamentId: tournamentId,
             expectedVersion: prev.version,
             command: { type: 'GENERATE_DRAW', entries: unique },
           });
@@ -363,7 +385,7 @@ export function DrawManagerPanel({
           return;
         }
         const res = await invokeDrawCommand({
-          tournamentId: DEMO_DRAW_TOURNAMENT_ID,
+          tournamentId: tournamentId,
           expectedVersion: prev.version,
           command: { type: 'START_PRESENTATION' },
         });
@@ -435,7 +457,7 @@ export function DrawManagerPanel({
           style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(96,165,250,0.35)', color: '#93c5fd' }}
         >
           Modo local DEMO: avanço no browser. Escolha de slot e confrontos usam a máquina local.
-          Remoto: Edge/migration ainda precisam de CONFIRM_SLOT / LAUNCH_MATCHUPS.
+          Remoto: requer migrations BT + deploy draw-cmd/tick + admin magic link.
         </div>
       )}
 
@@ -598,6 +620,10 @@ export function DrawManagerPanel({
           <div className="text-sm font-black uppercase" style={{ color: '#4ade80' }}>
             8 jogadores · 8 slots — apresentação pronta
           </div>
+          <p className="text-[11px]" style={{ color: '#94a3b8' }}>
+            SEGUINTE inicia a apresentação visual dos 4 duelos na overlay. Os confrontos QF só
+            começam depois, com COMEÇAR CONFRONTOS.
+          </p>
           <div className="flex flex-wrap gap-2">
             <Btn
               label="Reiniciar apresentação"
@@ -615,12 +641,11 @@ export function DrawManagerPanel({
               icon={<RotateCcw className="w-3.5 h-3.5" />}
             />
             <Btn
-              label="SEGUINTE"
+              label="SEGUINTE — Apresentar duelos"
               onClick={() => {
                 void (async () => {
+                  // Start reveal_match only — do NOT launch QF yet.
                   await dispatchCommand({ type: 'LAUNCH_MATCHUPS' });
-                  const snap = asObsSnapshot(stateRef.current);
-                  onLaunchMatchups?.(snap);
                 })();
               }}
               disabled={busy || !canLaunchMatchups(state)}
@@ -628,6 +653,40 @@ export function DrawManagerPanel({
               primary
             />
           </div>
+        </div>
+      )}
+
+      {state.phase === 'reveal_match' && (
+        <div
+          className="text-[11px] rounded-xl px-3 py-2 font-bold"
+          style={{
+            background: 'rgba(251,191,36,0.1)',
+            border: '1px solid rgba(251,191,36,0.35)',
+            color: '#fbbf24',
+          }}
+        >
+          A apresentar duelos · Jogo {state.revealedMatches}/{DRAW_MATCH_COUNT}
+        </div>
+      )}
+
+      {state.phase === 'awaiting_advance' && state.result && (
+        <div
+          className="rounded-xl p-4 space-y-3"
+          style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.4)' }}
+        >
+          <div className="text-sm font-black uppercase" style={{ color: '#fbbf24' }}>
+            Duelos apresentados — pronto para os quartos
+          </div>
+          <Btn
+            label="COMEÇAR CONFRONTOS"
+            onClick={() => {
+              const snap = asObsSnapshot(stateRef.current);
+              onLaunchMatchups?.(snap);
+            }}
+            disabled={busy}
+            icon={<Swords className="w-3.5 h-3.5" />}
+            primary
+          />
         </div>
       )}
 

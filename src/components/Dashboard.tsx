@@ -409,7 +409,7 @@ export function Dashboard() {
   const panelPageTitles: Record<Exclude<PanelPage, null>, string> = {
     bonus: 'Bonus Hunt / Opening',
     fever: 'Fever Champions League',
-    bonus_tournament: 'Bonus Tournament (DEMO)',
+    bonus_tournament: 'Bonus Tournament',
     giveaway: 'Giveaways',
     chill: 'Chill',
     twitch: 'Twitch Integration',

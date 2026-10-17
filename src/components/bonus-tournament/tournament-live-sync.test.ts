@@ -5,6 +5,10 @@ import {
   overlaySceneKey,
   shouldOverlaySceneFade,
 } from './BonusTournamentOverlay';
+import {
+  buildNeutralOverlayDemo,
+  resolveOverlayLivePack,
+} from './BonusTournamentOverlayPreview';
 import { createDemoTournament } from './demo-data';
 import {
   clearLiveMirror,
@@ -12,6 +16,8 @@ import {
   writeLiveMirror,
 } from './tournament-live-mirror';
 import {
+  activateTournamentSession,
+  createDemoTournamentSession,
   createTournamentSession,
   setActiveTournamentId,
 } from './tournament-session-store';
@@ -65,19 +71,21 @@ describe('resolveBracketObsView — live session wins over fixtures', () => {
     expect(pack.view.semifinals.some((m) => m.playerA.participant !== null)).toBe(true);
   });
 
-  it('uses active session even when ?stage= requests a fixture', () => {
+  it('uses Supabase ACTIVE (dbActive) even when ?stage= requests a fixture', () => {
     const record = createTournamentSession({
       name: 'LIVE HUNT',
       chatCommand: '!torneio',
       prizePool: 250,
       durationMinutes: 15,
     });
+    // Local ACTIVE alone must NOT drive OBS REAL path
     setActiveTournamentId(record.id);
+    const localOnly = resolveBracketObsView('champion', null, null);
+    expect(localOnly.fromLiveSession).toBe(false);
 
-    const pack = resolveBracketObsView('champion');
+    const pack = resolveBracketObsView('champion', null, record.demo);
     expect(pack.fromLiveSession).toBe(true);
     expect(pack.view.title).toBe('LIVE HUNT');
-    // Fresh DEMO: no invented QF winners from fixtures
     expect(
       pack.view.quarterfinals.every(
         (m) => m.playerA.participant === null && m.playerB.participant === null,
@@ -86,17 +94,40 @@ describe('resolveBracketObsView — live session wins over fixtures', () => {
     expect(pack.view.champion).toBeNull();
   });
 
-  it('falls back to live mirror when session store has no active id', () => {
+  it('ignores stale live mirror when nothing is ACTIVE', () => {
     const demo = createDemoTournament('qf');
     writeLiveMirror({ sessionId: demo.id, demo, drawSnapshot: null });
     setActiveTournamentId(null);
 
     const pack = resolveBracketObsView('final');
+    expect(pack.fromLiveSession).toBe(false);
+    expect(pack.view.stage).toBe('final');
+  });
+
+  it('uses remote broadcast payload when no local ACTIVE (OBS path)', () => {
+    const demo = createDemoTournament('qf');
+    const remote = {
+      sessionId: demo.id,
+      demo,
+      drawSnapshot: null,
+      updatedAt: Date.now(),
+    };
+    const pack = resolveBracketObsView(null, remote);
     expect(pack.fromLiveSession).toBe(true);
     expect(pack.view.title).toBe(
       demo.entriesConfig.tournamentTitle || demo.name,
     );
     expect(pack.view.quarterfinals[0]?.playerA.participant?.displayName).toBeTruthy();
+  });
+
+  it('empty bracket when no ACTIVE, no remote, no stage', () => {
+    const pack = resolveBracketObsView(null);
+    expect(pack.fromLiveSession).toBe(false);
+    expect(
+      pack.view.quarterfinals.every(
+        (m) => m.playerA.participant === null && m.playerB.participant === null,
+      ),
+    ).toBe(true);
   });
 
   it('clears mirror so fixtures return after hub exit', () => {
@@ -106,6 +137,54 @@ describe('resolveBracketObsView — live session wins over fixtures', () => {
     expect(readLiveMirror().demo).toBeNull();
     const pack = resolveBracketObsView('qf');
     expect(pack.fromLiveSession).toBe(false);
+  });
+});
+
+describe('resolveOverlayLivePack — ACTIVE only', () => {
+  it('returns null when nothing is ACTIVE even if mirror has DEMO fixtures', () => {
+    const demo = createDemoTournament('qf');
+    writeLiveMirror({ sessionId: demo.id, demo, drawSnapshot: null });
+    setActiveTournamentId(null);
+    const pack = resolveOverlayLivePack(null);
+    expect(pack.liveSynced).toBe(false);
+    expect(pack.demo).toBeNull();
+  });
+
+  it('uses dbActive Supabase row (not localStorage)', () => {
+    const record = createDemoTournamentSession({
+      name: 'LIVE',
+      chatCommand: '!t',
+      prizePool: 100,
+      durationMinutes: 10,
+    });
+    activateTournamentSession(record.id);
+    const live = { ...record.demo, status: 'qf' as const };
+    writeLiveMirror({ sessionId: record.id, demo: live, drawSnapshot: null });
+    // Local ACTIVE + mirror ignored for REAL overlay resolution
+    expect(resolveOverlayLivePack(null, null).liveSynced).toBe(false);
+    const pack = resolveOverlayLivePack(null, live);
+    expect(pack.liveSynced).toBe(true);
+    expect(pack.demo?.id).toBe(record.id);
+    expect(pack.demo?.status).toBe('qf');
+  });
+
+  it('uses ephemeral remote broadcast when no db ACTIVE', () => {
+    const demo = createDemoTournament('sf');
+    const pack = resolveOverlayLivePack({
+      sessionId: demo.id,
+      demo,
+      drawSnapshot: null,
+      updatedAt: Date.now(),
+    });
+    expect(pack.liveSynced).toBe(true);
+    expect(pack.demo?.status).toBe('sf');
+  });
+
+  it('buildNeutralOverlayDemo has no players/matches', () => {
+    const n = buildNeutralOverlayDemo();
+    expect(n.players).toHaveLength(0);
+    expect(n.matches).toHaveLength(0);
+    expect(n.entries).toHaveLength(0);
   });
 });
 

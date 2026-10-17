@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DEMO_ENTRY_COUNT,
+  activateTournamentSession,
+  createDemoTournamentSession,
   createTournamentSession,
   deleteTournamentSession,
   getActiveTournamentId,
   listTournamentSessions,
   resetDemoTournamentSession,
   setActiveTournamentId,
+  upsertTournamentSession,
 } from './tournament-session-store';
 
 const KEYS = ['bt-tournament-sessions-v1', 'bt-tournament-active-id-v1'];
@@ -44,25 +47,36 @@ afterEach(() => {
 });
 
 describe('tournament-session-store DEMO roster', () => {
-  it('createTournamentSession seeds exactly 8 distinct fictícios', () => {
+  it('createTournamentSession is REAL — empty roster, not DEMO', () => {
     const record = createTournamentSession({
       name: 'HUNT DOS REIS',
       chatCommand: '!torneio',
       prizePool: 250,
       durationMinutes: 15,
     });
-    expect(record.demo.isDemo).toBe(true);
+    expect(record.demo.isDemo).toBe(false);
     expect(record.demo.status).toBe('entries');
     expect(record.demo.entriesConfig.entriesOpen).toBe(true);
-    expect(record.demo.entries).toHaveLength(DEMO_ENTRY_COUNT);
-    const ids = record.demo.entries.map((e) => e.twitchUserId);
-    expect(new Set(ids).size).toBe(DEMO_ENTRY_COUNT);
+    expect(record.demo.entries).toHaveLength(0);
     expect(record.demo.players).toHaveLength(0);
     expect(record.demo.matches).toHaveLength(0);
   });
 
+  it('createDemoTournamentSession seeds exactly 8 distinct fictícios (dev/tests only)', () => {
+    const record = createDemoTournamentSession({
+      name: 'HUNT DOS REIS',
+      chatCommand: '!torneio',
+      prizePool: 250,
+      durationMinutes: 15,
+    });
+    expect(record.demo.isDemo).toBe(true);
+    expect(record.demo.entries).toHaveLength(DEMO_ENTRY_COUNT);
+    const ids = record.demo.entries.map((e) => e.twitchUserId);
+    expect(new Set(ids).size).toBe(DEMO_ENTRY_COUNT);
+  });
+
   it('reset clears progression and restores 8 entries without new remote writes', () => {
-    const created = createTournamentSession({
+    const created = createDemoTournamentSession({
       name: 'TEST',
       chatCommand: '!x',
       prizePool: 100,
@@ -113,7 +127,41 @@ describe('tournament-session-store DEMO roster', () => {
     expect(listTournamentSessions().some((s) => s.id === reset.id)).toBe(true);
   });
 
-  it('deleteTournamentSession removes only the selected DEMO and clears active if needed', () => {
+  it('createTournamentSession does not auto-activate', () => {
+    expect(getActiveTournamentId()).toBeNull();
+    const a = createTournamentSession({
+      name: 'A',
+      chatCommand: '!a',
+      prizePool: 100,
+      durationMinutes: 10,
+    });
+    expect(getActiveTournamentId()).toBeNull();
+    upsertTournamentSession({ ...a.demo, name: 'A2' });
+    expect(getActiveTournamentId()).toBeNull();
+  });
+
+  it('activateTournamentSession is exclusive and clearable', () => {
+    const a = createTournamentSession({
+      name: 'A',
+      chatCommand: '!a',
+      prizePool: 100,
+      durationMinutes: 10,
+    });
+    const b = createTournamentSession({
+      name: 'B',
+      chatCommand: '!b',
+      prizePool: 200,
+      durationMinutes: 15,
+    });
+    expect(activateTournamentSession(a.id).ok).toBe(true);
+    expect(getActiveTournamentId()).toBe(a.id);
+    expect(activateTournamentSession(b.id).ok).toBe(true);
+    expect(getActiveTournamentId()).toBe(b.id);
+    expect(activateTournamentSession(null).ok).toBe(true);
+    expect(getActiveTournamentId()).toBeNull();
+  });
+
+  it('deleteTournamentSession removes the selected session and clears active if needed', () => {
     const a = createTournamentSession({
       name: 'KEEP',
       chatCommand: '!a',

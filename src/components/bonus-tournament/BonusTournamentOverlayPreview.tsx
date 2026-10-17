@@ -9,69 +9,115 @@ import { hydrateDemoSlotsFromCatalog } from './hydrate-demo-slots';
 import { BonusTournamentOverlay } from './BonusTournamentOverlay';
 import type { BonusTournamentDemo, BonusTournamentEntry, BonusTournamentMatch } from './types';
 import {
-  getActiveTournamentSession,
-  subscribeTournamentSessions,
-} from './tournament-session-store';
-import { readLiveMirror, subscribeLiveMirror } from './tournament-live-mirror';
+  subscribeRemoteLiveMirror,
+  type TournamentRemoteMirrorPayload,
+} from './tournament-remote-broadcast';
+import { subscribeActiveRemoteTournament } from './tournament-remote-api';
 import type { DrawPublicSnapshot } from './draw-types';
 
-/** OBS / preview overlay — prefers live Dashboard mirror (demo + draw snapshot). */
+/** Neutral idle frame when nothing is ACTIVE — never stale DEMO fixtures. */
+export function buildNeutralOverlayDemo(): BonusTournamentDemo {
+  return {
+    ...createDemoTournament('entries'),
+    id: 'bt-neutral-idle',
+    name: 'Bonus Tournament',
+    status: 'entries',
+    overlayView: 'overview',
+    entries: [],
+    players: [],
+    matches: [],
+    selectedMatchId: null,
+    entriesConfig: defaultEntriesConfig({
+      tournamentTitle: 'Bonus Tournament',
+      prizePool: 0,
+      durationSeconds: 0,
+      timerStartedAt: null,
+      timerPaused: true,
+      remainingSecondsSnapshot: 0,
+      entriesOpen: false,
+    }),
+  };
+}
+
+/**
+ * Resolve overlay live data: ACTIVE (same-origin) → remote broadcast (OBS) →
+ * local mirror only if it still matches ACTIVE → otherwise null (neutral).
+ */
+export function resolveOverlayLivePack(
+  remote: TournamentRemoteMirrorPayload | null,
+  dbActive: BonusTournamentDemo | null = null,
+): {
+  demo: BonusTournamentDemo | null;
+  drawSnapshot: DrawPublicSnapshot | null;
+  liveSynced: boolean;
+} {
+  // REAL: Supabase ACTIVE only (no localStorage / BroadcastChannel).
+  if (dbActive) {
+    return {
+      demo: dbActive,
+      drawSnapshot:
+        remote?.sessionId === dbActive.id ? remote.drawSnapshot : null,
+      liveSynced: true,
+    };
+  }
+
+  if (remote?.sessionId && remote.demo && remote.demo.id === remote.sessionId) {
+    return {
+      demo: remote.demo,
+      drawSnapshot: remote.drawSnapshot,
+      liveSynced: true,
+    };
+  }
+
+  return { demo: null, drawSnapshot: null, liveSynced: false };
+}
+
+/** OBS / preview overlay — ACTIVE tournament only (local or remote broadcast). */
 export function BonusTournamentOverlayPreview() {
+  const [remote, setRemote] = useState<TournamentRemoteMirrorPayload | null>(null);
+  const [dbActive, setDbActive] = useState<BonusTournamentDemo | null>(null);
   const [demo, setDemo] = useState<BonusTournamentDemo>(() => {
-    const mirror = typeof window !== 'undefined' ? readLiveMirror() : null;
-    if (mirror?.demo) return mirror.demo;
-    const active = typeof window !== 'undefined' ? getActiveTournamentSession() : null;
-    if (active) return active.demo;
-    const base = createDemoTournament('qf');
-    return { ...base, overlayView: 'duel' };
+    if (typeof window === 'undefined') return buildNeutralOverlayDemo();
+    return resolveOverlayLivePack(null).demo ?? buildNeutralOverlayDemo();
   });
   const [drawSnapshot, setDrawSnapshot] = useState<DrawPublicSnapshot | null>(() => {
     if (typeof window === 'undefined') return null;
-    return readLiveMirror().drawSnapshot;
+    return resolveOverlayLivePack(null).drawSnapshot;
   });
   const [liveSynced, setLiveSynced] = useState(() => {
     if (typeof window === 'undefined') return false;
-    return Boolean(readLiveMirror().demo || getActiveTournamentSession());
+    return resolveOverlayLivePack(null).liveSynced;
   });
+  /** Isolated preview controls only when nothing is ACTIVE / remote. */
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     const sync = () => {
-      const mirror = readLiveMirror();
-      const active = getActiveTournamentSession();
-      if (mirror.demo) {
-        setDemo(mirror.demo);
-        setDrawSnapshot(mirror.drawSnapshot);
+      const pack = resolveOverlayLivePack(remote, dbActive);
+      if (pack.liveSynced && pack.demo) {
+        setDemo(pack.demo);
+        setDrawSnapshot(pack.drawSnapshot);
         setLiveSynced(true);
-        return;
-      }
-      if (active) {
-        setDemo(active.demo);
-        setDrawSnapshot(null);
-        setLiveSynced(true);
+        setPreviewMode(false);
         return;
       }
       setLiveSynced(false);
+      setDrawSnapshot(null);
+      if (!previewMode) {
+        setDemo(buildNeutralOverlayDemo());
+      }
     };
     sync();
-    const a = subscribeTournamentSessions(sync);
-    const b = subscribeLiveMirror(sync);
-    return () => {
-      a();
-      b();
-    };
+  }, [remote, dbActive, previewMode]);
+
+  useEffect(() => {
+    return subscribeRemoteLiveMirror((payload) => {
+      setRemote(payload.sessionId ? payload : null);
+    });
   }, []);
 
   useEffect(() => {
-    if (readLiveMirror().demo || getActiveTournamentSession()) return;
-    let cancelled = false;
-    void hydrateDemoSlotsFromCatalog(createDemoTournament('qf')).then((next) => {
-      if (!cancelled && !readLiveMirror().demo && !getActiveTournamentSession()) {
-        setDemo({ ...next, overlayView: 'duel' });
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    return subscribeActiveRemoteTournament((t) => setDbActive(t));
   }, []);
 
   const revealNextPay = (side: 'A' | 'B', amount: number) => {
@@ -93,6 +139,14 @@ export function BonusTournamentOverlayPreview() {
     });
   };
 
+  const enableLocalPreview = () => {
+    if (liveSynced) return;
+    setPreviewMode(true);
+    void hydrateDemoSlotsFromCatalog(createDemoTournament('qf')).then((next) => {
+      setDemo({ ...next, overlayView: 'duel' });
+    });
+  };
+
   const resetLiveBuys = () => {
     void hydrateDemoSlotsFromCatalog(createDemoTournament('qf')).then((next) => {
       setDemo({ ...next, overlayView: 'duel' });
@@ -106,6 +160,7 @@ export function BonusTournamentOverlayPreview() {
   };
 
   const showEntries = (count: number, open = true) => {
+    setPreviewMode(true);
     const entries = buildDemoEntries(count);
     setDemo({
       ...createDemoTournament('entries'),
@@ -223,6 +278,7 @@ export function BonusTournamentOverlayPreview() {
   });
 
   const isEntries = demo.overlayView === 'entries' || demo.status === 'entries';
+  const showLocalControls = !liveSynced && previewMode;
 
   return (
     <div
@@ -235,8 +291,10 @@ export function BonusTournamentOverlayPreview() {
           style={{ color: '#94a3b8' }}
         >
           {liveSynced
-            ? 'Live sync · sessão Dashboard ativa · /bonus-tournament/overlay'
-            : 'Preview isolado · /bonus-tournament/overlay · DEMO'}
+            ? 'Live sync · torneio ACTIVE · /bonus-tournament/overlay'
+            : previewMode
+              ? 'Preview isolado · /bonus-tournament/overlay · DEMO'
+              : 'Sem torneio ACTIVE · estado neutro · /bonus-tournament/overlay'}
         </div>
         <BonusTournamentOverlay demo={demo} drawSnapshot={drawSnapshot} />
         <div className="mt-4 flex flex-wrap justify-center gap-2 max-w-[520px] mx-auto">
@@ -247,6 +305,15 @@ export function BonusTournamentOverlayPreview() {
             >
               Controlos locais desativados — a Dashboard é a fonte de verdade.
             </div>
+          ) : !previewMode ? (
+            <button
+              type="button"
+              onClick={enableLocalPreview}
+              className="px-3 py-1 rounded text-[10px] font-bold uppercase"
+              style={btn(false)}
+            >
+              Abrir preview DEMO local
+            </button>
           ) : (
             <>
           <button type="button" onClick={() => setDemo((d) => ({ ...d, overlayView: 'overview', status: d.status === 'entries' ? 'qf' : d.status }))} className="px-3 py-1 rounded text-[10px] font-bold uppercase" style={btn(demo.overlayView === 'overview')}>
@@ -262,7 +329,7 @@ export function BonusTournamentOverlayPreview() {
             Campeão
           </button>
 
-          {!isEntries && (
+          {showLocalControls && !isEntries && (
             <>
               <button type="button" onClick={() => revealNextPay('A', 22)} className="px-3 py-1 rounded text-[10px] font-bold uppercase" style={{ background: 'rgba(74,222,128,0.12)', color: '#4ade80', border: '1px solid rgba(74,222,128,0.35)' }}>
                 Revelar PAY A
@@ -285,7 +352,7 @@ export function BonusTournamentOverlayPreview() {
             </>
           )}
 
-          {isEntries && (
+          {showLocalControls && isEntries && (
             <>
               {[0, 3, 8, 18, 20, 50, 100].map((n) => (
                 <button
@@ -317,9 +384,11 @@ export function BonusTournamentOverlayPreview() {
             </>
           )}
 
+          {showLocalControls && (
           <button type="button" onClick={resetLiveBuys} className="px-3 py-1 rounded text-[10px] font-bold uppercase" style={{ background: 'rgba(255,255,255,0.06)', color: '#e2e8f0', border: '1px solid rgba(255,255,255,0.15)' }}>
             Reset compras
           </button>
+          )}
             </>
           )}
         </div>

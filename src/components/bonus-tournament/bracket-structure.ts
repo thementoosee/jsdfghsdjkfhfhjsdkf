@@ -124,6 +124,26 @@ function fromDemoMatch(
   return matchView(m.id, label, sublabel, a, b, winnerTwitch);
 }
 
+/** Neutral empty bracket — used when no ACTIVE tournament (no fixtures). */
+export function buildEmptyBracketView(title = 'Bonus Tournament'): BracketView {
+  return {
+    stage: 'live',
+    title,
+    quarterfinals: [
+      emptyMatch('qf-0', 'Quartos de Final', ''),
+      emptyMatch('qf-1', 'Quartos de Final', ''),
+      emptyMatch('qf-2', 'Quartos de Final', ''),
+      emptyMatch('qf-3', 'Quartos de Final', ''),
+    ],
+    semifinals: [
+      emptyMatch('sf-0', 'Meias-Finais', ''),
+      emptyMatch('sf-1', 'Meias-Finais', ''),
+    ],
+    final: emptyMatch('final-0', 'Final', ''),
+    champion: null,
+  };
+}
+
 /** Project live/demo tournament state into a bracket view (read-only). */
 export function buildBracketViewFromDemo(
   demo: BonusTournamentDemo,

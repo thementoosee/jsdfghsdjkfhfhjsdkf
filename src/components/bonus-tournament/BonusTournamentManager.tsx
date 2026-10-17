@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Trophy,
   Users,
@@ -40,19 +40,46 @@ import type { DrawPublicSnapshot } from './draw-types';
 import type { BonusTournamentDemo, BonusTournamentMatch } from './types';
 import { ROUND_LABEL, STATUS_LABEL } from './types';
 import {
+  activateTournamentSession,
+  createDemoTournamentSession,
   createTournamentSession,
   deleteTournamentSession,
   DEMO_ENTRY_COUNT,
+  getActiveTournamentId,
+  getActiveTournamentSession,
   isTournamentInProgress,
   listTournamentSessions,
   resetDemoTournamentSession,
   saveTournamentDemo,
-  setActiveTournamentId,
   subscribeTournamentSessions,
   tabForStatus,
   type TournamentSessionRecord,
 } from './tournament-session-store';
 import { clearLiveMirror, writeLiveMirror } from './tournament-live-mirror';
+import {
+  clearRemoteLiveMirror,
+  publishRemoteLiveMirror,
+  startRemoteLiveHeartbeat,
+} from './tournament-remote-broadcast';
+import {
+  activateRemoteTournament,
+  createRemoteTournament,
+  deleteRemoteTournament,
+  listRemoteTournaments,
+  persistRemoteTournamentState,
+  pingOperatorAdmin,
+  probeTournamentRemote,
+  rowToTournament,
+  subscribeRemoteEntries,
+  type RemoteBackendStatus,
+} from './tournament-remote-api';
+import {
+  bindOperatorSecretLifecycle,
+  clearOperatorSecret,
+  getOperatorSecret,
+  hasOperatorSecret,
+  setOperatorSecret,
+} from './bt-operator-session';
 import {
   applyDrawLaunchToDemo,
   confirmWinnerAndAdvance,
@@ -197,6 +224,13 @@ export function BonusTournamentManager() {
   const [createMins, setCreateMins] = useState(15);
   const [createError, setCreateError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TournamentSessionRecord | null>(null);
+  const [remoteStatus, setRemoteStatus] = useState<RemoteBackendStatus>('unknown');
+  const [remoteDetail, setRemoteDetail] = useState<string | undefined>();
+  const remoteVersionRef = useRef(0);
+  const [operatorUnlocked, setOperatorUnlocked] = useState(() => hasOperatorSecret());
+  const [operatorDraft, setOperatorDraft] = useState('');
+  const [operatorError, setOperatorError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const refreshSessions = useCallback(() => {
     setSessions(listTournamentSessions());
@@ -207,27 +241,160 @@ export function BonusTournamentManager() {
     return subscribeTournamentSessions(refreshSessions);
   }, [refreshSessions]);
 
-  // Persist demo + live OBS mirror on every change while in workspace
+  useEffect(() => bindOperatorSecretLifecycle(), []);
+
+  // Probe Supabase live tables (anon). Operator unlock loads full list via Edge.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const probe = await probeTournamentRemote();
+      if (cancelled) return;
+      setRemoteStatus(probe.status);
+      setRemoteDetail(probe.detail);
+
+      if ((probe.status === 'ready' || probe.status === 'needs_operator') && hasOperatorSecret()) {
+        const listed = await listRemoteTournaments();
+        if (cancelled || !listed.ok) return;
+        for (const row of listed.rows) {
+          const pack = await import('./tournament-remote-api').then((m) =>
+            m.fetchRemoteTournament(row.id),
+          );
+          const entries = pack.ok ? pack.entries : [];
+          saveTournamentDemo(rowToTournament(row, entries));
+          if (row.is_active) {
+            activateTournamentSession(row.id);
+            remoteVersionRef.current = row.state_version;
+          }
+        }
+        refreshSessions();
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshSessions, operatorUnlocked]);
+
+  const activeTournamentId = getActiveTournamentId();
+  const isWorkspaceActive = Boolean(demo && activeTournamentId === demo.id);
+
+  // Persist local cache; remote CAS when live + admin; OBS mirror only when ACTIVE
   useEffect(() => {
     if (!demo) {
-      clearLiveMirror();
+      refreshSessions();
       return;
     }
     saveTournamentDemo(demo);
-    writeLiveMirror({
-      sessionId: demo.id,
-      demo,
-      drawSnapshot,
-    });
+    const activeId = getActiveTournamentId();
+    if (activeId === demo.id) {
+      writeLiveMirror({
+        sessionId: demo.id,
+        demo,
+        drawSnapshot,
+      });
+      void publishRemoteLiveMirror({
+        sessionId: demo.id,
+        demo,
+        drawSnapshot,
+      });
+    }
+    if (
+      (remoteStatus === 'ready' || remoteStatus === 'needs_operator') &&
+      operatorUnlocked &&
+      !demo.isDemo
+    ) {
+      const expected = remoteVersionRef.current;
+      void persistRemoteTournamentState(demo, expected).then((res) => {
+        if (res.ok && res.row) remoteVersionRef.current = res.row.state_version;
+        if (res.conflict && res.row) remoteVersionRef.current = res.row.state_version;
+      });
+    }
     refreshSessions();
-  }, [demo, drawSnapshot, refreshSessions]);
+  }, [demo, drawSnapshot, refreshSessions, remoteStatus, operatorUnlocked]);
+
+  // Live Twitch entries for REAL tournaments
+  useEffect(() => {
+    if (!demo || demo.isDemo) return;
+    if (remoteStatus !== 'ready' && remoteStatus !== 'needs_operator') return;
+    return subscribeRemoteEntries(demo.id, (entries) => {
+      setDemo((p) => {
+        if (!p || p.id !== demo.id) return p;
+        if (p.entries.length === entries.length && p.entries.every((e, i) => e.id === entries[i]?.id)) {
+          return p;
+        }
+        return { ...p, entries };
+      });
+    });
+  }, [demo?.id, demo?.isDemo, remoteStatus]);
+
+  // Heartbeat for OBS joiners while any tournament is ACTIVE (workspace or hub)
+  useEffect(() => {
+    const activeId = getActiveTournamentId();
+    if (!activeId) return;
+    return startRemoteLiveHeartbeat(() => {
+      const active = getActiveTournamentSession();
+      if (!active) return null;
+      if (demo && demo.id === active.id) {
+        return {
+          sessionId: demo.id,
+          demo,
+          drawSnapshot,
+          updatedAt: Date.now(),
+        };
+      }
+      return {
+        sessionId: active.id,
+        demo: active.demo,
+        drawSnapshot: null,
+        updatedAt: Date.now(),
+      };
+    });
+  }, [demo, drawSnapshot, sessions, activeTournamentId]);
 
   const goHub = () => {
     setShell('hub');
     setDemo(null);
     setDrawSnapshot(null);
-    setActiveTournamentId(null);
+    // Keep ACTIVE as-is — leaving the workspace must not deactivate overlays.
+    refreshSessions();
+  };
+
+  const handleActivate = (id: string) => {
+    const result = activateTournamentSession(id);
+    if (!result.ok) return;
+    if (remoteStatus === 'ready' || remoteStatus === 'needs_operator') {
+      if (!operatorUnlocked) {
+        alert('Introduz o Operator Secret na visão geral antes de ACTIVAR.');
+        return;
+      }
+      void activateRemoteTournament(id).then((res) => {
+        if (!res.ok) {
+          alert(res.error || 'Falha ao ACTIVAR no Supabase.');
+        }
+      });
+    }
+    const record = listTournamentSessions().find((s) => s.id === id);
+    if (record) {
+      writeLiveMirror({
+        sessionId: record.id,
+        demo: record.demo,
+        drawSnapshot: demo?.id === id ? drawSnapshot : null,
+      });
+      void publishRemoteLiveMirror({
+        sessionId: record.id,
+        demo: record.demo,
+        drawSnapshot: demo?.id === id ? drawSnapshot : null,
+      });
+    }
+    refreshSessions();
+  };
+
+  const handleDeactivate = () => {
+    activateTournamentSession(null);
+    if ((remoteStatus === 'ready' || remoteStatus === 'needs_operator') && operatorUnlocked) {
+      void activateRemoteTournament(null);
+    }
     clearLiveMirror();
+    clearRemoteLiveMirror();
     refreshSessions();
   };
 
@@ -251,7 +418,7 @@ export function BonusTournamentManager() {
 
   const openSession = (record: TournamentSessionRecord) => {
     setDemo(record.demo);
-    setActiveTournamentId(record.id);
+    // Do not auto-ACTIVAR — overlays follow explicit ACTIVE only.
     setShell('workspace');
     setTab(tabForStatus(record.demo.status));
   };
@@ -300,8 +467,75 @@ export function BonusTournamentManager() {
             </h1>
           </div>
           <p className="text-sm mt-2" style={{ color: ui.muted }}>
-            Visão geral · criar torneio · continuar sessão · overlays sincronizadas (local)
+            Torneios REAL · ACTIVAR envia para OBS · inscritos via comando Twitch
           </p>
+          <p className="text-[11px] mt-2 font-bold" style={{ color: remoteStatus === 'missing_tables' ? '#fbbf24' : '#4ade80' }}>
+            Backend: {remoteDetail || remoteStatus}
+            {operatorUnlocked ? ' · operador desbloqueado' : ''}
+          </p>
+          <div
+            className="mt-4 rounded-xl p-3 space-y-2"
+            style={{ background: '#1e1e24', border: `1px solid ${ui.inputBorder}` }}
+          >
+            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: ui.muted }}>
+              Operator secret (sessão)
+            </div>
+            <p className="text-[11px]" style={{ color: ui.muted }}>
+              Sem login. O secret vive só nas Edge secrets / nesta sessão do browser — nunca no OBS.
+            </p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <input
+                type="password"
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={operatorUnlocked ? '•••••••• (já definido)' : 'Colar BT_OPERATOR_SECRET'}
+                value={operatorDraft}
+                onChange={(e) => setOperatorDraft(e.target.value)}
+                className="flex-1 min-w-[180px] rounded-xl px-3 py-2 text-sm font-bold focus:outline-none"
+                style={inputStyle}
+              />
+              <PrimaryBtn
+                className="!py-2 !text-[11px]"
+                onClick={() => {
+                  void (async () => {
+                    setOperatorError(null);
+                    if (!operatorDraft.trim() && !getOperatorSecret()) {
+                      setOperatorError('Introduz o secret.');
+                      return;
+                    }
+                    if (operatorDraft.trim()) setOperatorSecret(operatorDraft.trim());
+                    setOperatorDraft('');
+                    const ping = await pingOperatorAdmin();
+                    if (!ping.ok) {
+                      clearOperatorSecret();
+                      setOperatorUnlocked(false);
+                      setOperatorError(ping.error || 'Secret rejeitado pela Edge.');
+                      return;
+                    }
+                    setOperatorUnlocked(true);
+                  })();
+                }}
+              >
+                Desbloquear
+              </PrimaryBtn>
+              {operatorUnlocked && (
+                <GhostBtn
+                  onClick={() => {
+                    clearOperatorSecret();
+                    setOperatorUnlocked(false);
+                    setOperatorDraft('');
+                  }}
+                >
+                  Terminar sessão
+                </GhostBtn>
+              )}
+            </div>
+            {operatorError && (
+              <div className="text-[11px] font-bold" style={{ color: '#f87171' }}>
+                {operatorError}
+              </div>
+            )}
+          </div>
           <div className="mt-5">
             <PrimaryBtn onClick={() => setShell('create')}>
               <Plus className="w-4 h-4" /> Começar torneio
@@ -312,13 +546,16 @@ export function BonusTournamentManager() {
         {activeSessions.length > 0 && (
           <Card className="space-y-3">
             <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: ui.muted }}>
-              Torneio ativo
+              Em curso · ACTIVE controla as overlays OBS
             </div>
             {activeSessions.map((s) => (
               <SessionRow
                 key={s.id}
                 record={s}
+                isActive={getActiveTournamentId() === s.id}
                 onContinue={() => openSession(s)}
+                onActivate={() => handleActivate(s.id)}
+                onDeactivate={handleDeactivate}
                 onDelete={() => setDeleteTarget(s)}
               />
             ))}
@@ -338,7 +575,10 @@ export function BonusTournamentManager() {
               <SessionRow
                 key={s.id}
                 record={s}
+                isActive={getActiveTournamentId() === s.id}
                 onContinue={() => openSession(s)}
+                onActivate={() => handleActivate(s.id)}
+                onDeactivate={handleDeactivate}
                 onDelete={() => setDeleteTarget(s)}
               />
             ))
@@ -350,11 +590,18 @@ export function BonusTournamentManager() {
             record={deleteTarget}
             onCancel={() => setDeleteTarget(null)}
             onConfirm={() => {
-              const result = deleteTournamentSession(deleteTarget.id);
+              const id = deleteTarget.id;
+              const wasDemo = deleteTarget.demo.isDemo;
+              const result = deleteTournamentSession(id);
               if (result.deleted && result.wasActive) {
                 clearLiveMirror();
+                clearRemoteLiveMirror();
                 setDemo(null);
                 setDrawSnapshot(null);
+                if (operatorUnlocked) void activateRemoteTournament(null);
+              }
+              if (!wasDemo && operatorUnlocked) {
+                void deleteRemoteTournament(id);
               }
               setDeleteTarget(null);
               refreshSessions();
@@ -424,11 +671,11 @@ export function BonusTournamentManager() {
           </div>
           <div className="text-xs font-bold space-y-1" style={{ color: ui.muted }}>
             <div>
-              Participantes: <span style={{ color: ui.text }}>8 (fixo nesta versão)</span>
+              Participantes: <span style={{ color: ui.text }}>reais via Twitch</span> · sorteio de 8
             </div>
-            <div style={{ color: ui.accentSoft }}>
-              MODO DEMO — ao abrir, {DEMO_ENTRY_COUNT} jogadores fictícios são criados só neste
-              browser (sem Twitch / Supabase).
+            <div>
+              O torneio <span style={{ color: ui.text }}>não</span> fica ACTIVE ao criar — usa ACTIVAR
+              para as overlays.
             </div>
           </div>
           {createError && (
@@ -437,37 +684,88 @@ export function BonusTournamentManager() {
             </div>
           )}
           <PrimaryBtn
+            disabled={creating}
             onClick={() => {
-              const name = createName.trim();
-              const cmd = createCmd.trim();
-              if (!name) {
-                setCreateError('Indique o nome do torneio.');
-                return;
-              }
-              if (!cmd) {
-                setCreateError('Indique o comando de inscrição.');
-                return;
-              }
-              if (!Number.isFinite(createPrize) || createPrize < 0) {
-                setCreateError('Prize pool inválido.');
-                return;
-              }
-              if (!Number.isFinite(createMins) || createMins < 1) {
-                setCreateError('Duração inválida.');
-                return;
-              }
-              setCreateError(null);
-              const record = createTournamentSession({
-                name,
-                chatCommand: cmd,
-                prizePool: createPrize,
-                durationMinutes: createMins,
-              });
-              openSession(record);
+              void (async () => {
+                const name = createName.trim();
+                const cmd = createCmd.trim();
+                if (!name) {
+                  setCreateError('Indique o nome do torneio.');
+                  return;
+                }
+                if (!cmd) {
+                  setCreateError('Indique o comando de inscrição.');
+                  return;
+                }
+                if (!Number.isFinite(createPrize) || createPrize < 0) {
+                  setCreateError('Prize pool inválido.');
+                  return;
+                }
+                if (!Number.isFinite(createMins) || createMins < 1) {
+                  setCreateError('Duração inválida.');
+                  return;
+                }
+                setCreateError(null);
+                setCreating(true);
+                try {
+                  if (remoteStatus === 'ready' || remoteStatus === 'needs_operator') {
+                    if (!operatorUnlocked) {
+                      setCreateError(
+                        'Desbloqueia o Operator Secret na visão geral para criar no Supabase.',
+                      );
+                      return;
+                    }
+                    const remote = await createRemoteTournament({
+                      name,
+                      chatCommand: cmd,
+                      prizePool: createPrize,
+                      durationMinutes: createMins,
+                    });
+                    if (!remote.ok || !remote.row) {
+                      setCreateError(remote.error || 'Falha ao criar torneio remoto.');
+                      return;
+                    }
+                    remoteVersionRef.current = remote.row.state_version;
+                    const record = {
+                      id: remote.row.id,
+                      createdAt: remote.row.created_at,
+                      updatedAt: remote.row.updated_at,
+                      demo: rowToTournament(remote.row, []),
+                    };
+                    saveTournamentDemo(record.demo);
+                    openSession(record);
+                    return;
+                  }
+                  const record = createTournamentSession({
+                    name,
+                    chatCommand: cmd,
+                    prizePool: createPrize,
+                    durationMinutes: createMins,
+                  });
+                  openSession(record);
+                } finally {
+                  setCreating(false);
+                }
+              })();
             }}
           >
-            Abrir inscrições
+            {creating ? 'A criar…' : 'Abrir inscrições'}
           </PrimaryBtn>
+          {import.meta.env.DEV && (
+            <GhostBtn
+              onClick={() => {
+                const record = createDemoTournamentSession({
+                  name: `${createName.trim() || 'DEMO'} (dev)`,
+                  chatCommand: createCmd.trim() || '!torneio',
+                  prizePool: createPrize,
+                  durationMinutes: createMins,
+                });
+                openSession(record);
+              }}
+            >
+              Criar DEMO local (só desenvolvimento)
+            </GhostBtn>
+          )}
         </Card>
       </div>
     );
@@ -593,7 +891,7 @@ export function BonusTournamentManager() {
       return;
     }
     if (!tabAllowed(demo, next) && next === 'matchups') {
-      alert('Conclua o sorteio (SEGUINTE) antes dos confrontos.');
+      alert('Apresente os duelos (SEGUINTE) e clique COMEÇAR CONFRONTOS antes desta página.');
       return;
     }
     if (next === 'champion' && demo.status !== 'completed') {
@@ -646,12 +944,44 @@ export function BonusTournamentManager() {
                   DEMO
                 </span>
               )}
+              {isWorkspaceActive ? (
+                <span
+                  className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full"
+                  style={{
+                    background: 'rgba(74,222,128,0.18)',
+                    color: '#4ade80',
+                    border: '1px solid rgba(74,222,128,0.4)',
+                  }}
+                >
+                  Active · overlays
+                </span>
+              ) : (
+                <span
+                  className="text-[10px] font-black uppercase px-2.5 py-1 rounded-full"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    color: ui.muted,
+                    border: `1px solid ${ui.inputBorder}`,
+                  }}
+                >
+                  Não active
+                </span>
+              )}
             </div>
             <p className="text-sm mt-2" style={{ color: ui.muted }}>
-              Sessão DEMO local · refresh não reinicia · sem dados Twitch / Supabase
+              {demo.isDemo
+                ? 'Sandbox DEMO local · não grava no Supabase'
+                : 'Torneio REAL · overlays só seguem ACTIVE · inscritos via Twitch'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {isWorkspaceActive ? (
+              <GhostBtn onClick={handleDeactivate}>Desativar overlays</GhostBtn>
+            ) : (
+              <PrimaryBtn className="!py-2 !text-[11px]" onClick={() => handleActivate(demo.id)}>
+                Activar nas overlays
+              </PrimaryBtn>
+            )}
             {demo.isDemo && (
               <GhostBtn
                 danger
@@ -781,57 +1111,61 @@ export function BonusTournamentManager() {
               </div>
 
               <div>
-                <div className="text-[10px] font-black uppercase mb-2" style={{ color: ui.muted }}>
-                  Roster DEMO ({demo.entries.length} / mínimo 8) — opcional
-                </div>
-                <p className="text-[11px] mb-2" style={{ color: ui.muted }}>
-                  Já vêm {DEMO_ENTRY_COUNT} fictícios ao abrir. Só use estes controlos para stress-test
-                  da lista (não duplica no refresh).
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {[8, 12, 18, 20, 50].map((n) => (
-                    <GhostBtn
-                      key={n}
-                      active={demo.entries.length === n}
-                      onClick={() =>
-                        setDemo((p) =>
-                          p
-                            ? {
-                                ...p,
-                                entries: buildDemoEntries(n),
-                              }
-                            : p,
-                        )
-                      }
-                    >
-                      {n}
-                    </GhostBtn>
-                  ))}
-                  <GhostBtn
-                    onClick={() =>
-                      setDemo((p) => {
-                        if (!p) return p;
-                        const n = p.entries.length;
-                        const name = `LiveJoin${n + 1}`;
-                        return {
-                          ...p,
-                          entries: [
-                            ...p.entries,
-                            {
-                              id: `demo-e-live-${n + 1}`,
-                              twitchUserId: `demo_twitch_live_${3000 + n}`,
-                              displayName: name,
-                              avatarUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=134e4a&color=f8fafc&size=128&bold=true&format=png`,
-                              enrolledAt: new Date().toISOString(),
-                            },
-                          ],
-                        };
-                      })
-                    }
-                  >
-                    +1 inscrito
-                  </GhostBtn>
-                </div>
+                {demo.isDemo ? (
+                  <>
+                    <div className="text-[10px] font-black uppercase mb-2" style={{ color: ui.muted }}>
+                      Roster DEMO ({demo.entries.length} / mínimo 8) — só desenvolvimento
+                    </div>
+                    <p className="text-[11px] mb-2" style={{ color: ui.muted }}>
+                      Sandbox local. Não grava no Supabase / Twitch.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {[8, 12, 18, 20, 50].map((n) => (
+                        <GhostBtn
+                          key={n}
+                          active={demo.entries.length === n}
+                          onClick={() =>
+                            setDemo((p) => (p ? { ...p, entries: buildDemoEntries(n) } : p))
+                          }
+                        >
+                          {n}
+                        </GhostBtn>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-[10px] font-black uppercase mb-2" style={{ color: ui.muted }}>
+                      Inscritos Twitch ({demo.entries.length} · mínimo 8 para sortear)
+                    </div>
+                    <p className="text-[11px] mb-2" style={{ color: ui.muted }}>
+                      Viewers escrevem{' '}
+                      <span style={{ color: ui.text }}>{demo.entriesConfig.chatCommand}</span> no
+                      chat. Torneio ACTIVE + inscrições abertas. EventSub → bonus_tournament_entries.
+                    </p>
+                    {demo.entries.length === 0 && (
+                      <p className="text-[11px] font-bold" style={{ color: '#fbbf24' }}>
+                        Ainda sem inscritos. Confirma Twitch online e ACTIVAR este torneio.
+                      </p>
+                    )}
+                    {demo.entries.length > 0 && (
+                      <ul
+                        className="max-h-40 overflow-y-auto space-y-1 text-[11px]"
+                        style={{ color: ui.text }}
+                      >
+                        {demo.entries.slice(0, 40).map((e) => (
+                          <li key={e.id}>
+                            {e.displayName}
+                            <span style={{ color: ui.muted }}> · {e.twitchUserId}</span>
+                          </li>
+                        ))}
+                        {demo.entries.length > 40 && (
+                          <li style={{ color: ui.muted }}>… +{demo.entries.length - 40}</li>
+                        )}
+                      </ul>
+                    )}
+                  </>
+                )}
               </div>
 
               <div className="flex flex-wrap gap-2">
@@ -979,10 +1313,12 @@ export function BonusTournamentManager() {
           {tab === 'draw' && (
             <div className="space-y-5">
               <DrawManagerPanel
+                tournamentId={demo.id}
                 tournamentName={demo.entriesConfig.tournamentTitle || demo.name}
                 entries={demo.entries}
                 entriesOpen={demo.entriesConfig.entriesOpen}
                 requireEntriesClosed
+                forceLocal={demo.isDemo}
                 onSnapshotChange={onDrawSnapshotChange}
                 onDrawPhaseActive={onDrawPhaseActive}
                 onLaunchMatchups={handleLaunchMatchups}
@@ -1210,22 +1546,45 @@ export function BonusTournamentManager() {
 
 function SessionRow({
   record,
+  isActive,
   onContinue,
+  onActivate,
+  onDeactivate,
   onDelete,
 }: {
   record: TournamentSessionRecord;
+  isActive: boolean;
   onContinue: () => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
   onDelete: () => void;
 }) {
   const d = record.demo;
   return (
     <div
       className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl"
-      style={{ background: '#1e1e24', border: `1px solid ${ui.inputBorder}` }}
+      style={{
+        background: '#1e1e24',
+        border: `1px solid ${isActive ? 'rgba(74,222,128,0.45)' : ui.inputBorder}`,
+      }}
     >
       <div className="min-w-0">
-        <div className="text-sm font-black truncate" style={{ color: ui.text }}>
-          {d.entriesConfig.tournamentTitle || d.name}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-black truncate" style={{ color: ui.text }}>
+            {d.entriesConfig.tournamentTitle || d.name}
+          </div>
+          {isActive && (
+            <span
+              className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded"
+              style={{
+                background: 'rgba(74,222,128,0.18)',
+                color: '#4ade80',
+                border: '1px solid rgba(74,222,128,0.4)',
+              }}
+            >
+              Active
+            </span>
+          )}
         </div>
         <div className="text-[11px] mt-0.5" style={{ color: ui.muted }}>
           {STATUS_LABEL[d.status]} · {d.entries.length} inscritos · {d.entriesConfig.prizePool}€ ·{' '}
@@ -1233,6 +1592,35 @@ function SessionRow({
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
+        {isActive ? (
+          <button
+            type="button"
+            onClick={onDeactivate}
+            className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide"
+            style={{
+              background: 'rgba(74,222,128,0.12)',
+              color: '#4ade80',
+              border: '1px solid rgba(74,222,128,0.4)',
+            }}
+            title="Desativar overlays"
+          >
+            Desativar
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={onActivate}
+            className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wide"
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              color: ui.muted,
+              border: `1px solid ${ui.inputBorder}`,
+            }}
+            title="Ativar nas overlays OBS"
+          >
+            Activar
+          </button>
+        )}
         <button
           type="button"
           onClick={onDelete}

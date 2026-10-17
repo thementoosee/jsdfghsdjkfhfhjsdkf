@@ -1,13 +1,13 @@
 /**
- * Local session store for Bonus Tournament dashboard flow.
- * Primary persistence: localStorage + BroadcastChannel (multi-window).
- * Production remote tables / Edge remain optional — see probeDrawSync.
+ * Local cache / offline draft for Bonus Tournament dashboard.
+ * Live source of truth: Supabase `bonus_tournaments` (+ entries) when migration applied.
+ * localStorage remains a same-browser cache and DEMO-only sandbox.
  */
 
 import type { BonusTournamentDemo, BonusTournamentEntriesConfig } from './types';
 import { buildDemoEntries, defaultEntriesConfig } from './demo-data';
 
-/** Fixed DEMO roster size for local end-to-end tests (never written to Supabase). */
+/** Fixed DEMO roster size for automated tests / explicit dev fixtures only. */
 export const DEMO_ENTRY_COUNT = 8;
 
 const STORAGE_KEY = 'bt-tournament-sessions-v1';
@@ -91,6 +91,28 @@ export function setActiveTournamentId(id: string | null): void {
   writeRaw(store);
 }
 
+/**
+ * Mark exactly one tournament as ACTIVE for OBS overlays.
+ * Does not mutate tournament data. Pass null to clear ACTIVE.
+ */
+export function activateTournamentSession(id: string | null): {
+  ok: boolean;
+  reason?: 'not_found';
+} {
+  if (id === null) {
+    setActiveTournamentId(null);
+    return { ok: true };
+  }
+  const store = readRaw();
+  if (!store.sessions.some((s) => s.id === id)) {
+    return { ok: false, reason: 'not_found' };
+  }
+  store.activeId = id;
+  writeRaw(store);
+  return { ok: true };
+}
+
+/** Persist session data WITHOUT changing which tournament is ACTIVE. */
 export function upsertTournamentSession(demo: BonusTournamentDemo): TournamentSessionRecord {
   const store = readRaw();
   const now = new Date().toISOString();
@@ -103,16 +125,18 @@ export function upsertTournamentSession(demo: BonusTournamentDemo): TournamentSe
     record = { id: demo.id, createdAt: now, updatedAt: now, demo };
     store.sessions = [record, ...store.sessions];
   }
-  store.activeId = demo.id;
+  // Never auto-activate on create/save — ACTIVE is an explicit admin action.
   writeRaw(store);
   return record;
 }
 
-export function createTournamentSession(args: {
+function buildSessionShell(args: {
   name: string;
   chatCommand: string;
   prizePool: number;
   durationMinutes: number;
+  isDemo: boolean;
+  entries: BonusTournamentDemo['entries'];
 }): TournamentSessionRecord {
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -137,10 +161,9 @@ export function createTournamentSession(args: {
   const demo: BonusTournamentDemo = {
     id,
     name: title,
-    isDemo: true,
+    isDemo: args.isDemo,
     status: 'entries',
-    // Auto DEMO roster — local only; never Twitch / Supabase.
-    entries: buildDemoEntries(DEMO_ENTRY_COUNT),
+    entries: args.entries,
     entriesConfig,
     players: [],
     matches: [],
@@ -149,6 +172,33 @@ export function createTournamentSession(args: {
   };
 
   return upsertTournamentSession(demo);
+}
+
+/** REAL tournament — empty roster; Twitch EventSub fills bonus_tournament_entries. */
+export function createTournamentSession(args: {
+  name: string;
+  chatCommand: string;
+  prizePool: number;
+  durationMinutes: number;
+}): TournamentSessionRecord {
+  return buildSessionShell({ ...args, isDemo: false, entries: [] });
+}
+
+/**
+ * Explicit DEMO sandbox for vitest / local stress only.
+ * Never use as the default create path for live.
+ */
+export function createDemoTournamentSession(args: {
+  name: string;
+  chatCommand: string;
+  prizePool: number;
+  durationMinutes: number;
+}): TournamentSessionRecord {
+  return buildSessionShell({
+    ...args,
+    isDemo: true,
+    entries: buildDemoEntries(DEMO_ENTRY_COUNT),
+  });
 }
 
 /**
@@ -186,20 +236,16 @@ export function saveTournamentDemo(demo: BonusTournamentDemo): void {
 }
 
 /**
- * Delete a single local DEMO tournament session.
- * Never touches Supabase / remote data. Refuses non-demo records.
+ * Delete a local cache session. Remote delete is handled separately via API.
  */
 export function deleteTournamentSession(id: string): {
   deleted: boolean;
   wasActive: boolean;
-  reason?: 'not_found' | 'not_demo';
+  reason?: 'not_found';
 } {
   const store = readRaw();
   const record = store.sessions.find((s) => s.id === id);
   if (!record) return { deleted: false, wasActive: false, reason: 'not_found' };
-  if (!record.demo.isDemo) {
-    return { deleted: false, wasActive: false, reason: 'not_demo' };
-  }
   const wasActive = store.activeId === id;
   store.sessions = store.sessions.filter((s) => s.id !== id);
   if (wasActive) store.activeId = null;

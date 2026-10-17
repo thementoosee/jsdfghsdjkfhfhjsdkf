@@ -58,8 +58,27 @@ function getCallbackUrl() {
   return `${supabaseUrl}/functions/v1/twitch-eventsub`;
 }
 
-function getEventSubSecret() {
-  return Deno.env.get('TWITCH_EVENTSUB_SECRET') || (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').slice(0, 32);
+/**
+ * Prefer dedicated TWITCH_EVENTSUB_SECRET (≥16 chars).
+ * Temporary production compatibility: existing EventSub subscriptions were signed
+ * with service_role[:32]. Keep that legacy path until TWITCH_EVENTSUB_SECRET is set
+ * and subscriptions are recreated via action=setup (otherwise live chat breaks).
+ */
+function getEventSubSecret(): string | null {
+  const dedicated = (Deno.env.get('TWITCH_EVENTSUB_SECRET') ?? '').trim();
+  if (dedicated.length >= 16) return dedicated;
+  const legacy = (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '').slice(0, 32);
+  return legacy.length >= 16 ? legacy : null;
+}
+
+const EVENTSUB_MAX_SKEW_MS = 10 * 60 * 1000;
+/** Best-effort replay cache (per isolate). */
+const seenEventSubIds = new Map<string, number>();
+
+function pruneSeenEventSubIds(now: number) {
+  for (const [id, ts] of seenEventSubIds) {
+    if (now - ts > EVENTSUB_MAX_SKEW_MS) seenEventSubIds.delete(id);
+  }
 }
 
 async function hmacSha256Hex(secret: string, message: string) {
@@ -76,18 +95,42 @@ async function hmacSha256Hex(secret: string, message: string) {
     .join('');
 }
 
-async function isValidSignature(req: Request, rawBody: string) {
+async function isValidSignature(req: Request, rawBody: string): Promise<{
+  ok: boolean;
+  reason?: string;
+}> {
+  const secret = getEventSubSecret();
+  if (!secret) {
+    return { ok: false, reason: 'eventsub_secret_not_configured' };
+  }
+
   const messageId = req.headers.get('Twitch-Eventsub-Message-Id') ?? '';
   const timestamp = req.headers.get('Twitch-Eventsub-Message-Timestamp') ?? '';
   const signature = req.headers.get('Twitch-Eventsub-Message-Signature') ?? '';
 
   if (!messageId || !timestamp || !signature) {
-    return false;
+    return { ok: false, reason: 'missing_signature_headers' };
+  }
+
+  const tsMs = Date.parse(timestamp);
+  const now = Date.now();
+  if (!Number.isFinite(tsMs) || Math.abs(now - tsMs) > EVENTSUB_MAX_SKEW_MS) {
+    return { ok: false, reason: 'timestamp_skew' };
+  }
+
+  pruneSeenEventSubIds(now);
+  if (seenEventSubIds.has(messageId)) {
+    return { ok: false, reason: 'replay' };
   }
 
   // Twitch EventSub: HMAC-SHA256(secret, message_id + timestamp + body)
-  const expected = `sha256=${await hmacSha256Hex(getEventSubSecret(), messageId + timestamp + rawBody)}`;
-  return signature === expected;
+  const expected = `sha256=${await hmacSha256Hex(secret, messageId + timestamp + rawBody)}`;
+  if (signature !== expected) {
+    return { ok: false, reason: 'bad_signature' };
+  }
+
+  seenEventSubIds.set(messageId, now);
+  return { ok: true };
 }
 
 async function getActiveTwitchConfig(supabase: ReturnType<typeof getAdminClient>) {
@@ -220,6 +263,11 @@ async function createSubscription(
   version: string,
   condition: JsonRecord
 ) {
+  const eventSubSecret = getEventSubSecret();
+  if (!eventSubSecret) {
+    throw new Error('TWITCH_EVENTSUB_SECRET is required to create EventSub subscriptions');
+  }
+
   const response = await fetch('https://api.twitch.tv/helix/eventsub/subscriptions', {
     method: 'POST',
     headers: {
@@ -234,7 +282,7 @@ async function createSubscription(
       transport: {
         method: 'webhook',
         callback: getCallbackUrl(),
-        secret: getEventSubSecret(),
+        secret: eventSubSecret,
       },
     }),
   });
@@ -488,9 +536,14 @@ async function insertChatMessageFromNotification(
     username: row.username,
   });
 
-  // Giveaway keyword / command entry (!command)
+  // Keyword / command entry (!command) — Giveaway + Bonus Tournament ACTIVE
   const commandToken = text.trim().split(/\s+/)[0]?.toLowerCase() || '';
   if (commandToken.startsWith('!')) {
+    const chatterId = String(event.chatter_user_id ?? row.username);
+    const displayName = row.display_name || row.username;
+    const defaultAvatar =
+      'https://static-cdn.jtvnw.net/user-default-pictures-uv/13e5fa74-defa-11e9-809c-784f43822e80-profile_image-70x70.png';
+
     try {
       const { data: giveaways, error: giveawayError } = await supabase
         .from('giveaways')
@@ -505,15 +558,13 @@ async function insertChatMessageFromNotification(
           (g) => String(g.command || '').trim().toLowerCase() === commandToken
         );
         if (match) {
-          const chatterId = String(event.chatter_user_id ?? row.username);
           const { error: participantError } = await supabase
             .from('giveaway_participants')
             .insert({
               giveaway_id: match.id,
-              username: row.display_name || row.username,
+              username: displayName,
               user_id: chatterId,
-              profile_image_url:
-                'https://static-cdn.jtvnw.net/user-default-pictures-uv/13e5fa74-defa-11e9-809c-784f43822e80-profile_image-70x70.png',
+              profile_image_url: defaultAvatar,
             });
 
           if (participantError) {
@@ -538,6 +589,61 @@ async function insertChatMessageFromNotification(
       console.error(
         '[twitch-eventsub] giveaway processing error',
         giveawayErr instanceof Error ? giveawayErr.message : String(giveawayErr)
+      );
+    }
+
+    // Bonus Tournament — only the ACTIVE tournament with entries_open accepts chat joins
+    try {
+      const { data: activeBt, error: btErr } = await supabase
+        .from('bonus_tournaments')
+        .select('id, name, chat_command, entries_open, status')
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (btErr) {
+        // Table may not exist until live migration is applied — ignore quietly
+        if (
+          btErr.code !== '42P01' &&
+          !(btErr.message ?? '').toLowerCase().includes('does not exist')
+        ) {
+          console.error('[twitch-eventsub] bonus tournament lookup failed', btErr.message);
+        }
+      } else if (
+        activeBt &&
+        activeBt.entries_open === true &&
+        (activeBt.status === 'entries' || activeBt.status === 'preparation') &&
+        String(activeBt.chat_command || '')
+          .trim()
+          .toLowerCase() === commandToken
+      ) {
+        const { error: entryError } = await supabase.from('bonus_tournament_entries').insert({
+          tournament_id: String(activeBt.id),
+          twitch_user_id: chatterId,
+          display_name: displayName,
+          avatar_url: defaultAvatar,
+        });
+
+        if (entryError) {
+          if (entryError.code === '23505') {
+            console.log('[twitch-eventsub] bonus tournament already entered', {
+              tournament: activeBt.name,
+              username: row.username,
+            });
+          } else {
+            console.error('[twitch-eventsub] bonus tournament entry failed', entryError.message);
+          }
+        } else {
+          console.log('[twitch-eventsub] bonus tournament entry ok', {
+            tournament: activeBt.name,
+            username: row.username,
+            command: commandToken,
+          });
+        }
+      }
+    } catch (btCatch) {
+      console.error(
+        '[twitch-eventsub] bonus tournament processing error',
+        btCatch instanceof Error ? btCatch.message : String(btCatch)
       );
     }
   }
@@ -779,11 +885,15 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'Empty body' }, 400);
     }
 
-    const shouldValidate = Boolean(req.headers.get('Twitch-Eventsub-Message-Id'));
-    if (shouldValidate) {
+    // All EventSub notification / verification / revocation POSTs must carry valid HMAC.
+    const hasEventSubHeaders = Boolean(req.headers.get('Twitch-Eventsub-Message-Id'));
+    if (!hasEventSubHeaders && messageType) {
+      return jsonResponse({ error: 'missing_eventsub_headers' }, 403);
+    }
+    if (hasEventSubHeaders || messageType === 'notification' || messageType === 'webhook_callback_verification' || messageType === 'revocation') {
       const valid = await isValidSignature(req, rawBody);
-      if (!valid) {
-        return jsonResponse({ error: 'Invalid Twitch signature' }, 403);
+      if (!valid.ok) {
+        return jsonResponse({ error: 'Invalid Twitch signature', reason: valid.reason }, 403);
       }
     }
 

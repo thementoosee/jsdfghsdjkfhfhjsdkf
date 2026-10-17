@@ -67,6 +67,8 @@ export type DrawRow = {
   result: DrawResult | null;
   entries_closed: boolean;
   unique_entry_count: number;
+  /** false for live Twitch tournaments; true only for explicit DEMO fixtures. */
+  is_demo?: boolean;
   updated_at: string;
 };
 
@@ -347,6 +349,7 @@ export async function applyCommand(
       result: null,
       entries_closed: false,
       unique_entry_count: 0,
+      is_demo: false,
       updated_at: new Date().toISOString(),
     };
   }
@@ -535,6 +538,6 @@ export function rowToCasPayload(row: DrawRow): Record<string, unknown> {
     entries_closed: row.entries_closed,
     unique_entry_count: row.unique_entry_count,
     updated_at: row.updated_at,
-    is_demo: true,
+    is_demo: row.is_demo === true,
   };
 }

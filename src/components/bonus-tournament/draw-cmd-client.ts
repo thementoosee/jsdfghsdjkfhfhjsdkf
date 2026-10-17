@@ -1,7 +1,12 @@
 /**
  * Browser → Edge Function command path (no direct table writes, no client entry roster).
+ * Auth: operator secret header (preferred) and/or existing session JWT.
  */
 import { supabase } from '../../lib/supabase';
+import {
+  BT_OPERATOR_SECRET_HEADER,
+  getOperatorSecret,
+} from './bt-operator-session';
 import { rowToDrawState } from './draw-sync';
 import type { DrawAdminCommand, DrawPresentationState } from './draw-types';
 
@@ -9,8 +14,20 @@ export type InvokeDrawCmdResult =
   | { ok: true; state: DrawPresentationState }
   | { ok: false; status: number; error: string; detail?: string; remote?: DrawPresentationState };
 
-/** Strip entries — server loads bonus_tournament_entries. */
-function toEdgeCommand(command: DrawAdminCommand): { type: string } {
+/**
+ * Strip client entry rosters (server loads bonus_tournament_entries).
+ * Keep slot-confirm fields for CONFIRM_SLOT / CORRECT_SLOT.
+ */
+function toEdgeCommand(command: DrawAdminCommand): Record<string, unknown> {
+  if (command.type === 'CONFIRM_SLOT' || command.type === 'CORRECT_SLOT') {
+    return {
+      type: command.type,
+      twitchUserId: command.twitchUserId,
+      slotId: command.slotId,
+      slotName: command.slotName,
+      slotImage: command.slotImage,
+    };
+  }
   return { type: command.type };
 }
 
@@ -19,10 +36,14 @@ export async function invokeDrawCommand(args: {
   expectedVersion: number;
   command: DrawAdminCommand;
 }): Promise<InvokeDrawCmdResult> {
+  const secret = getOperatorSecret();
   const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session) {
-    return { ok: false, status: 401, error: 'not_signed_in' };
+  if (!secret && !sessionData.session) {
+    return { ok: false, status: 401, error: 'operator_secret_required' };
   }
+
+  const headers: Record<string, string> = {};
+  if (secret) headers[BT_OPERATOR_SECRET_HEADER] = secret;
 
   const { data, error } = await supabase.functions.invoke('bonus-tournament-draw-cmd', {
     body: {
@@ -30,6 +51,7 @@ export async function invokeDrawCommand(args: {
       expectedVersion: args.expectedVersion,
       command: toEdgeCommand(args.command),
     },
+    headers,
   });
 
   if (error) {

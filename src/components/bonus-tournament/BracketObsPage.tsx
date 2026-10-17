@@ -5,29 +5,40 @@ import {
   BRACKET_OVERLAY_W,
   buildBracketViewFromDemo,
   buildDemoBracketView,
+  buildEmptyBracketView,
   parseBracketDemoStage,
   type BracketView,
 } from './bracket-structure';
 import {
-  getActiveTournamentSession,
-  subscribeTournamentSessions,
-} from './tournament-session-store';
-import { readLiveMirror, subscribeLiveMirror } from './tournament-live-mirror';
+  subscribeRemoteLiveMirror,
+  type TournamentRemoteMirrorPayload,
+} from './tournament-remote-broadcast';
+import { subscribeActiveRemoteTournament } from './tournament-remote-api';
+import type { BonusTournamentDemo } from './types';
 
 /**
- * Resolve bracket view: active live session ALWAYS wins over ?stage= fixtures.
- * Fixtures only when there is no active tournament session.
+ * Resolve bracket view: ACTIVE from Supabase ALWAYS wins over ?stage= fixtures.
+ * No localStorage. Fixtures only with ?stage= AND no ACTIVE.
  */
-export function resolveBracketObsView(stageParam: string | null | undefined): {
+export function resolveBracketObsView(
+  stageParam: string | null | undefined,
+  remote?: TournamentRemoteMirrorPayload | null,
+  dbActive?: BonusTournamentDemo | null,
+): {
   view: BracketView;
   fromLiveSession: boolean;
 } {
-  const active = getActiveTournamentSession();
-  const mirror = readLiveMirror();
-  // Prefer active session store; fall back to live mirror (same-origin OBS tabs).
-  const demo =
-    active?.demo ??
-    (mirror.demo && (!mirror.sessionId || mirror.demo.id === mirror.sessionId) ? mirror.demo : null);
+  let demo: BonusTournamentDemo | null = null;
+
+  if (dbActive) {
+    demo = dbActive;
+  } else if (
+    remote?.sessionId &&
+    remote.demo &&
+    remote.demo.id === remote.sessionId
+  ) {
+    demo = remote.demo;
+  }
 
   if (demo) {
     return {
@@ -36,15 +47,21 @@ export function resolveBracketObsView(stageParam: string | null | undefined): {
     };
   }
 
+  if (stageParam) {
+    return {
+      view: buildDemoBracketView(parseBracketDemoStage(stageParam)),
+      fromLiveSession: false,
+    };
+  }
+
   return {
-    view: buildDemoBracketView(parseBracketDemoStage(stageParam)),
+    view: buildEmptyBracketView(),
     fromLiveSession: false,
   };
 }
 
 /**
  * Read-only OBS Browser Source — center casino cutout 1288×720.
- * Live session from Dashboard takes priority; ?stage= is preview-only fallback.
  */
 export function BracketObsPage() {
   const stageParam = useMemo(() => {
@@ -52,18 +69,23 @@ export function BracketObsPage() {
     return new URLSearchParams(window.location.search).get('stage');
   }, []);
 
-  const [pack, setPack] = useState(() => resolveBracketObsView(stageParam));
+  const [remote, setRemote] = useState<TournamentRemoteMirrorPayload | null>(null);
+  const [dbActive, setDbActive] = useState<BonusTournamentDemo | null>(null);
+  const [pack, setPack] = useState(() => resolveBracketObsView(stageParam, null, null));
 
   useEffect(() => {
-    const sync = () => setPack(resolveBracketObsView(stageParam));
-    sync();
-    const unsubSession = subscribeTournamentSessions(sync);
-    const unsubMirror = subscribeLiveMirror(sync);
-    return () => {
-      unsubSession();
-      unsubMirror();
-    };
-  }, [stageParam]);
+    setPack(resolveBracketObsView(stageParam, remote, dbActive));
+  }, [stageParam, remote, dbActive]);
+
+  useEffect(() => {
+    return subscribeRemoteLiveMirror((payload) => {
+      setRemote(payload.sessionId ? payload : null);
+    });
+  }, []);
+
+  useEffect(() => {
+    return subscribeActiveRemoteTournament((t) => setDbActive(t));
+  }, []);
 
   return (
     <div

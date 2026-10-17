@@ -31,7 +31,7 @@ export interface BonusTournamentPlayer {
   id: string;
   twitchUserId: string;
   displayName: string;
-  /** Demo avatar URL — not live Twitch API in Phase 1 */
+  /** Twitch (or demo) avatar URL */
   avatarUrl: string;
   /** Slot is fixed for the whole tournament (not per round). */
   slotName: string;
@@ -40,7 +40,7 @@ export interface BonusTournamentPlayer {
 
 /**
  * Enrollment record (pre-draw). Unique identity = twitchUserId.
- * Prepared for future Twitch !torneio — no live API in Phase 1.
+ * Enrolled via Twitch chat command (EventSub) into bonus_tournament_entries.
  */
 export interface BonusTournamentEntry {
   id: string;
@@ -51,12 +51,12 @@ export interface BonusTournamentEntry {
   enrolledAt: string;
 }
 
-/** DEMO / future panel settings for the entries overlay. */
+/** Panel / overlay settings for the entries phase. */
 export interface BonusTournamentEntriesConfig {
   /** Custom title shown under BONUS TOURNAMENT during entries only */
   tournamentTitle: string;
   prizePool: number;
-  /** Chat command shown on the entries overlay (Twitch integration later). */
+  /** Twitch chat command (matched by twitch-eventsub when tournament is ACTIVE). */
   chatCommand: string;
   /** Total registration window length (seconds) */
   durationSeconds: number;
@@ -86,15 +86,19 @@ export interface BonusTournamentMatch {
   buyPriceB: number | null;
   buysA: [BonusTournamentBuy, BonusTournamentBuy, BonusTournamentBuy];
   buysB: [BonusTournamentBuy, BonusTournamentBuy, BonusTournamentBuy];
-  /** Set only after admin confirm (demo). Auto-suggest may differ. */
+  /** Set only after admin confirm. Auto-suggest may differ. */
   confirmedWinnerId: string | null;
   status: 'pending' | 'live' | 'done';
 }
 
+/**
+ * Live tournament state (Dashboard + overlays).
+ * `isDemo` is true only for explicit local/dev fixtures — never for live Twitch runs.
+ */
 export interface BonusTournamentDemo {
   id: string;
   name: string;
-  isDemo: true;
+  isDemo: boolean;
   status: BonusTournamentStatus;
   /**
    * Unique enrolled participants (may be >8).
@@ -109,6 +113,9 @@ export interface BonusTournamentDemo {
   selectedMatchId: string | null;
   overlayView: 'overview' | 'duel' | 'entries' | 'draw';
 }
+
+/** @deprecated Alias — prefer BonusTournamentDemo (live + optional demo). */
+export type BonusTournament = BonusTournamentDemo;
 
 export const STATUS_LABEL: Record<BonusTournamentStatus, string> = {
   preparation: 'Preparação',

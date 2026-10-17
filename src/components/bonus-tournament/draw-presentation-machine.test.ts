@@ -10,7 +10,12 @@ import {
   maybeAutoAdvance,
   mergeRemoteIfNewer,
 } from './draw-presentation-machine';
-import { countConfirmedSlots, createIdleDrawState, DRAW_SLOT_COUNT } from './draw-types';
+import {
+  countConfirmedSlots,
+  createIdleDrawState,
+  DRAW_MATCH_COUNT,
+  DRAW_SLOT_COUNT,
+} from './draw-types';
 
 const idle = createIdleDrawState;
 const picks = buildDemoSlotCatalogPicks(8);
@@ -156,6 +161,13 @@ describe('draw-presentation-machine', () => {
     expect(state.revealedMatches).toBe(1);
     expect(state.result!.matchups[0]!.playerA.slot?.slotId).toBeTruthy();
     expect(state.result!.matchups[0]!.playerB.slot?.slotId).toBeTruthy();
+
+    // Advance through all 4 duel reveals → awaiting_advance (QF not auto-started)
+    while (state.phase === 'reveal_match') {
+      state = advancePresentation(state);
+    }
+    expect(state.phase).toBe('awaiting_advance');
+    expect(state.revealedMatches).toBe(DRAW_MATCH_COUNT);
   });
 
   it('pause blocks auto-advance; resume continues without skipping', async () => {
