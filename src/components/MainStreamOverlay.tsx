@@ -1,12 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import {
+  MAIN_OVERLAY_CENTER_HEIGHT_PX,
   MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
   getMainOverlayBackgroundMaskUrl,
   getMainOverlayCasinoCutout,
   getMainOverlaySecondSlotCutout,
 } from '../lib/overlay-layout';
 import { parseShowSecondSlot } from '../lib/overlay-modules';
+import {
+  MAIN_OVERLAY_FLIP_DURATION_MS,
+  MAIN_OVERLAY_FLIP_EASING,
+  planMainOverlayFlip,
+} from '../lib/main-overlay-flip';
 import { pickMainOverlay, type MainOverlayKind } from '../lib/main-overlay-priority';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
@@ -20,6 +26,13 @@ type OverlayType = MainOverlayKind;
 interface OverlayState {
   type: OverlayType;
   id: string | null;
+}
+
+interface FlipTransition {
+  from: OverlayState;
+  to: OverlayState;
+  /** Remount key so a queued flip always restarts the CSS animation cleanly. */
+  key: number;
 }
 
 async function resolveMainOverlayTarget(): Promise<OverlayState> {
@@ -101,29 +114,22 @@ export function MainStreamOverlay() {
     type: null,
     id: null,
   });
-  const [leavingOverlay, setLeavingOverlay] = useState<OverlayState | null>(null);
-  const [enteringOverlay, setEnteringOverlay] = useState<OverlayState | null>(null);
-  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const enterStartTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const cleanupTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Always-current overlay — transitionTo is closed over by a mount-only subscription. */
+  const [flip, setFlip] = useState<FlipTransition | null>(null);
+  const flipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flipKeyRef = useRef(0);
+  const flippingRef = useRef(false);
+  const pendingTargetRef = useRef<OverlayState | null>(null);
+  /** Desired / in-flight target — Realtime dedupe reads this, not only settled UI state. */
   const overlayStateRef = useRef<OverlayState>({ type: null, id: null });
-  const EXIT_DURATION_MS = 450;
-  const SWITCH_DELAY_MS = 2000;
-  const ENTER_DURATION_MS = 450;
-
-  useEffect(() => {
-    overlayStateRef.current = overlayState;
-  }, [overlayState]);
+  /** Settled face shown when not flipping (source for the next front face). */
+  const settledStateRef = useRef<OverlayState>({ type: null, id: null });
 
   useEffect(() => {
     initializeOverlays();
     const cleanup = subscribeToChanges();
 
     return () => {
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-      if (enterStartTimerRef.current) clearTimeout(enterStartTimerRef.current);
-      if (cleanupTimerRef.current) clearTimeout(cleanupTimerRef.current);
+      if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
       cleanup();
     };
   }, []);
@@ -163,6 +169,7 @@ export function MainStreamOverlay() {
     const initial = await ensureChillFallback(await resolveMainOverlayTarget());
     console.log('[Main Init] Overlay target:', initial);
     overlayStateRef.current = initial;
+    settledStateRef.current = initial;
     setOverlayState(initial);
   };
 
@@ -240,52 +247,50 @@ export function MainStreamOverlay() {
     };
   };
 
+  const finishFlipTo = (landed: OverlayState) => {
+    flippingRef.current = false;
+    settledStateRef.current = landed;
+    overlayStateRef.current = landed;
+    setOverlayState(landed);
+    setFlip(null);
+
+    const pending = pendingTargetRef.current;
+    pendingTargetRef.current = null;
+    if (pending && (pending.type !== landed.type || pending.id !== landed.id)) {
+      startFlip(landed, pending);
+    }
+  };
+
+  const startFlip = (from: OverlayState, to: OverlayState) => {
+    flippingRef.current = true;
+    overlayStateRef.current = to;
+    flipKeyRef.current += 1;
+    setFlip({ from, to, key: flipKeyRef.current });
+
+    if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
+    flipTimerRef.current = setTimeout(() => {
+      finishFlipTo(to);
+    }, MAIN_OVERLAY_FLIP_DURATION_MS);
+  };
+
   const transitionTo = (type: OverlayType, id: string | null) => {
     const nextOverlay: OverlayState = { type, id };
-    const current = overlayStateRef.current;
+    const plan = planMainOverlayFlip({
+      current: overlayStateRef.current,
+      next: nextOverlay,
+      flipping: flippingRef.current,
+      pending: pendingTargetRef.current,
+    });
 
-    if (current.type === nextOverlay.type && current.id === nextOverlay.id) {
+    if (plan === 'noop') return;
+
+    if (plan === 'queue') {
+      pendingTargetRef.current = nextOverlay;
+      overlayStateRef.current = nextOverlay;
       return;
     }
 
-    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-    if (enterStartTimerRef.current) clearTimeout(enterStartTimerRef.current);
-    if (cleanupTimerRef.current) clearTimeout(cleanupTimerRef.current);
-
-    const currentOverlay = current.type ? current : null;
-
-    // Lock target immediately so debounced realtime events don't re-trigger enter/exit.
-    overlayStateRef.current = nextOverlay;
-
-    if (!currentOverlay && nextOverlay.type) {
-      setEnteringOverlay(nextOverlay);
-      cleanupTimerRef.current = setTimeout(() => {
-        setOverlayState(nextOverlay);
-        setEnteringOverlay(null);
-      }, ENTER_DURATION_MS);
-      return;
-    }
-
-    setLeavingOverlay(currentOverlay);
-    setEnteringOverlay(null);
-
-    exitTimerRef.current = setTimeout(() => {
-      setLeavingOverlay(null);
-      setOverlayState({ type: null, id: null });
-    }, EXIT_DURATION_MS);
-
-    if (!nextOverlay.type) {
-      return;
-    }
-
-    enterStartTimerRef.current = setTimeout(() => {
-      setEnteringOverlay(nextOverlay);
-    }, EXIT_DURATION_MS + SWITCH_DELAY_MS);
-
-    cleanupTimerRef.current = setTimeout(() => {
-      setOverlayState(nextOverlay);
-      setEnteringOverlay(null);
-    }, EXIT_DURATION_MS + SWITCH_DELAY_MS + ENTER_DURATION_MS);
+    startFlip(settledStateRef.current, nextOverlay);
   };
 
   const renderLeftOverlay = (state: OverlayState | null) => {
@@ -335,40 +340,50 @@ export function MainStreamOverlay() {
       style={{ margin: 0, padding: 0, background: 'transparent' }}
     >
       <style>{`
-        @keyframes slideInFromRight {
-          from {
-            transform: translateX(100%);
-          }
-          to {
-            transform: translateX(0);
-          }
+        @keyframes mainOverlayFlipY {
+          from { transform: rotateY(0deg); }
+          to { transform: rotateY(-180deg); }
         }
 
-        @keyframes slideOutToRight {
-          from {
-            transform: translateX(0);
-          }
-          to {
-            transform: translateX(100%);
-          }
+        .main-overlay-flip-scene {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          overflow: hidden;
+          isolation: isolate;
+          contain: paint;
+          clip-path: inset(0);
+          perspective: ${MAIN_OVERLAY_SIDEBAR_WIDTH_PX * 4}px;
+          perspective-origin: 50% 50%;
         }
 
-        .slide-in-left-overlay {
-          animation: slideInFromRight 0.45s ease-out forwards;
+        .main-overlay-flip-card {
+          position: relative;
+          width: 100%;
+          height: 100%;
+          transform-style: preserve-3d;
+          animation: mainOverlayFlipY ${MAIN_OVERLAY_FLIP_DURATION_MS}ms ${MAIN_OVERLAY_FLIP_EASING} forwards;
         }
 
-        .slide-out-overlay {
-          animation: slideOutToRight 0.45s ease-in forwards;
-        }
-
-        .overlay-layer {
+        .main-overlay-flip-face {
           position: absolute;
           inset: 0;
           overflow: hidden;
+          backface-visibility: hidden;
+          -webkit-backface-visibility: hidden;
+          transform-style: preserve-3d;
         }
 
-        .overlay-layer.slide-in-left-overlay .no-overlay-effects *,
-        .overlay-layer.slide-out-overlay .no-overlay-effects * {
+        .main-overlay-flip-face-front {
+          transform: rotateY(0deg);
+        }
+
+        .main-overlay-flip-face-back {
+          transform: rotateY(180deg);
+        }
+
+        .main-overlay-flip-face .no-overlay-effects *,
+        .main-overlay-flip-card .no-overlay-effects * {
           animation: none !important;
           transition: none !important;
         }
@@ -421,33 +436,37 @@ export function MainStreamOverlay() {
           style={{ background: 'transparent' }}
         >
           <div className="flex gap-[8px] h-[720px] w-full" style={{ background: 'transparent' }}>
+            {/*
+              Fixed sidebar frame only — perspective/transform live here.
+              Never applied to Slot View / casino / root chrome.
+            */}
             <div
-              className="flex-shrink-0 h-full relative overflow-hidden"
+              className="flex-shrink-0 relative overflow-hidden"
               style={{
                 width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
+                height: MAIN_OVERLAY_CENTER_HEIGHT_PX,
                 isolation: 'isolate',
                 contain: 'paint',
                 clipPath: 'inset(0)',
               }}
             >
-              {leavingOverlay && (
-                <div className="overlay-layer slide-out-overlay h-full">
-                  <div className="h-full no-overlay-effects">
-                    {renderLeftOverlay(leavingOverlay)}
+              {flip ? (
+                <div className="main-overlay-flip-scene h-full w-full">
+                  <div className="main-overlay-flip-card" key={flip.key}>
+                    <div className="main-overlay-flip-face main-overlay-flip-face-front">
+                      <div className="h-full w-full no-overlay-effects">
+                        {renderLeftOverlay(flip.from)}
+                      </div>
+                    </div>
+                    <div className="main-overlay-flip-face main-overlay-flip-face-back">
+                      <div className="h-full w-full no-overlay-effects">
+                        {renderLeftOverlay(flip.to)}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
-
-              {enteringOverlay && (
-                <div className="overlay-layer slide-in-left-overlay h-full">
-                  <div className="h-full no-overlay-effects">
-                    {renderLeftOverlay(enteringOverlay)}
-                  </div>
-                </div>
-              )}
-
-              {!leavingOverlay && !enteringOverlay && (
-                <div className="h-full overflow-hidden" style={{ contain: 'paint' }}>
+              ) : (
+                <div className="h-full w-full overflow-hidden" style={{ contain: 'paint' }}>
                   {renderLeftOverlay(overlayState)}
                 </div>
               )}
