@@ -2,11 +2,13 @@
  * Same-origin Dashboard proxy → bonus-tournament-draw-cmd Edge.
  * Attaches BT_OPERATOR_SECRET server-side so the browser never holds it.
  */
+export const config = { runtime: 'edge' };
+
 const OPERATOR_HEADER = 'X-BT-Operator-Secret';
 
 function allowedOrigin(req) {
-  const origin = String(req.headers.origin || '');
-  const host = String(req.headers.host || '');
+  const origin = req.headers.get('origin') || '';
+  const host = req.headers.get('host') || '';
   if (!host) return false;
   if (origin) {
     try {
@@ -15,22 +17,33 @@ function allowedOrigin(req) {
       return false;
     }
   }
-  const site = String(req.headers['sec-fetch-site'] || '');
+  const site = req.headers.get('sec-fetch-site') || '';
   if (site && site !== 'same-origin' && site !== 'none') return false;
   return true;
 }
 
-module.exports = async function handler(req, res) {
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+export default async function handler(req) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    return res.status(204).end();
+    return new Response(null, {
+      status: 204,
+      headers: {
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      },
+    });
   }
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'method_not_allowed' });
+    return json({ error: 'method_not_allowed' }, 405);
   }
   if (!allowedOrigin(req)) {
-    return res.status(403).json({ error: 'forbidden_origin' });
+    return json({ error: 'forbidden_origin' }, 403);
   }
 
   const secret = String(process.env.BT_OPERATOR_SECRET || '').trim();
@@ -42,13 +55,20 @@ module.exports = async function handler(req, res) {
   );
 
   if (!secret || secret.length < 24) {
-    return res.status(503).json({ error: 'operator_secret_not_configured' });
+    return json({ error: 'operator_secret_not_configured' }, 503);
   }
   if (!supabaseUrl || !anonKey) {
-    return res.status(503).json({ error: 'supabase_not_configured' });
+    return json({ error: 'supabase_not_configured' }, 503);
   }
 
-  const authHeader = String(req.headers.authorization || '');
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'invalid_json' }, 400);
+  }
+
+  const authHeader = req.headers.get('authorization') || '';
   const edgeRes = await fetch(`${supabaseUrl}/functions/v1/bonus-tournament-draw-cmd`, {
     method: 'POST',
     headers: {
@@ -57,11 +77,12 @@ module.exports = async function handler(req, res) {
       apikey: anonKey,
       [OPERATOR_HEADER]: secret,
     },
-    body: JSON.stringify(req.body || {}),
+    body: JSON.stringify(body || {}),
   });
 
   const text = await edgeRes.text();
-  res.status(edgeRes.status);
-  res.setHeader('Content-Type', 'application/json');
-  return res.send(text);
-};
+  return new Response(text, {
+    status: edgeRes.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
