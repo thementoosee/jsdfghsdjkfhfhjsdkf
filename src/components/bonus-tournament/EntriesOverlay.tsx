@@ -9,7 +9,7 @@ import {
 import { Clock3, Trophy, Users } from 'lucide-react';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { AutoFitNumber } from './AutoFitNumber';
-import { FLOAT_RING, formatEntriesTimer, hashEntriesSeed } from './entries-carousel';
+import { FLOAT_RING, entriesRosterIdentity, formatEntriesTimer } from './entries-carousel';
 import {
   allowsVisualRepeats,
   bootstrapAgents,
@@ -77,8 +77,9 @@ export function EntriesOverlay({ demo }: EntriesOverlayProps) {
   });
   const statusOpen = statusDot === ENTRIES_DOT_GREEN;
 
-  // Stable identity — timer ticks must not remount the field
-  const fieldKey = useMemo(() => hashEntriesSeed(entries), [entries]);
+  // Stable identity — timer ticks / poll refreshes must not remount the field
+  const rosterIdentity = useMemo(() => entriesRosterIdentity(entries), [entries]);
+  const fieldKey = rosterIdentity;
 
   return (
     <div className="h-full flex flex-col min-h-0 overflow-hidden">
@@ -254,22 +255,61 @@ function CirculationField({ entries }: { entries: BonusTournamentEntry[] }) {
     return () => ro.disconnect();
   }, []);
 
-  // Bootstrap / rebuild when entries set or field size changes meaningfully
+  const rosterIdentity = useMemo(() => entriesRosterIdentity(entries), [entries]);
+  const entriesRef = useRef(entries);
+  entriesRef.current = entries;
+
+  // Soft-patch display names / avatars without restarting motion (same roster ids).
+  useEffect(() => {
+    const byId = new Map(entries.map((e) => [e.twitchUserId, e]));
+    let patched = false;
+    agentsRef.current = agentsRef.current.map((a) => {
+      const next = byId.get(a.entry.twitchUserId);
+      if (!next || next === a.entry) return a;
+      if (
+        next.displayName === a.entry.displayName &&
+        next.avatarUrl === a.entry.avatarUrl &&
+        next.id === a.entry.id
+      ) {
+        return a;
+      }
+      patched = true;
+      return { ...a, entry: next };
+    });
+    if (queueRef.current) {
+      const byTwitch = new Map(entries.map((e) => [e.twitchUserId, e]));
+      queueRef.current = {
+        ...queueRef.current,
+        order: queueRef.current.order.map((e) => byTwitch.get(e.twitchUserId) ?? e),
+      };
+    }
+    if (patched) {
+      setRoster((prev) =>
+        prev.map((slot) => {
+          const next = byId.get(slot.entry.twitchUserId);
+          return next ? { ...slot, entry: next } : slot;
+        }),
+      );
+    }
+  }, [entries]);
+
+  // Hard bootstrap only when roster membership or field size changes — NOT on poll refreshes.
   useEffect(() => {
     if (size.w < 80 || size.h < 80) return;
+    const liveEntries = entriesRef.current;
     if (reduceMotion) {
-      const { agents } = bootstrapAgents(entries, size.w, size.h);
+      const { agents } = bootstrapAgents(liveEntries, size.w, size.h);
       agentsRef.current = agents.map((a) => ({ ...a, vx: 0, vy: 0 }));
       queueRef.current = null;
       setRoster(agents.map((a) => ({ slotId: a.slotId, entry: a.entry, w: a.w, depth: a.depth })));
       return;
     }
 
-    const { agents, queue } = bootstrapAgents(entries, size.w, size.h);
+    const { agents, queue } = bootstrapAgents(liveEntries, size.w, size.h);
     agentsRef.current = agents;
     queueRef.current = queue;
     setRoster(agents.map((a) => ({ slotId: a.slotId, entry: a.entry, w: a.w, depth: a.depth })));
-  }, [entries, size.w, size.h, reduceMotion]);
+  }, [rosterIdentity, size.w, size.h, reduceMotion]);
 
   useEffect(() => {
     if (reduceMotion) {
@@ -358,7 +398,8 @@ function CirculationField({ entries }: { entries: BonusTournamentEntry[] }) {
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [reduceMotion, uniqueCount, size.w, size.h, entries]);
+    // uniqueCount tracks membership size; rosterIdentity covers id set. Never depend on `entries` ref.
+  }, [reduceMotion, uniqueCount, rosterIdentity, size.w, size.h]);
 
   return (
     <div ref={rootRef} className="relative h-full w-full overflow-hidden">

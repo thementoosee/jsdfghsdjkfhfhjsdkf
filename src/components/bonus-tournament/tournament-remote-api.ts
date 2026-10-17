@@ -342,16 +342,50 @@ export async function pingOperatorAdmin(): Promise<{ ok: boolean; error?: string
   return res.ok ? { ok: true } : { ok: false, error: res.error };
 }
 
+/** Fingerprint of overlay-relevant ACTIVE state — skip noop poll/Realtime echoes. */
+export function activeTournamentFingerprint(
+  tournament: BonusTournamentDemo | null,
+  stateVersion?: number | null,
+): string {
+  if (!tournament) return 'null';
+  const entryIds = tournament.entries
+    .map((e) => `${e.twitchUserId}:${e.displayName}:${e.avatarUrl}`)
+    .sort()
+    .join(',');
+  const cfg = tournament.entriesConfig;
+  return [
+    tournament.id,
+    stateVersion ?? '',
+    tournament.status,
+    tournament.overlayView,
+    tournament.selectedMatchId ?? '',
+    cfg.entriesOpen ? '1' : '0',
+    cfg.timerPaused ? '1' : '0',
+    cfg.timerStartedAt ?? '',
+    cfg.durationSeconds,
+    cfg.prizePool,
+    cfg.chatCommand,
+    cfg.tournamentTitle,
+    entryIds,
+    JSON.stringify(tournament.players),
+    JSON.stringify(tournament.matches),
+  ].join('#');
+}
+
 /** OBS: subscribe to ACTIVE tournament changes (Postgres Realtime). */
 export function subscribeActiveRemoteTournament(
   onChange: (tournament: BonusTournamentDemo | null) => void,
 ): () => void {
   let cancelled = false;
+  let lastFingerprint = '';
 
   const refresh = async () => {
     const pack = await fetchActiveRemoteTournament();
-    if (cancelled) return;
-    if (pack.ok) onChange(pack.tournament);
+    if (cancelled || !pack.ok) return;
+    const fp = activeTournamentFingerprint(pack.tournament, pack.row?.state_version ?? null);
+    if (fp === lastFingerprint) return;
+    lastFingerprint = fp;
+    onChange(pack.tournament);
   };
 
   void refresh();

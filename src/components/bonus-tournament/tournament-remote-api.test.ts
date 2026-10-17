@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createDemoTournament } from './demo-data';
-import { rowToTournament, tournamentToPayload } from './tournament-remote-api';
+import { buildDemoEntries, createDemoTournament } from './demo-data';
+import {
+  activeTournamentFingerprint,
+  rowToTournament,
+  tournamentToPayload,
+} from './tournament-remote-api';
 import type { RemoteTournamentRow } from './tournament-remote-api';
 
 describe('tournament-remote-api mappers', () => {
@@ -37,5 +41,20 @@ describe('tournament-remote-api mappers', () => {
     expect(Array.isArray(payload.players)).toBe(true);
     expect(Array.isArray(payload.matches)).toBe(true);
     expect(payload.chat_command).toBe(demo.entriesConfig.chatCommand);
+  });
+
+  it('activeTournamentFingerprint ignores new object identity from polling', () => {
+    const entries = buildDemoEntries(8);
+    const a = { ...createDemoTournament('entries'), entries, isDemo: false };
+    const b = {
+      ...a,
+      entries: entries.map((e) => ({ ...e })),
+      entriesConfig: { ...a.entriesConfig },
+    };
+    expect(activeTournamentFingerprint(a, 3)).toBe(activeTournamentFingerprint(b, 3));
+    expect(activeTournamentFingerprint(a, 3)).not.toBe(activeTournamentFingerprint(a, 4));
+    expect(activeTournamentFingerprint(a, 3)).not.toBe(
+      activeTournamentFingerprint({ ...a, entries: buildDemoEntries(9) }, 3),
+    );
   });
 });

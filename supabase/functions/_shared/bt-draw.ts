@@ -326,12 +326,24 @@ export function maybeAutoAdvance(row: DrawRow, nowMs = Date.now()): DrawRow | nu
   return advancePresentation(row);
 }
 
+/**
+ * Single source of truth for "entries closed":
+ * `bonus_tournaments.entries_open === false` (Dashboard / admin persist).
+ * Presentation `entries_closed` is a mirror synced on CLOSE_ENTRIES / GENERATE.
+ */
+export function isTournamentEntriesClosed(entriesOpen: boolean | null | undefined): boolean {
+  return entriesOpen === false;
+}
+
 export async function applyCommand(
   row: DrawRow | null,
   cmd: DrawCmd,
   tournamentId: string,
   trustedEntries?: Array<{ twitchUserId: string; displayName: string; avatarUrl: string }>,
+  opts?: { tournamentEntriesOpen?: boolean | null },
 ): Promise<{ row: DrawRow; allowResultReplace: boolean }> {
+  const tournamentClosed = isTournamentEntriesClosed(opts?.tournamentEntriesOpen);
+
   if (!row) {
     row = {
       tournament_id: tournamentId,
@@ -347,11 +359,15 @@ export async function applyCommand(
       phase_started_at: null,
       phase_duration_ms: null,
       result: null,
-      entries_closed: false,
+      // Seed from tournament SoT so GENERATE works after Dashboard "Encerrar" without a prior CLOSE_ENTRIES.
+      entries_closed: tournamentClosed,
       unique_entry_count: 0,
       is_demo: false,
       updated_at: new Date().toISOString(),
     };
+  } else if (tournamentClosed && !row.entries_closed) {
+    // Mirror tournament SoT onto the presentation row before command checks.
+    row = { ...row, entries_closed: true };
   }
 
   switch (cmd.type) {
@@ -360,7 +376,7 @@ export async function applyCommand(
 
     case 'GENERATE_DRAW':
     case 'REGENERATE_DRAW': {
-      if (!row.entries_closed) throw new Error('Close entries first');
+      if (!row.entries_closed && !tournamentClosed) throw new Error('Close entries first');
       if (!trustedEntries) {
         throw new Error('entries_source_unavailable');
       }
@@ -371,6 +387,7 @@ export async function applyCommand(
       return {
         row: bump(row, {
           result,
+          entries_closed: true,
           presentation_id: crypto.randomUUID(),
           phase: 'idle',
           run_status: 'idle',

@@ -75,6 +75,7 @@ import {
   subscribeRemoteEntries,
   type RemoteBackendStatus,
 } from './tournament-remote-api';
+import { invokeDrawCommand } from './draw-cmd-client';
 import {
   applyDrawLaunchToDemo,
   confirmWinnerAndAdvance,
@@ -83,6 +84,7 @@ import {
 } from './match-progression';
 import { formatEntriesTimer } from './entries-carousel';
 import { countBtTestEntries, isBtTestTwitchUserId } from './bt-test-entries';
+import { fetchDrawState } from './draw-sync';
 
 type ManagerTab = 'overview' | 'entries' | 'draw' | 'matchups' | 'champion' | 'overlays';
 type ShellView = 'hub' | 'create' | 'workspace';
@@ -1234,19 +1236,53 @@ export function BonusTournamentManager() {
                   disabled={entriesClosed && !demo.entriesConfig.timerPaused}
                   onClick={() => {
                     if (!confirm('Encerrar inscrições definitivamente neste torneio?')) return;
-                    setDemo((p) => {
-                      if (!p) return p;
-                      return {
-                        ...p,
-                        status: p.status === 'preparation' ? 'entries' : p.status,
+                    void (async () => {
+                      const prev = demo;
+                      const closedDemo = {
+                        ...prev,
+                        status: (prev.status === 'preparation' ? 'entries' : prev.status) as typeof prev.status,
                         entriesConfig: {
-                          ...p.entriesConfig,
+                          ...prev.entriesConfig,
                           entriesOpen: false,
                           timerPaused: true,
-                          remainingSecondsSnapshot: getEntriesRemainingSeconds(p.entriesConfig),
+                          remainingSecondsSnapshot: getEntriesRemainingSeconds(prev.entriesConfig),
                         },
                       };
-                    });
+
+                      // DEMO / offline: local only. Remote: persist first — never show Encerradas on failed write.
+                      if (prev.isDemo || !operatorUnlocked) {
+                        setDemo(closedDemo);
+                        return;
+                      }
+
+                      const expected = remoteVersionRef.current;
+                      const persisted = await persistRemoteTournamentState(closedDemo, expected);
+                      if (!persisted.ok) {
+                        alert(
+                          persisted.error ||
+                            'Falha ao gravar o encerramento das inscrições. Estado não alterado.',
+                        );
+                        return;
+                      }
+                      if (persisted.row) remoteVersionRef.current = persisted.row.state_version;
+                      setDemo(closedDemo);
+
+                      // Mirror onto draw presentation (Edge also accepts tournament.entries_open as SoT).
+                      try {
+                        const draw = await fetchDrawState(prev.id);
+                        const version = draw.state?.version ?? 0;
+                        const closeDraw = await invokeDrawCommand({
+                          tournamentId: prev.id,
+                          expectedVersion: version,
+                          command: { type: 'CLOSE_ENTRIES' },
+                        });
+                        if (!closeDraw.ok && closeDraw.error !== 'version_conflict') {
+                          console.warn('[BT] CLOSE_ENTRIES mirror failed:', closeDraw.error);
+                        }
+                      } catch (err) {
+                        console.warn('[BT] CLOSE_ENTRIES mirror error:', err);
+                      }
+                    })();
                   }}
                 >
                   Encerrar inscrições

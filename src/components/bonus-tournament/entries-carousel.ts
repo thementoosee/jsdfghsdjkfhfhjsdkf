@@ -21,6 +21,19 @@ export function hashEntriesSeed(entries: BonusTournamentEntry[]): number {
   return h >>> 0;
 }
 
+/**
+ * Stable roster identity for circulation bootstrap.
+ * Same twitch id set → same key (order-independent), so polling with a new array
+ * reference must NOT remount / restart float animations.
+ */
+export function entriesRosterIdentity(entries: BonusTournamentEntry[]): string {
+  return entries
+    .map((e) => e.twitchUserId)
+    .filter(Boolean)
+    .sort()
+    .join('|');
+}
+
 function shuffle<T>(list: T[], rng: () => number): T[] {
   const out = [...list];
   for (let i = out.length - 1; i > 0; i -= 1) {

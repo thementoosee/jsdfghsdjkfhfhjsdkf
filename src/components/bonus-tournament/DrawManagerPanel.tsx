@@ -28,6 +28,7 @@ import {
 import { uniqueEntriesByTwitchId } from './draw-result';
 import { DRAW_TIMING } from './draw-timing';
 import { invokeDrawCommand } from './draw-cmd-client';
+import { areEntriesClosedForDraw } from './entries-closed';
 import { pingOperatorAdmin } from './tournament-remote-api';
 import {
   asObsSnapshot,
@@ -267,6 +268,11 @@ export function DrawManagerPanel({
       ? `${window.location.origin}/bonus-tournament/draw`
       : '/bonus-tournament/draw';
 
+  const entriesClosedForDraw = areEntriesClosedForDraw({
+    tournamentEntriesOpen: entriesOpen,
+    presentationEntriesClosed: state.entriesClosed,
+  });
+
   const closeEntries = () => {
     if (!confirm('Encerrar inscrições? Não poderá aceitar novos inscritos neste DEMO até reset.')) {
       return;
@@ -276,7 +282,7 @@ export function DrawManagerPanel({
   };
 
   const generate = () => {
-    if (!canGenerateDraw(unique.length, state.entriesClosed || !entriesOpen)) {
+    if (!canGenerateDraw(unique.length, entriesClosedForDraw)) {
       alert(`Precisa de ${DRAW_SLOT_COUNT} inscritos únicos e inscrições encerradas.`);
       return;
     }
@@ -285,7 +291,7 @@ export function DrawManagerPanel({
 
   /**
    * START: close entries → generate if needed (keep locked draw) → countdown 3.
-   * Idempotent while ceremony is already running/paused.
+   * Tournament `entries_open` is SoT; presentation `entries_closed` is synced when stale.
    */
   const startCeremony = async () => {
     if (busy) return;
@@ -293,7 +299,7 @@ export function DrawManagerPanel({
       setLastError(`Precisa de ${DRAW_SLOT_COUNT} inscritos únicos para iniciar.`);
       return;
     }
-    if (requireEntriesClosed && (entriesOpen || !state.entriesClosed)) {
+    if (requireEntriesClosed && entriesOpen) {
       setLastError('Encerrar inscrições na Dashboard antes de iniciar o sorteio.');
       return;
     }
@@ -312,18 +318,19 @@ export function DrawManagerPanel({
     try {
       let prev = stateRef.current;
 
+      // Sync presentation mirror when tournament already closed, or close both when allowed.
       if (!prev.entriesClosed || entriesOpen) {
-        if (requireEntriesClosed) {
+        if (entriesOpen && requireEntriesClosed) {
           setLastError('Encerrar inscrições na Dashboard antes de iniciar o sorteio.');
           return;
         }
-        onEntriesClosed();
+        if (entriesOpen) onEntriesClosed();
         if (localOnly) {
           prev = await applyDrawCommand(prev, { type: 'CLOSE_ENTRIES' });
         } else {
           const admin = await refreshAdmin();
           if (!admin.ok) {
-            setLastError('Desbloqueie os comandos do sorteio antes de iniciar.');
+            setLastError('Admin remoto indisponível. Verifica o proxy /api/bt-draw-cmd.');
             return;
           }
           const res = await invokeDrawCommand({
@@ -481,7 +488,7 @@ export function DrawManagerPanel({
         <Btn
           label="Gerar sorteio"
           onClick={generate}
-          disabled={!canGenerateDraw(unique.length, state.entriesClosed || !entriesOpen) || !!state.result || busy}
+          disabled={!canGenerateDraw(unique.length, entriesClosedForDraw) || !!state.result || busy}
           icon={<Shuffle className="w-3.5 h-3.5" />}
         />
         <Btn label="Novo sorteio (admin)" onClick={regenerate} disabled={unique.length < DRAW_SLOT_COUNT || busy} icon={<Shuffle className="w-3.5 h-3.5" />} />

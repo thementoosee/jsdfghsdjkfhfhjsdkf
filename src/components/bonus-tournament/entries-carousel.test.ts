@@ -3,6 +3,7 @@ import { buildDemoEntries, getEntriesRemainingSeconds, defaultEntriesConfig } fr
 import {
   buildCarouselRows,
   buildVisualPool,
+  entriesRosterIdentity,
   fitAmplitudeX,
   formatEntriesTimer,
   layoutFloatingUnits,
@@ -114,5 +115,12 @@ describe('entries floating / carousel helpers', () => {
       started + 90_000,
     );
     expect(rem).toBe(210);
+  });
+
+  it('entriesRosterIdentity is stable across poll clones and order', () => {
+    const a = buildDemoEntries(5);
+    const b = a.map((e) => ({ ...e })).reverse();
+    expect(entriesRosterIdentity(a)).toBe(entriesRosterIdentity(b));
+    expect(entriesRosterIdentity(a)).not.toBe(entriesRosterIdentity(buildDemoEntries(6)));
   });
 });

@@ -218,18 +218,22 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Prefer is_demo from bonus_tournaments (live core); fall back to presentation row / false.
+    // Tournament row is SoT for entries_open / is_demo (Dashboard Encerrar persists here).
+    const { data: tour } = await admin
+      .from('bonus_tournaments')
+      .select('is_demo, entries_open, entries_config')
+      .eq('id', tournamentId)
+      .maybeSingle();
+
     let isDemo = false;
-    if (existing && typeof (existing as { is_demo?: boolean }).is_demo === 'boolean') {
+    if (tour && typeof tour.is_demo === 'boolean') {
+      isDemo = tour.is_demo;
+    } else if (existing && typeof (existing as { is_demo?: boolean }).is_demo === 'boolean') {
       isDemo = Boolean((existing as { is_demo?: boolean }).is_demo);
-    } else {
-      const { data: tour } = await admin
-        .from('bonus_tournaments')
-        .select('is_demo')
-        .eq('id', tournamentId)
-        .maybeSingle();
-      if (tour && typeof tour.is_demo === 'boolean') isDemo = tour.is_demo;
     }
+
+    const tournamentEntriesOpen =
+      tour && typeof tour.entries_open === 'boolean' ? Boolean(tour.entries_open) : null;
 
     const seedRow = existing
       ? ({ ...(existing as DrawRow), is_demo: isDemo } as DrawRow)
@@ -237,7 +241,9 @@ Deno.serve(async (req) => {
 
     let applied;
     try {
-      applied = await applyCommand(seedRow, command, tournamentId, trustedEntries);
+      applied = await applyCommand(seedRow, command, tournamentId, trustedEntries, {
+        tournamentEntriesOpen,
+      });
       applied = {
         ...applied,
         row: { ...applied.row, is_demo: isDemo },
@@ -269,6 +275,31 @@ Deno.serve(async (req) => {
         return json({ error: 'version_conflict', state: remote.data ?? null }, 409);
       }
       return json({ error: 'cas_write_failed', detail: writeErr.message }, 500);
+    }
+
+    // Keep tournament SoT in sync when draw closes entries (CLOSE_ENTRIES or GENERATE after Dashboard close).
+    if (
+      command.type === 'CLOSE_ENTRIES' ||
+      ((command.type === 'GENERATE_DRAW' || command.type === 'REGENERATE_DRAW') &&
+        applied.row.entries_closed)
+    ) {
+      const cfg =
+        tour?.entries_config && typeof tour.entries_config === 'object'
+          ? { ...(tour.entries_config as Record<string, unknown>) }
+          : {};
+      cfg.entriesOpen = false;
+      cfg.timerPaused = true;
+      const { error: closeTourErr } = await admin
+        .from('bonus_tournaments')
+        .update({
+          entries_open: false,
+          entries_config: cfg,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', tournamentId);
+      if (closeTourErr) {
+        console.warn('[bt-draw-cmd] sync entries_open failed:', closeTourErr.message);
+      }
     }
 
     return json({ ok: true, state: written });
