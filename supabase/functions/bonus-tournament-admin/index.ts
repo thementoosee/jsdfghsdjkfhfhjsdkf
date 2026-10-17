@@ -1,12 +1,13 @@
 /**
- * Bonus Tournament — operator admin API (no Dashboard login).
+ * Bonus Tournament — operator admin API.
  *
- * Auth: BT_OPERATOR_SECRET via header X-BT-Operator-Secret (Edge secret only).
+ * Auth: JWT app_metadata.bonus_tournament_admin OR BT_OPERATOR_SECRET
+ * (secret only from Edge / same-origin Dashboard proxy — never VITE_*).
  * Writes use service_role; browsers never get direct INSERT/UPDATE/DELETE.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
-  assertOperatorAuthorized,
+  authorizeBtAdmin,
   clientRateKey,
   operatorSecretHeaderName,
   rateLimitAllow,
@@ -156,7 +157,7 @@ Deno.serve(async (req) => {
     return json({ error: 'rate_limited' }, 429);
   }
 
-  const auth = assertOperatorAuthorized(req);
+  const auth = await authorizeBtAdmin(req);
   if (!auth.ok) return json({ error: auth.error }, auth.status);
 
   let body: Record<string, unknown>;
@@ -418,6 +419,33 @@ Deno.serve(async (req) => {
     }
 
     if (action === 'deactivate') {
+      const claimChillFallback = async () => {
+        // Restore CHILL on main when nothing else is claiming it (Opening/Hunt/Fever).
+        const [{ data: opening }, { data: hunt }, { data: fever }] = await Promise.all([
+          sb.from('bonus_openings').select('id').eq('show_on_main_overlay', true).maybeSingle(),
+          sb.from('bonus_hunts').select('id').eq('show_on_main_overlay', true).maybeSingle(),
+          sb
+            .from('fever_tournaments')
+            .select('id')
+            .eq('show_on_main_overlay', true)
+            .eq('status', 'active')
+            .maybeSingle(),
+        ]);
+        if (opening?.id || hunt?.id || fever?.id) return;
+        const { data: chill } = await sb
+          .from('chill_sessions')
+          .select('id')
+          .is('ended_at', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!chill?.id) return;
+        await sb
+          .from('chill_sessions')
+          .update({ show_on_main_overlay: true, updated_at: new Date().toISOString() })
+          .eq('id', chill.id);
+      };
+
       const id = body.tournamentId != null ? String(body.tournamentId) : '';
       if (id) {
         const { data, error } = await sb.rpc('bt_activate_tournament', {
@@ -425,6 +453,7 @@ Deno.serve(async (req) => {
           p_active: false,
         });
         if (error) return json({ error: 'deactivate_failed', detail: error.message }, 400);
+        await claimChillFallback();
         return json({ ok: true, row: data });
       }
       // Clear whatever is ACTIVE
@@ -433,12 +462,16 @@ Deno.serve(async (req) => {
         .select('id')
         .eq('is_active', true)
         .maybeSingle();
-      if (!active?.id) return json({ ok: true, row: null });
+      if (!active?.id) {
+        await claimChillFallback();
+        return json({ ok: true, row: null });
+      }
       const { data, error } = await sb.rpc('bt_activate_tournament', {
         p_tournament_id: active.id,
         p_active: false,
       });
       if (error) return json({ error: 'deactivate_failed', detail: error.message }, 400);
+      await claimChillFallback();
       return json({ ok: true, row: data });
     }
 

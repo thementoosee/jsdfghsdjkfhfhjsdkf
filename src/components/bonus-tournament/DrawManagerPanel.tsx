@@ -27,13 +27,8 @@ import {
 } from './draw-presentation-machine';
 import { uniqueEntriesByTwitchId } from './draw-result';
 import { DRAW_TIMING } from './draw-timing';
-import {
-  getBonusTournamentAdminSession,
-  requestDrawAdminMagicLink,
-  signOutDrawAdmin,
-} from './draw-admin-auth';
-import { hasOperatorSecret } from './bt-operator-session';
 import { invokeDrawCommand } from './draw-cmd-client';
+import { pingOperatorAdmin } from './tournament-remote-api';
 import {
   asObsSnapshot,
   fetchDrawState,
@@ -121,9 +116,6 @@ export function DrawManagerPanel({
   const [syncStatus, setSyncStatus] = useState<DrawSyncStatus>('unknown');
   const [syncDetail, setSyncDetail] = useState<string | undefined>();
   const [adminOk, setAdminOk] = useState(false);
-  const [adminEmail, setAdminEmail] = useState<string | undefined>();
-  const [unlockEmail, setUnlockEmail] = useState('');
-  const [unlockMsg, setUnlockMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [lastError, setLastError] = useState<string | null>(null);
   const [correctTargetId, setCorrectTargetId] = useState<string | null>(null);
@@ -160,10 +152,9 @@ export function DrawManagerPanel({
   }, [tournamentName, unique.length, entriesOpen]);
 
   const refreshAdmin = useCallback(async () => {
-    const admin = await getBonusTournamentAdminSession();
-    setAdminOk(admin.ok);
-    setAdminEmail(admin.email);
-    return admin;
+    const ping = await pingOperatorAdmin();
+    setAdminOk(ping.ok);
+    return ping;
   }, []);
 
   const dispatchCommand = useCallback(
@@ -183,9 +174,9 @@ export function DrawManagerPanel({
         }
 
         const admin = await refreshAdmin();
-        if (!admin.ok && !hasOperatorSecret()) {
+        if (!admin.ok) {
           setLastError(
-            'Desbloqueia o Operator Secret na visão geral (ou magic link legado) antes de gravar no servidor.',
+            'Admin remoto indisponível. Verifica o proxy /api/bt-draw-cmd e as Edge secrets.',
           );
           return;
         }
@@ -447,7 +438,7 @@ export function DrawManagerPanel({
           <SyncIcon className="w-3.5 h-3.5" />
           OBS {syncStatus === 'ready' ? 'lido OK' : syncStatus === 'missing_table' ? 'migration pendente' : syncStatus}
           {' · '}
-          Admin {adminOk ? `OK${adminEmail ? ` (${adminEmail})` : ''}` : 'bloqueado'}
+          Admin {adminOk ? 'OK' : 'indisponível'}
         </div>
       </div>
 
@@ -457,68 +448,7 @@ export function DrawManagerPanel({
           style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(96,165,250,0.35)', color: '#93c5fd' }}
         >
           Modo local DEMO: avanço no browser. Escolha de slot e confrontos usam a máquina local.
-          Remoto: requer migrations BT + deploy draw-cmd/tick + admin magic link.
-        </div>
-      )}
-
-      {!localOnly && (
-        <div
-          className="rounded-lg p-3 space-y-2"
-          style={{ background: '#252525', border: '1px solid #3d3d3d' }}
-        >
-          <div className="text-[10px] font-black uppercase" style={{ color: '#8a8a8a' }}>
-            Desbloquear comandos (só sorteio)
-          </div>
-          {adminOk ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px]" style={{ color: '#4ade80' }}>
-                Sessão admin ativa{adminEmail ? `: ${adminEmail}` : ''}
-              </span>
-              <button
-                type="button"
-                className="text-[10px] font-bold uppercase px-2 py-1 rounded"
-                style={{ border: '1px solid #3d3d3d', color: '#a8a8a8' }}
-                onClick={() => {
-                  void signOutDrawAdmin().then(() => refreshAdmin());
-                }}
-              >
-                Terminar sessão sorteio
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2 items-center">
-              <input
-                type="email"
-                value={unlockEmail}
-                onChange={(e) => setUnlockEmail(e.target.value)}
-                placeholder="email admin (Auth)"
-                className="rounded px-2 py-1.5 text-xs min-w-[200px]"
-                style={{ background: '#1a1a1a', border: '1px solid #3d3d3d', color: '#e2e8f0' }}
-              />
-              <button
-                type="button"
-                className="px-2.5 py-1.5 rounded text-[10px] font-bold uppercase"
-                style={{ background: 'linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%)', color: '#fff' }}
-                onClick={() => {
-                  void requestDrawAdminMagicLink(unlockEmail).then((r) => {
-                    setUnlockMsg(
-                      r.ok
-                        ? 'Magic link enviado — abre o email neste browser para desbloquear.'
-                        : r.error ?? 'Falha',
-                    );
-                    if (r.ok) void refreshAdmin();
-                  });
-                }}
-              >
-                Enviar magic link
-              </button>
-              {unlockMsg && (
-                <span className="text-[11px]" style={{ color: '#94a3b8' }}>
-                  {unlockMsg}
-                </span>
-              )}
-            </div>
-          )}
+          Remoto: requer migrations BT + deploy draw-cmd/tick + proxy /api/bt-draw-cmd.
         </div>
       )}
 

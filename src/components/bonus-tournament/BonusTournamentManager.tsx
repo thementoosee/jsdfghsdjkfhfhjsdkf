@@ -70,19 +70,11 @@ import {
   deleteRemoteTournament,
   listRemoteTournaments,
   persistRemoteTournamentState,
-  pingOperatorAdmin,
   probeTournamentRemote,
   rowToTournament,
   subscribeRemoteEntries,
   type RemoteBackendStatus,
 } from './tournament-remote-api';
-import {
-  bindOperatorSecretLifecycle,
-  clearOperatorSecret,
-  getOperatorSecret,
-  hasOperatorSecret,
-  setOperatorSecret,
-} from './bt-operator-session';
 import {
   applyDrawLaunchToDemo,
   confirmWinnerAndAdvance,
@@ -231,10 +223,9 @@ export function BonusTournamentManager() {
   const [remoteStatus, setRemoteStatus] = useState<RemoteBackendStatus>('unknown');
   const [remoteDetail, setRemoteDetail] = useState<string | undefined>();
   const remoteVersionRef = useRef(0);
-  const [operatorUnlocked, setOperatorUnlocked] = useState(() => hasOperatorSecret());
-  const [operatorDraft, setOperatorDraft] = useState('');
-  const [operatorError, setOperatorError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Admin writes go through same-origin /api/bt-admin — no manual codes. */
+  const operatorUnlocked = remoteStatus === 'ready';
 
   const refreshSessions = useCallback(() => {
     setSessions(listTournamentSessions());
@@ -245,9 +236,7 @@ export function BonusTournamentManager() {
     return subscribeTournamentSessions(refreshSessions);
   }, [refreshSessions]);
 
-  useEffect(() => bindOperatorSecretLifecycle(), []);
-
-  // Probe Supabase live tables (anon). Operator unlock loads full list via Edge.
+  // Probe live tables + Dashboard admin proxy; load full list when ready.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -256,7 +245,7 @@ export function BonusTournamentManager() {
       setRemoteStatus(probe.status);
       setRemoteDetail(probe.detail);
 
-      if ((probe.status === 'ready' || probe.status === 'needs_operator') && hasOperatorSecret()) {
+      if (probe.status === 'ready') {
         const listed = await listRemoteTournaments();
         if (cancelled || !listed.ok) return;
         for (const row of listed.rows) {
@@ -276,7 +265,7 @@ export function BonusTournamentManager() {
     return () => {
       cancelled = true;
     };
-  }, [refreshSessions, operatorUnlocked]);
+  }, [refreshSessions]);
 
   const activeTournamentId = getActiveTournamentId();
   const isWorkspaceActive = Boolean(demo && activeTournamentId === demo.id);
@@ -367,7 +356,7 @@ export function BonusTournamentManager() {
     if (!result.ok) return;
     if (remoteStatus === 'ready' || remoteStatus === 'needs_operator') {
       if (!operatorUnlocked) {
-        alert('Introduz o Operator Secret na visão geral antes de ACTIVAR.');
+        alert('Admin remoto indisponível. Verifica o proxy /api/bt-admin e as Edge secrets.');
         return;
       }
       void activateRemoteTournament(id).then(async (res) => {
@@ -478,71 +467,8 @@ export function BonusTournamentManager() {
           </p>
           <p className="text-[11px] mt-2 font-bold" style={{ color: remoteStatus === 'missing_tables' ? '#fbbf24' : '#4ade80' }}>
             Backend: {remoteDetail || remoteStatus}
-            {operatorUnlocked ? ' · operador desbloqueado' : ''}
+            {operatorUnlocked ? ' · admin pronto' : ''}
           </p>
-          <div
-            className="mt-4 rounded-xl p-3 space-y-2"
-            style={{ background: '#1e1e24', border: `1px solid ${ui.inputBorder}` }}
-          >
-            <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: ui.muted }}>
-              Operator secret (sessão)
-            </div>
-            <p className="text-[11px]" style={{ color: ui.muted }}>
-              Sem login. O secret vive só nas Edge secrets / nesta sessão do browser — nunca no OBS.
-            </p>
-            <div className="flex flex-wrap gap-2 items-center">
-              <input
-                type="password"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={operatorUnlocked ? '•••••••• (já definido)' : 'Colar BT_OPERATOR_SECRET'}
-                value={operatorDraft}
-                onChange={(e) => setOperatorDraft(e.target.value)}
-                className="flex-1 min-w-[180px] rounded-xl px-3 py-2 text-sm font-bold focus:outline-none"
-                style={inputStyle}
-              />
-              <PrimaryBtn
-                className="!py-2 !text-[11px]"
-                onClick={() => {
-                  void (async () => {
-                    setOperatorError(null);
-                    if (!operatorDraft.trim() && !getOperatorSecret()) {
-                      setOperatorError('Introduz o secret.');
-                      return;
-                    }
-                    if (operatorDraft.trim()) setOperatorSecret(operatorDraft.trim());
-                    setOperatorDraft('');
-                    const ping = await pingOperatorAdmin();
-                    if (!ping.ok) {
-                      clearOperatorSecret();
-                      setOperatorUnlocked(false);
-                      setOperatorError(ping.error || 'Secret rejeitado pela Edge.');
-                      return;
-                    }
-                    setOperatorUnlocked(true);
-                  })();
-                }}
-              >
-                Desbloquear
-              </PrimaryBtn>
-              {operatorUnlocked && (
-                <GhostBtn
-                  onClick={() => {
-                    clearOperatorSecret();
-                    setOperatorUnlocked(false);
-                    setOperatorDraft('');
-                  }}
-                >
-                  Terminar sessão
-                </GhostBtn>
-              )}
-            </div>
-            {operatorError && (
-              <div className="text-[11px] font-bold" style={{ color: '#f87171' }}>
-                {operatorError}
-              </div>
-            )}
-          </div>
           <div className="mt-5">
             <PrimaryBtn onClick={() => setShell('create')}>
               <Plus className="w-4 h-4" /> Começar torneio
@@ -718,7 +644,7 @@ export function BonusTournamentManager() {
                   if (remoteStatus === 'ready' || remoteStatus === 'needs_operator') {
                     if (!operatorUnlocked) {
                       setCreateError(
-                        'Desbloqueia o Operator Secret na visão geral para criar no Supabase.',
+                        'Admin remoto indisponível. Verifica o proxy /api/bt-admin e as Edge secrets.',
                       );
                       return;
                     }

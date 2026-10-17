@@ -1,14 +1,11 @@
 /**
  * Bonus Tournament remote API — REAL live.
  * Public reads: anon SELECT of ACTIVE tournament (+ entries).
- * Writes: Edge `bonus-tournament-admin` + operator secret (never JWT login).
+ * Writes: same-origin `/api/bt-admin` proxy (server attaches operator secret)
+ * or JWT admin session. Never ship secrets in the browser bundle.
  */
 
 import { supabase } from '../../lib/supabase';
-import {
-  BT_OPERATOR_SECRET_HEADER,
-  getOperatorSecret,
-} from './bt-operator-session';
 import type {
   BonusTournamentDemo,
   BonusTournamentEntriesConfig,
@@ -22,6 +19,7 @@ import { defaultEntriesConfig } from './demo-data';
 export const BT_TOURNAMENTS_TABLE = 'bonus_tournaments';
 export const BT_ENTRIES_TABLE = 'bonus_tournament_entries';
 export const BT_ADMIN_FN = 'bonus-tournament-admin';
+export const BT_ADMIN_PROXY = '/api/bt-admin';
 
 export type RemoteBackendStatus =
   | 'unknown'
@@ -121,36 +119,51 @@ async function invokeAdmin(
   action: string,
   body: Record<string, unknown> = {},
 ): Promise<{ ok: boolean; status: number; data?: Record<string, unknown>; error?: string }> {
-  const secret = getOperatorSecret();
-  if (!secret) {
-    return { ok: false, status: 401, error: 'operator_secret_required' };
+  const { data: sessionData } = await supabase.auth.getSession();
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const accessToken = sessionData.session?.access_token;
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+  let payload: Record<string, unknown> = {};
+  let httpStatus = 500;
+
+  try {
+    const res = await fetch(BT_ADMIN_PROXY, {
+      method: 'POST',
+      headers,
+      credentials: 'same-origin',
+      body: JSON.stringify({ action, ...body }),
+    });
+    httpStatus = res.status;
+    payload = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  } catch (err) {
+    return {
+      ok: false,
+      status: 500,
+      error: err instanceof Error ? err.message : 'admin_proxy_failed',
+    };
   }
 
-  const { data, error } = await supabase.functions.invoke(BT_ADMIN_FN, {
-    body: { action, ...body },
-    headers: { [BT_OPERATOR_SECRET_HEADER]: secret },
-  });
-
-  if (error) {
-    return { ok: false, status: 500, error: error.message };
-  }
-
-  const payload = (data ?? {}) as Record<string, unknown>;
   if (payload.error) {
     const status =
-      payload.error === 'unauthorized'
+      payload.error === 'unauthorized' || payload.error === 'forbidden_origin'
         ? 401
         : payload.error === 'rate_limited'
           ? 429
           : payload.error === 'version_conflict'
             ? 409
-            : 400;
+            : httpStatus >= 400
+              ? httpStatus
+              : 400;
     return {
       ok: false,
       status,
       error: String(payload.detail ?? payload.error),
       data: payload,
     };
+  }
+  if (httpStatus >= 400) {
+    return { ok: false, status: httpStatus, error: 'admin_request_failed', data: payload };
   }
   return { ok: true, status: 200, data: payload };
 }
@@ -162,11 +175,13 @@ export async function probeTournamentRemote(): Promise<{
 }> {
   const { error } = await supabase.from(BT_TOURNAMENTS_TABLE).select('id').eq('is_active', true).limit(1);
   if (!error) {
+    const ping = await pingOperatorAdmin();
+    if (ping.ok) {
+      return { status: 'ready', detail: 'Tabelas OK · admin via sessão Dashboard' };
+    }
     return {
-      status: getOperatorSecret() ? 'ready' : 'needs_operator',
-      detail: getOperatorSecret()
-        ? undefined
-        : 'Tabelas OK · introduz o Operator Secret para administrar.',
+      status: 'needs_operator',
+      detail: ping.error || 'Tabelas OK · proxy admin indisponível (ver /api/bt-admin).',
     };
   }
   const msg = error.message || '';
@@ -376,13 +391,11 @@ export function subscribeRemoteEntries(
 ): () => void {
   let cancelled = false;
   const refresh = async () => {
-    // Operator path preferred when secret present (sees entries even if not ACTIVE yet)
-    if (getOperatorSecret()) {
-      const res = await invokeAdmin('list_entries', { tournamentId });
-      if (!cancelled && res.ok) {
-        onChange(mapEntries((res.data?.entries as Parameters<typeof mapEntries>[0]) ?? []));
-        return;
-      }
+    // Operator path via Dashboard proxy (sees entries even if not ACTIVE yet)
+    const res = await invokeAdmin('list_entries', { tournamentId });
+    if (!cancelled && res.ok) {
+      onChange(mapEntries((res.data?.entries as Parameters<typeof mapEntries>[0]) ?? []));
+      return;
     }
     const pack = await fetchRemoteEntries(tournamentId);
     if (!cancelled) onChange(pack.entries);

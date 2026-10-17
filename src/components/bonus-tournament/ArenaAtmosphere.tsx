@@ -1,10 +1,15 @@
 /**
  * Shared digital arena backdrop — approved navy/blue/violet depth.
  * Used by entries field and champion stage. Behind content only.
+ * Kept strictly inside the panel (inset 0) so paint never escapes into Slot View.
  */
 export function ArenaAtmosphere({ reduceMotion = false }: { reduceMotion?: boolean }) {
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden>
+    <div
+      className="pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      aria-hidden
+      style={{ contain: 'paint', isolation: 'isolate' }}
+    >
       <style>{`
         @keyframes btArenaDrift {
           0% { transform: translate3d(0, 0, 0); }
@@ -35,7 +40,7 @@ export function ArenaAtmosphere({ reduceMotion = false }: { reduceMotion?: boole
         className={reduceMotion ? undefined : 'bt-arena-drift'}
         style={{
           position: 'absolute',
-          inset: '-8%',
+          inset: 0,
           opacity: 0.7,
           animation: reduceMotion ? 'none' : 'btArenaDrift 28s ease-in-out infinite',
           backgroundImage: `

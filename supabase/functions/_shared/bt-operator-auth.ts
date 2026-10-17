@@ -1,7 +1,12 @@
 /**
- * Bonus Tournament operator auth — Edge secrets only.
+ * Bonus Tournament operator auth.
+ * - Prefer JWT with app_metadata.bonus_tournament_admin
+ * - Fallback: BT_OPERATOR_SECRET via X-BT-Operator-Secret (server / same-origin proxy only)
  * Never ship BT_OPERATOR_SECRET in VITE_* / browser bundles.
  */
+
+import { createClient } from 'npm:@supabase/supabase-js@2';
+import { isAdminAppMetadata } from './bt-draw.ts';
 
 const HEADER = 'X-BT-Operator-Secret';
 
@@ -38,6 +43,42 @@ export function assertOperatorAuthorized(req: Request): { ok: true } | { ok: fal
     return { ok: false, status: 401, error: 'unauthorized' };
   }
   return { ok: true };
+}
+
+/**
+ * Authorize BT admin writes: JWT admin claim OR operator secret.
+ * Direct Edge calls without either credential remain 401 (not public).
+ */
+export async function authorizeBtAdmin(
+  req: Request,
+): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  const op = assertOperatorAuthorized(req);
+  if (op.ok) return { ok: true };
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return { ok: false, status: op.status, error: op.error };
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+  if (!supabaseUrl || !anonKey) {
+    return { ok: false, status: 500, error: 'server_misconfigured' };
+  }
+
+  const userClient = createClient(supabaseUrl, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (
+    !userErr &&
+    userData.user &&
+    isAdminAppMetadata(userData.user.app_metadata as Record<string, unknown>)
+  ) {
+    return { ok: true };
+  }
+
+  return { ok: false, status: op.status, error: op.error };
 }
 
 /** Simple per-isolate rate limit (best-effort; not shared across instances). */

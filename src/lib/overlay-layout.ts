@@ -69,7 +69,11 @@ export function getMainOverlaySecondSlotCutout(hasTopBar: boolean): MainOverlayC
   };
 }
 
-/** CSS mask that keeps the overlay chrome and punches out casino (+ optional second-slot) windows. */
+/**
+ * CSS mask: keep chrome/sidebar paint, punch casino + optional second-slot (Slot View).
+ * Apply to background chrome AND the content stacking layer so BT atmosphere cannot
+ * paint into OBS capture holes (overflow:hidden alone fails with filters/transforms).
+ */
 export function getMainOverlayBackgroundMaskUrl(
   hasTopBar: boolean,
   options: { showSecondSlot?: boolean } = {},

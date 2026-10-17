@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import {
   MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
   getMainOverlayBackgroundMaskUrl,
+  getMainOverlayCasinoCutout,
   getMainOverlaySecondSlotCutout,
 } from '../lib/overlay-layout';
 import { parseShowSecondSlot } from '../lib/overlay-modules';
@@ -64,6 +65,32 @@ async function resolveMainOverlayTarget(): Promise<OverlayState> {
     chillId: activeChill?.id ?? null,
     bonusTournamentId: activeBt?.id ?? null,
   });
+}
+
+/**
+ * When nothing claims main (Opening > Hunt > Fever > manual Chill > ACTIVE BT),
+ * auto-claim a live chill session so CHILL is the default fallback.
+ * Does not alter tournament rows; safe to call on every resolve.
+ */
+async function ensureChillFallback(current: OverlayState): Promise<OverlayState> {
+  if (current.type) return current;
+
+  const { data: anyActiveSession } = await supabase
+    .from('chill_sessions')
+    .select('id')
+    .is('ended_at', null)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!anyActiveSession?.id) return current;
+
+  await supabase
+    .from('chill_sessions')
+    .update({ show_on_main_overlay: true })
+    .eq('id', anyActiveSession.id);
+
+  return { type: 'chill', id: anyActiveSession.id };
 }
 
 export function MainStreamOverlay() {
@@ -133,30 +160,7 @@ export function MainStreamOverlay() {
     if (mainError) console.error('[Main Init] Error loading main_stream config:', mainError);
     if (mainRows?.[0]) applyMainStreamConfig(mainRows[0].config as Record<string, unknown>);
 
-    // Chill fallback: if a live chill session exists without show_on_main, claim it
-    // only when nothing else (incl. ACTIVE bonus tournament) would win.
-    const initial = await resolveMainOverlayTarget();
-    if (!initial.type) {
-      const { data: anyActiveSession } = await supabase
-        .from('chill_sessions')
-        .select('id')
-        .is('ended_at', null)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (anyActiveSession) {
-        await supabase
-          .from('chill_sessions')
-          .update({ show_on_main_overlay: true })
-          .eq('id', anyActiveSession.id);
-        const next = { type: 'chill' as const, id: anyActiveSession.id };
-        overlayStateRef.current = next;
-        setOverlayState(next);
-        return;
-      }
-    }
-
+    const initial = await ensureChillFallback(await resolveMainOverlayTarget());
     console.log('[Main Init] Overlay target:', initial);
     overlayStateRef.current = initial;
     setOverlayState(initial);
@@ -171,7 +175,7 @@ export function MainStreamOverlay() {
       if (debounceTimer) clearTimeout(debounceTimer);
 
       debounceTimer = setTimeout(async () => {
-        const next = await resolveMainOverlayTarget();
+        const next = await ensureChillFallback(await resolveMainOverlayTarget());
         console.log('[Main] ✅ →', next.type, next.id);
         transitionTo(next.type, next.id);
       }, 100);
@@ -313,6 +317,7 @@ export function MainStreamOverlay() {
   const hasTopBar = Boolean(barOverlayId);
   const backgroundMask = getMainOverlayBackgroundMaskUrl(hasTopBar, { showSecondSlot });
   const secondSlot = getMainOverlaySecondSlotCutout(hasTopBar);
+  const casinoCutout = getMainOverlayCasinoCutout(hasTopBar);
   const backgroundMaskStyle = {
     WebkitMaskImage: backgroundMask,
     maskImage: backgroundMask,
@@ -392,7 +397,15 @@ export function MainStreamOverlay() {
         />
       </div>
 
-      <div className="relative z-10 h-full flex flex-col" style={{ background: 'transparent' }}>
+      {/*
+        Content layer uses the same casino + Slot View mask as chrome.
+        Borders for capture guides sit ABOVE this layer so they stay visible
+        while no atmosphere/filter paint can cover OBS holes.
+      */}
+      <div
+        className="relative z-10 h-full flex flex-col"
+        style={{ background: 'transparent', ...backgroundMaskStyle }}
+      >
         {hasTopBar && (
           <div className="w-full">
             <iframe
@@ -408,13 +421,14 @@ export function MainStreamOverlay() {
           style={{ background: 'transparent' }}
         >
           <div className="flex gap-[8px] h-[720px] w-full" style={{ background: 'transparent' }}>
-            {/*
-              Clip the left column to 288×720 so BT atmosphere / outer glow cannot
-              paint over the Slot View (second-slot cutout below this row).
-            */}
             <div
               className="flex-shrink-0 h-full relative overflow-hidden"
-              style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
+              style={{
+                width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX,
+                isolation: 'isolate',
+                contain: 'paint',
+                clipPath: 'inset(0)',
+              }}
             >
               {leavingOverlay && (
                 <div className="overlay-layer slide-out-overlay h-full">
@@ -433,33 +447,19 @@ export function MainStreamOverlay() {
               )}
 
               {!leavingOverlay && !enteringOverlay && (
-                <div className="h-full overflow-hidden">
+                <div className="h-full overflow-hidden" style={{ contain: 'paint' }}>
                   {renderLeftOverlay(overlayState)}
                 </div>
               )}
             </div>
 
-            <div
-              className="flex-1 h-full flex items-center justify-center relative"
-              style={{ background: 'transparent' }}
-            >
-              <div
-                className="w-full h-full"
-                style={{
-                  background: 'transparent',
-                  backgroundImage: 'none',
-                  border: '2px solid rgba(59, 130, 246, 0.5)',
-                  borderRadius: '16px',
-                  boxShadow: 'none',
-                }}
-              />
-            </div>
+            {/* Center column spacer — casino border drawn as sibling guide below. */}
+            <div className="flex-1 h-full" style={{ background: 'transparent' }} />
 
             <div
               className="flex-shrink-0 h-full relative overflow-visible"
               style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
             >
-              {/* Shop drawer sits behind the chat and slides out below its bottom edge. */}
               <div
                 className="absolute left-0 right-0 pointer-events-none"
                 style={{
@@ -483,7 +483,21 @@ export function MainStreamOverlay() {
         </div>
       </div>
 
-      {/* Second slot capture guide — transparent hole + blue border for OBS. */}
+      {/* Capture guides outside masked content — never covered by BT paint. */}
+      <div
+        className="absolute pointer-events-none z-20"
+        aria-hidden
+        style={{
+          left: casinoCutout.x,
+          top: casinoCutout.y,
+          width: casinoCutout.width,
+          height: casinoCutout.height,
+          background: 'transparent',
+          border: '2px solid rgba(59, 130, 246, 0.5)',
+          borderRadius: casinoCutout.radius,
+          boxShadow: 'none',
+        }}
+      />
       {showSecondSlot && (
         <div
           className="absolute pointer-events-none z-20"
