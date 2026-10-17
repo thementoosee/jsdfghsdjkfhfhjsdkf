@@ -28,6 +28,7 @@ import {
   fetchTwitchProfileImagesByIds,
   isMissingOrGenericAvatar,
 } from '../_shared/bt-twitch-avatars.ts';
+import { isBtTestTwitchUserId } from '../_shared/bt-test-entries.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -176,7 +177,11 @@ Deno.serve(async (req) => {
       }
 
       // Backfill missing/generic avatars once before locking the draw result.
-      const needAvatar = entryRows.filter((r) => isMissingOrGenericAvatar(String(r.avatar_url ?? '')));
+      const needAvatar = entryRows.filter(
+        (r) =>
+          !isBtTestTwitchUserId(String(r.twitch_user_id ?? '')) &&
+          isMissingOrGenericAvatar(String(r.avatar_url ?? '')),
+      );
       let avatarMap = new Map<string, string>();
       if (needAvatar.length > 0) {
         try {

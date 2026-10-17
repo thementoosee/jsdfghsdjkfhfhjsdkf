@@ -408,8 +408,12 @@ export function MainStreamOverlay() {
           style={{ background: 'transparent' }}
         >
           <div className="flex gap-[8px] h-[720px] w-full" style={{ background: 'transparent' }}>
+            {/*
+              Clip the left column to 288×720 so BT atmosphere / outer glow cannot
+              paint over the Slot View (second-slot cutout below this row).
+            */}
             <div
-              className="flex-shrink-0 h-full relative"
+              className="flex-shrink-0 h-full relative overflow-hidden"
               style={{ width: MAIN_OVERLAY_SIDEBAR_WIDTH_PX }}
             >
               {leavingOverlay && (
@@ -429,7 +433,7 @@ export function MainStreamOverlay() {
               )}
 
               {!leavingOverlay && !enteringOverlay && (
-                <div className="h-full">
+                <div className="h-full overflow-hidden">
                   {renderLeftOverlay(overlayState)}
                 </div>
               )}

@@ -256,9 +256,10 @@ function OverlayFrame({
         borderRadius: 16,
         border: '1px solid rgba(255,255,255,0.12)',
         background: shellBg,
-        boxShadow: champion
-          ? 'inset 0 0 0 1px rgba(255,255,255,0.04)'
-          : 'inset 0 0 0 1px rgba(255,255,255,0.04), 0 0 40px rgba(245,158,11,0.12)',
+        // Inset-only chrome — outer glow was painting into the Slot View cutout below.
+        // Soft amber depth stays inside the panel via ArenaAtmosphere / radial fills.
+        boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
+        contain: 'layout paint style',
         fontFamily: '"Rubik", "Segoe UI", system-ui, sans-serif',
         color: '#e2e8f0',
       }}

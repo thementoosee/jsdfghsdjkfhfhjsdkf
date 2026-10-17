@@ -64,6 +64,8 @@ import {
 import {
   activateRemoteTournament,
   refreshRemoteAvatars,
+  seedRemoteTestEntries,
+  removeRemoteTestEntries,
   createRemoteTournament,
   deleteRemoteTournament,
   listRemoteTournaments,
@@ -88,6 +90,7 @@ import {
   PENDING_PLAYER_ID,
 } from './match-progression';
 import { formatEntriesTimer } from './entries-carousel';
+import { countBtTestEntries, isBtTestTwitchUserId } from './bt-test-entries';
 
 type ManagerTab = 'overview' | 'entries' | 'draw' | 'matchups' | 'champion' | 'overlays';
 type ShellView = 'hub' | 'create' | 'workspace';
@@ -1147,6 +1150,58 @@ export function BonusTournamentManager() {
                       <span style={{ color: ui.text }}>{demo.entriesConfig.chatCommand}</span> no
                       chat. Torneio ACTIVE + inscrições abertas. EventSub → bonus_tournament_entries.
                     </p>
+                    {operatorUnlocked && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <GhostBtn
+                          onClick={() => {
+                            void seedRemoteTestEntries(demo.id).then((res) => {
+                              if (!res.ok) {
+                                alert(res.error || 'Falha ao adicionar participantes TESTE.');
+                                return;
+                              }
+                              if (res.entries) {
+                                setDemo((p) => (p ? { ...p, entries: res.entries! } : p));
+                              }
+                            });
+                          }}
+                        >
+                          Adicionar 8 participantes TESTE
+                        </GhostBtn>
+                        <GhostBtn
+                          disabled={countBtTestEntries(demo.entries) === 0}
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                'Remover apenas participantes TESTE (TestPlayer01–08)? Inscritos reais da Twitch não são afetados.',
+                              )
+                            ) {
+                              return;
+                            }
+                            void removeRemoteTestEntries(demo.id).then((res) => {
+                              if (!res.ok) {
+                                alert(
+                                  res.error ||
+                                    'Não foi possível remover. Se o sorteio já correu, repõe primeiro o estado de teste.',
+                                );
+                                return;
+                              }
+                              setDemo((p) =>
+                                p
+                                  ? {
+                                      ...p,
+                                      entries: p.entries.filter(
+                                        (e) => !isBtTestTwitchUserId(e.twitchUserId),
+                                      ),
+                                    }
+                                  : p,
+                              );
+                            });
+                          }}
+                        >
+                          Remover participantes TESTE
+                        </GhostBtn>
+                      </div>
+                    )}
                     {demo.entries.length === 0 && (
                       <p className="text-[11px] font-bold" style={{ color: '#fbbf24' }}>
                         Ainda sem inscritos. Confirma Twitch online e ACTIVAR este torneio.
@@ -1160,6 +1215,9 @@ export function BonusTournamentManager() {
                         {demo.entries.slice(0, 40).map((e) => (
                           <li key={e.id}>
                             {e.displayName}
+                            {isBtTestTwitchUserId(e.twitchUserId) ? (
+                              <span style={{ color: '#fbbf24' }}> · TESTE</span>
+                            ) : null}
                             <span style={{ color: ui.muted }}> · {e.twitchUserId}</span>
                           </li>
                         ))}

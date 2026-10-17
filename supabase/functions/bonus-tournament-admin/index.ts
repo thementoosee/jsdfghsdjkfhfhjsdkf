@@ -15,6 +15,7 @@ import {
   fetchTwitchProfileImagesByIds,
   isMissingOrGenericAvatar,
 } from '../_shared/bt-twitch-avatars.ts';
+import { BT_TEST_ROSTER, BT_TEST_USER_PREFIX, isBtTestTwitchUserId } from '../_shared/bt-test-entries.ts';
 
 const TOURNAMENTS = 'bonus_tournaments';
 const ENTRIES = 'bonus_tournament_entries';
@@ -34,7 +35,11 @@ async function refreshTournamentAvatars(
     .eq('tournament_id', tournamentId);
   if (error) return { ok: false, error: 'entries_failed', detail: error.message, status: 500 };
 
-  const need = (rows ?? []).filter((r) => isMissingOrGenericAvatar(r.avatar_url as string));
+  const need = (rows ?? []).filter(
+    (r) =>
+      !isBtTestTwitchUserId(String(r.twitch_user_id ?? '')) &&
+      isMissingOrGenericAvatar(r.avatar_url as string),
+  );
   if (need.length === 0) {
     return { ok: true, updated: 0, skipped: (rows ?? []).length, failed: 0 };
   }
@@ -139,7 +144,9 @@ type Action =
   | 'upsert_state'
   | 'delete'
   | 'list_entries'
-  | 'refresh_avatars';
+  | 'refresh_avatars'
+  | 'seed_test_entries'
+  | 'remove_test_entries';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
@@ -304,6 +311,110 @@ Deno.serve(async (req) => {
         skipped: result.skipped,
         failed: result.failed,
       });
+    }
+
+    if (action === 'seed_test_entries') {
+      const id = String(body.tournamentId ?? '');
+      if (!id) return json({ error: 'missing_tournament_id' }, 400);
+      const { data: tournament, error: tErr } = await sb
+        .from(TOURNAMENTS)
+        .select('id, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (tErr) return json({ error: 'tournament_lookup_failed', detail: tErr.message }, 500);
+      if (!tournament) return json({ error: 'not_found' }, 404);
+
+      const { data: existing, error: eErr } = await sb
+        .from(ENTRIES)
+        .select('twitch_user_id')
+        .eq('tournament_id', id)
+        .like('twitch_user_id', `${BT_TEST_USER_PREFIX}%`);
+      if (eErr) return json({ error: 'entries_failed', detail: eErr.message }, 500);
+
+      const have = new Set((existing ?? []).map((r) => String(r.twitch_user_id)));
+      const missing = BT_TEST_ROSTER.filter((p) => !have.has(p.twitchUserId));
+      let inserted = 0;
+      if (missing.length > 0) {
+        const { error: insErr } = await sb.from(ENTRIES).insert(
+          missing.map((p) => ({
+            tournament_id: id,
+            twitch_user_id: p.twitchUserId,
+            display_name: p.displayName,
+            avatar_url: p.avatarUrl,
+          })),
+        );
+        if (insErr) return json({ error: 'seed_failed', detail: insErr.message }, 500);
+        inserted = missing.length;
+      }
+
+      const { data: allEntries } = await sb
+        .from(ENTRIES)
+        .select('id, twitch_user_id, display_name, avatar_url, enrolled_at')
+        .eq('tournament_id', id)
+        .order('enrolled_at', { ascending: true });
+
+      return json({
+        ok: true,
+        inserted,
+        reused: BT_TEST_ROSTER.length - missing.length,
+        entries: allEntries ?? [],
+      });
+    }
+
+    if (action === 'remove_test_entries') {
+      const id = String(body.tournamentId ?? '');
+      if (!id) return json({ error: 'missing_tournament_id' }, 400);
+
+      const { data: tournament, error: tErr } = await sb
+        .from(TOURNAMENTS)
+        .select('id, status')
+        .eq('id', id)
+        .maybeSingle();
+      if (tErr) return json({ error: 'tournament_lookup_failed', detail: tErr.message }, 500);
+      if (!tournament) return json({ error: 'not_found' }, 404);
+
+      const status = String(tournament.status ?? '');
+      if (status !== 'preparation' && status !== 'entries') {
+        return json(
+          {
+            error: 'draw_or_bracket_active',
+            detail:
+              'Já existe sorteio/confrontos. Repõe o torneio para a fase de inscrições antes de remover participantes TESTE.',
+          },
+          409,
+        );
+      }
+
+      const { data: drawRow } = await sb
+        .from('bonus_tournament_draw_presentations')
+        .select('result, run_status, phase')
+        .eq('tournament_id', id)
+        .maybeSingle();
+      if (
+        drawRow &&
+        (drawRow.result != null ||
+          (drawRow.run_status && drawRow.run_status !== 'idle') ||
+          (drawRow.phase && drawRow.phase !== 'idle'))
+      ) {
+        return json(
+          {
+            error: 'draw_presentation_locked',
+            detail:
+              'Há uma apresentação de sorteio ativa ou com resultado. Repõe o estado de teste (draw idle) antes de remover participantes TESTE.',
+          },
+          409,
+        );
+      }
+
+      const { data: deleted, error: delErr } = await sb
+        .from(ENTRIES)
+        .delete()
+        .eq('tournament_id', id)
+        .like('twitch_user_id', `${BT_TEST_USER_PREFIX}%`)
+        .select('id');
+      if (delErr) return json({ error: 'remove_failed', detail: delErr.message }, 500);
+
+      return json({ ok: true, removed: (deleted ?? []).length });
     }
 
     if (action === 'deactivate') {

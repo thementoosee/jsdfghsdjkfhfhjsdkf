@@ -94,7 +94,7 @@ export function DrawSidebarOverlay({
               borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.12)',
               background: 'linear-gradient(165deg, #0b1220 0%, #101a2e 45%, #0a1020 100%)',
-              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04), 0 0 40px rgba(245,158,11,0.12)',
+              boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.04)',
               fontFamily: '"Rubik", "Segoe UI", system-ui, sans-serif',
               color: WHITE,
               contain: 'layout paint style',

@@ -287,7 +287,7 @@ export function BonusTournamentOverlayPreview({
 
   if (embedded) {
     return (
-      <div className="h-full w-full" style={{ background: 'transparent' }}>
+      <div className="h-full w-full overflow-hidden" style={{ background: 'transparent' }}>
         <BonusTournamentOverlay demo={demo} drawSnapshot={drawSnapshot} />
       </div>
     );

@@ -275,6 +275,28 @@ export async function refreshRemoteAvatars(
   return { ok: true, updated: Number(res.data?.updated ?? 0) };
 }
 
+/** Operator: upsert up to 8 synthetic TestPlayer0N enrollments (no Twitch API). */
+export async function seedRemoteTestEntries(
+  tournamentId: string,
+): Promise<{ ok: boolean; inserted?: number; entries?: BonusTournamentEntry[]; error?: string }> {
+  const res = await invokeAdmin('seed_test_entries', { tournamentId });
+  if (!res.ok) return { ok: false, error: res.error };
+  return {
+    ok: true,
+    inserted: Number(res.data?.inserted ?? 0),
+    entries: mapEntries((res.data?.entries as Parameters<typeof mapEntries>[0]) ?? []),
+  };
+}
+
+/** Operator: delete only bt_test_* enrollments (blocked if draw/bracket already started). */
+export async function removeRemoteTestEntries(
+  tournamentId: string,
+): Promise<{ ok: boolean; removed?: number; error?: string }> {
+  const res = await invokeAdmin('remove_test_entries', { tournamentId });
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, removed: Number(res.data?.removed ?? 0) };
+}
+
 export async function persistRemoteTournamentState(
   demo: BonusTournamentDemo,
   expectedVersion: number,
