@@ -103,9 +103,9 @@ describe('Edge applyCommand START / immutability', () => {
     expect(next.revealed_players).toBe(0);
   });
 
-  it('TICK advances countdown when phase duration elapsed', async () => {
+  it('TICK catch-up advances overdue countdown toward reveal', async () => {
     const result = sampleResult(false);
-    const started = new Date(Date.now() - 1500).toISOString();
+    const started = new Date(Date.now() - 3500).toISOString();
     const row = {
       ...lockedIdleRow(result),
       version: 2,
@@ -116,8 +116,8 @@ describe('Edge applyCommand START / immutability', () => {
       phase_duration_ms: 1000,
     };
     const { row: next } = await applyCommand(row, { type: 'TICK' }, 't1');
-    expect(next.countdown_value).toBe(2);
-    expect(next.phase).toBe('countdown');
+    expect(next.phase).toBe('reveal_player');
+    expect(next.countdown_value).toBeNull();
     expect(next.version).toBe(3);
     expect(next.result).toBe(result);
   });

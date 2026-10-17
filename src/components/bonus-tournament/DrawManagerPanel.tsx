@@ -29,6 +29,7 @@ import { uniqueEntriesByTwitchId } from './draw-result';
 import { DRAW_TIMING } from './draw-timing';
 import { invokeDrawCommand } from './draw-cmd-client';
 import { areEntriesClosedForDraw } from './entries-closed';
+import { useDrawReconcile } from './use-draw-reconcile';
 import { pingOperatorAdmin } from './tournament-remote-api';
 import {
   asObsSnapshot,
@@ -264,39 +265,15 @@ export function DrawManagerPanel({
     return () => clearInterval(id);
   }, [state.runStatus, localOnly]);
 
-  // Live remote: Dashboard is the ceremony controller — nudge Edge TICK (≥1 Hz).
-  // OBS mirrors CAS writes via Realtime/poll; without this, countdown stays at 3 forever.
-  useEffect(() => {
-    if (localOnly) return;
-    if (state.runStatus !== 'running') return;
-    let cancelled = false;
-    const nudge = async () => {
-      if (cancelled || busy) return;
-      const prev = stateRef.current;
-      if (prev.runStatus !== 'running') return;
-      const res = await invokeDrawCommand({
-        tournamentId,
-        expectedVersion: prev.version,
-        command: { type: 'TICK' },
-      });
-      if (cancelled) return;
-      if (res.ok) {
-        setState(res.state);
-        stateRef.current = res.state;
-      } else if (res.remote) {
-        setState(res.remote);
-        stateRef.current = res.remote;
-      }
-    };
-    const id = window.setInterval(() => {
-      void nudge();
-    }, 400);
-    void nudge();
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [state.runStatus, localOnly, tournamentId, busy]);
+  // Live remote: overdue reconcile (same path as OBS) — Dashboard optional after START.
+  const onReconciled = useCallback(
+    (remote: DrawPresentationState) => {
+      setState((local) => mergeRemoteIfNewer(local, remote));
+      stateRef.current = mergeRemoteIfNewer(stateRef.current, remote);
+    },
+    [],
+  );
+  useDrawReconcile(localOnly ? null : tournamentId, localOnly ? null : state, onReconciled);
 
   const obsUrl =
     typeof window !== 'undefined'

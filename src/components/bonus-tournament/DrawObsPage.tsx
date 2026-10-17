@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { DrawSidebarOverlay } from './DrawSidebarOverlay';
 import {
   fetchDrawState,
@@ -6,22 +6,33 @@ import {
   subscribeDrawState,
   type DrawSyncStatus,
 } from './draw-sync';
-import type { DrawPublicSnapshot } from './draw-types';
+import type { DrawPresentationState, DrawPublicSnapshot } from './draw-types';
 import { toPublicSnapshot } from './draw-types';
+import { useDrawReconcile } from './use-draw-reconcile';
 import { fetchActiveRemoteTournament } from './tournament-remote-api';
 import { getActiveTournamentId, subscribeTournamentSessions } from './tournament-session-store';
 import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../../lib/overlay-layout';
 
 /**
- * Read-only OBS Browser Source — SIDEBAR 288×720 draw ceremony.
- * Follows ACTIVE tournament id (remote preferred, local cache fallback).
- * Never issues admin commands.
+ * OBS Browser Source — SIDEBAR 288×720 draw ceremony.
+ * Follows ACTIVE tournament; reconciles overdue timed phases without Dashboard.
+ * Never issues admin commands (generate / delete / slot confirm).
  */
 export function DrawObsPage() {
   const [snapshot, setSnapshot] = useState<DrawPublicSnapshot | null>(null);
   const [syncStatus, setSyncStatus] = useState<DrawSyncStatus>('unknown');
   const [detail, setDetail] = useState<string | undefined>();
   const [tournamentId, setTournamentId] = useState<string | null>(null);
+
+  const onReconciled = useCallback((state: DrawPresentationState) => {
+    setSnapshot((prev) => {
+      const next = toPublicSnapshot(state);
+      if (prev && next.version < prev.version) return prev;
+      return next;
+    });
+  }, []);
+
+  useDrawReconcile(tournamentId, snapshot, onReconciled);
 
   useEffect(() => {
     let cancelled = false;

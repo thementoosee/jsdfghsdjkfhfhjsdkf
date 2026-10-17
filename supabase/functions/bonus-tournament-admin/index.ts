@@ -13,7 +13,7 @@ import {
   rateLimitAllow,
 } from '../_shared/bt-operator-auth.ts';
 import {
-  maybeAutoAdvance,
+  catchUpPresentation,
   PRESENTATIONS_TABLE,
   rowToCasPayload,
   type DrawRow,
@@ -544,19 +544,20 @@ Deno.serve(async (req) => {
         .eq('run_status', 'running');
       if (listErr) return json({ error: 'list_failed', detail: listErr.message }, 500);
 
-      const results: Array<{ tournamentId: string; advanced: boolean; reason?: string }> = [];
+      const results: Array<{ tournamentId: string; advanced: boolean; steps?: number; reason?: string }> =
+        [];
       for (const raw of rows ?? []) {
         const row = raw as DrawRow;
         const tournamentId = String(row.tournament_id);
-        const advanced = maybeAutoAdvance(row, nowMs);
-        if (!advanced || advanced.version === row.version) {
-          results.push({ tournamentId, advanced: false, reason: 'not_due' });
+        const { row: next, steps } = catchUpPresentation(row, nowMs);
+        if (steps === 0) {
+          results.push({ tournamentId, advanced: false, steps: 0, reason: 'not_due' });
           continue;
         }
         const { error: writeErr } = await sb.rpc('bt_draw_cas_write', {
           p_tournament_id: tournamentId,
           p_expected_version: row.version,
-          p_payload: rowToCasPayload(advanced),
+          p_payload: rowToCasPayload(next),
           p_allow_result_replace: false,
         });
         if (writeErr) {
@@ -568,7 +569,7 @@ Deno.serve(async (req) => {
           });
           continue;
         }
-        results.push({ tournamentId, advanced: true });
+        results.push({ tournamentId, advanced: true, steps });
       }
       return json({
         ok: true,

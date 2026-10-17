@@ -222,13 +222,31 @@ function enterPhase(
   phase: DrawPhase,
   durationMs: number | null,
   extra: Partial<DrawRow> = {},
+  atMs: number = Date.now(),
 ): DrawRow {
   return bump(row, {
     phase,
-    phase_started_at: new Date().toISOString(),
+    phase_started_at: new Date(atMs).toISOString(),
     phase_duration_ms: durationMs,
     ...extra,
   });
+}
+
+/** Apply phase transition without bumping version (used by multi-step catch-up). */
+function applyPhase(
+  row: DrawRow,
+  phase: DrawPhase,
+  durationMs: number | null,
+  atMs: number,
+  extra: Partial<DrawRow> = {},
+): DrawRow {
+  return {
+    ...row,
+    ...extra,
+    phase,
+    phase_started_at: new Date(atMs).toISOString(),
+    phase_duration_ms: durationMs,
+  };
 }
 
 function countConfirmedSlots(result: DrawResult | null): number {
@@ -254,54 +272,110 @@ function assignSlotToResult(
 }
 
 /** Advance one presentation step using DRAW_TIMING only (no hardcoded duplicates). */
-export function advancePresentation(row: DrawRow): DrawRow {
+export function advancePresentation(row: DrawRow, atMs: number = Date.now()): DrawRow {
   if (!row.result) return row;
   switch (row.phase) {
     case 'intro':
       return enterPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, {
         countdown_value: 3,
         run_status: 'running',
-      });
+      }, atMs);
     case 'countdown': {
       const v = row.countdown_value ?? 3;
       if (v > 1) {
-        return enterPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, { countdown_value: v - 1 });
+        return enterPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, { countdown_value: v - 1 }, atMs);
       }
       return enterPhase(row, 'reveal_player', DRAW_TIMING.revealPlayerMs, {
         countdown_value: null,
         revealed_players: 1,
-      });
+      }, atMs);
     }
     case 'reveal_player':
-      return enterPhase(row, 'awaiting_slot', null, { run_status: 'running' });
+      return enterPhase(row, 'awaiting_slot', null, { run_status: 'running' }, atMs);
     case 'slot_confirmed': {
       if (row.revealed_players >= DRAW_SLOT_COUNT) {
         return enterPhase(row, 'slots_ready', null, {
           revealed_players: DRAW_SLOT_COUNT,
           run_status: 'running',
-        });
+        }, atMs);
       }
       return enterPhase(row, 'reveal_player', DRAW_TIMING.revealPlayerMs, {
+        revealed_players: row.revealed_players + 1,
+      }, atMs);
+    }
+    case 'show_selected':
+      return enterPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, { revealed_matches: 1 }, atMs);
+    case 'reveal_match': {
+      const next = row.revealed_matches + 1;
+      if (next <= DRAW_MATCH_COUNT) {
+        return enterPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, { revealed_matches: next }, atMs);
+      }
+      return enterPhase(row, 'awaiting_advance', null, {
+        revealed_matches: DRAW_MATCH_COUNT,
+        run_status: 'completed',
+      }, atMs);
+    }
+    case 'show_bracket':
+      return enterPhase(row, 'awaiting_advance', null, { run_status: 'completed' }, atMs);
+    case 'awaiting_slot':
+    case 'slots_ready':
+    default:
+      return row;
+  }
+}
+
+/** One timed step without version bump — phase_started_at = when the step became due. */
+function advancePresentationQuiet(row: DrawRow, dueAtMs: number): DrawRow {
+  if (!row.result) return row;
+  switch (row.phase) {
+    case 'intro':
+      return applyPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, dueAtMs, {
+        countdown_value: 3,
+        run_status: 'running',
+      });
+    case 'countdown': {
+      const v = row.countdown_value ?? 3;
+      if (v > 1) {
+        return applyPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, dueAtMs, {
+          countdown_value: v - 1,
+        });
+      }
+      return applyPhase(row, 'reveal_player', DRAW_TIMING.revealPlayerMs, dueAtMs, {
+        countdown_value: null,
+        revealed_players: 1,
+      });
+    }
+    case 'reveal_player':
+      return applyPhase(row, 'awaiting_slot', null, dueAtMs, { run_status: 'running' });
+    case 'slot_confirmed': {
+      if (row.revealed_players >= DRAW_SLOT_COUNT) {
+        return applyPhase(row, 'slots_ready', null, dueAtMs, {
+          revealed_players: DRAW_SLOT_COUNT,
+          run_status: 'running',
+        });
+      }
+      return applyPhase(row, 'reveal_player', DRAW_TIMING.revealPlayerMs, dueAtMs, {
         revealed_players: row.revealed_players + 1,
       });
     }
     case 'show_selected':
-      return enterPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, { revealed_matches: 1 });
+      return applyPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, dueAtMs, {
+        revealed_matches: 1,
+      });
     case 'reveal_match': {
       const next = row.revealed_matches + 1;
       if (next <= DRAW_MATCH_COUNT) {
-        return enterPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, { revealed_matches: next });
+        return applyPhase(row, 'reveal_match', DRAW_TIMING.revealMatchMs, dueAtMs, {
+          revealed_matches: next,
+        });
       }
-      // No intermediate bracket on the sidebar — Arena Duel (QF) is next.
-      return enterPhase(row, 'awaiting_advance', null, {
+      return applyPhase(row, 'awaiting_advance', null, dueAtMs, {
         revealed_matches: DRAW_MATCH_COUNT,
         run_status: 'completed',
       });
     }
     case 'show_bracket':
-      return enterPhase(row, 'awaiting_advance', null, { run_status: 'completed' });
-    case 'awaiting_slot':
-    case 'slots_ready':
+      return applyPhase(row, 'awaiting_advance', null, dueAtMs, { run_status: 'completed' });
     default:
       return row;
   }
@@ -312,8 +386,62 @@ export function maybeAutoAdvance(row: DrawRow, nowMs = Date.now()): DrawRow | nu
   if (!row.phase_started_at || row.phase_duration_ms == null) return null;
   const started = Date.parse(row.phase_started_at);
   if (!Number.isFinite(started)) return null;
-  if (nowMs < started + row.phase_duration_ms) return null;
-  return advancePresentation(row);
+  const dueAt = started + row.phase_duration_ms;
+  if (nowMs < dueAt) return null;
+  return advancePresentation(row, dueAt);
+}
+
+/** True when a timed phase is overdue and eligible for server catch-up. */
+export function isTimedPhaseDue(row: DrawRow, nowMs = Date.now()): boolean {
+  if (row.run_status !== 'running') return false;
+  if (!row.phase_started_at || row.phase_duration_ms == null) return false;
+  const started = Date.parse(row.phase_started_at);
+  if (!Number.isFinite(started)) return false;
+  return nowMs >= started + row.phase_duration_ms;
+}
+
+/**
+ * Catch up all overdue timed steps into one logical state, then single version bump.
+ * Idempotent: if nothing due, returns steps=0 and the same row reference fields.
+ * Stops at gates (awaiting_slot / slots_ready / paused / completed).
+ */
+export function catchUpPresentation(
+  row: DrawRow,
+  nowMs = Date.now(),
+  maxSteps = 16,
+): { row: DrawRow; steps: number } {
+  let cur = row;
+  let steps = 0;
+  while (steps < maxSteps) {
+    if (cur.run_status !== 'running') break;
+    if (!cur.phase_started_at || cur.phase_duration_ms == null) break;
+    const started = Date.parse(cur.phase_started_at);
+    if (!Number.isFinite(started)) break;
+    const dueAt = started + cur.phase_duration_ms;
+    if (nowMs < dueAt) break;
+    const next = advancePresentationQuiet(cur, dueAt);
+    if (next.phase === cur.phase && next.countdown_value === cur.countdown_value &&
+        next.revealed_players === cur.revealed_players &&
+        next.revealed_matches === cur.revealed_matches) {
+      break;
+    }
+    cur = next;
+    steps += 1;
+  }
+  if (steps === 0) return { row, steps: 0 };
+  return {
+    row: bump(cur, {
+      // preserve catch-up phase timestamps from quiet advances
+      phase: cur.phase,
+      phase_started_at: cur.phase_started_at,
+      phase_duration_ms: cur.phase_duration_ms,
+      countdown_value: cur.countdown_value,
+      revealed_players: cur.revealed_players,
+      revealed_matches: cur.revealed_matches,
+      run_status: cur.run_status,
+    }),
+    steps,
+  };
 }
 
 /**
@@ -414,13 +542,11 @@ export async function applyCommand(
       };
     }
 
-    /** Server/controller nudge: advance at most one timed step when due (CAS +1). */
+    /** Server catch-up: all overdue timed steps in one CAS (+1 version). */
     case 'TICK': {
-      const advanced = maybeAutoAdvance(row);
-      if (!advanced || advanced.version === row.version) {
-        return { row, allowResultReplace: false };
-      }
-      return { row: advanced, allowResultReplace: false };
+      const { row: next, steps } = catchUpPresentation(row);
+      if (steps === 0) return { row, allowResultReplace: false };
+      return { row: next, allowResultReplace: false };
     }
 
     case 'PAUSE':
