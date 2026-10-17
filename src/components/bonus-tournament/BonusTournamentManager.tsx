@@ -49,6 +49,7 @@ import {
   getActiveTournamentSession,
   isTournamentInProgress,
   listTournamentSessions,
+  pruneNonDemoSessionsNotInRemote,
   resetDemoTournamentSession,
   saveTournamentDemo,
   subscribeTournamentSessions,
@@ -250,7 +251,9 @@ export function BonusTournamentManager() {
       if (probe.status === 'ready') {
         const listed = await listRemoteTournaments();
         if (cancelled || !listed.ok) return;
+        const remoteIds: string[] = [];
         for (const row of listed.rows) {
+          remoteIds.push(row.id);
           const pack = await import('./tournament-remote-api').then((m) =>
             m.fetchRemoteTournament(row.id),
           );
@@ -261,6 +264,8 @@ export function BonusTournamentManager() {
             remoteVersionRef.current = row.state_version;
           }
         }
+        // Remote list is SoT for non-DEMO sessions — drop local ghosts that still exist in DB list miss.
+        pruneNonDemoSessionsNotInRemote(remoteIds);
         refreshSessions();
       }
     })();
@@ -523,10 +528,28 @@ export function BonusTournamentManager() {
         {deleteTarget && (
           <DeleteTournamentModal
             record={deleteTarget}
+            remoteDelete={operatorUnlocked && !deleteTarget.demo.isDemo}
             onCancel={() => setDeleteTarget(null)}
-            onConfirm={() => {
+            onConfirm={async () => {
               const id = deleteTarget.id;
               const wasDemo = deleteTarget.demo.isDemo;
+              const needRemote = !wasDemo && operatorUnlocked;
+
+              if (needRemote) {
+                const remote = await deleteRemoteTournament(id);
+                if (!remote.ok) {
+                  return {
+                    ok: false as const,
+                    error: remote.error ?? 'Falha ao eliminar no servidor. O torneio não foi removido.',
+                  };
+                }
+              } else if (!wasDemo && !operatorUnlocked) {
+                return {
+                  ok: false as const,
+                  error: 'Admin remoto indisponível — não é possível eliminar torneios reais só no browser.',
+                };
+              }
+
               const result = deleteTournamentSession(id);
               if (result.deleted && result.wasActive) {
                 clearLiveMirror();
@@ -535,11 +558,9 @@ export function BonusTournamentManager() {
                 setDrawSnapshot(null);
                 if (operatorUnlocked) void activateRemoteTournament(null);
               }
-              if (!wasDemo && operatorUnlocked) {
-                void deleteRemoteTournament(id);
-              }
               setDeleteTarget(null);
               refreshSessions();
+              return { ok: true as const };
             }}
           />
         )}
@@ -1669,14 +1690,19 @@ function SessionRow({
 
 function DeleteTournamentModal({
   record,
+  remoteDelete,
   onCancel,
   onConfirm,
 }: {
   record: TournamentSessionRecord;
+  remoteDelete: boolean;
   onCancel: () => void;
-  onConfirm: () => void;
+  onConfirm: () => Promise<{ ok: true } | { ok: false; error: string }>;
 }) {
   const name = record.demo.entriesConfig.tournamentTitle || record.demo.name;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -1693,8 +1719,9 @@ function DeleteTournamentModal({
           Apagar torneio?
         </h2>
         <p className="text-sm leading-relaxed" style={{ color: ui.muted }}>
-          Tens a certeza de que queres apagar este torneio? Esta ação elimina os dados locais do
-          torneio e não pode ser anulada.
+          {remoteDelete
+            ? 'Esta ação elimina o torneio na base de dados (e o cache local). Só desaparece da lista após confirmação do servidor.'
+            : 'Esta ação elimina apenas o DEMO local neste browser.'}
         </p>
         <div
           className="rounded-xl px-3 py-2 text-sm font-bold truncate"
@@ -1702,19 +1729,38 @@ function DeleteTournamentModal({
         >
           {name}
         </div>
+        {error && (
+          <p className="text-xs font-bold" style={{ color: '#fca5a5' }}>
+            {error}
+          </p>
+        )}
         <div className="flex flex-wrap justify-end gap-2 pt-1">
-          <GhostBtn onClick={onCancel}>CANCELAR</GhostBtn>
+          <GhostBtn onClick={onCancel} disabled={busy}>
+            CANCELAR
+          </GhostBtn>
           <button
             type="button"
-            onClick={onConfirm}
-            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide"
+            disabled={busy}
+            onClick={() => {
+              void (async () => {
+                setBusy(true);
+                setError(null);
+                const res = await onConfirm();
+                if (!res.ok) {
+                  setError(res.error);
+                  setBusy(false);
+                  return;
+                }
+              })();
+            }}
+            className="px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wide disabled:opacity-50"
             style={{
               background: 'rgba(239,68,68,0.15)',
               color: '#fca5a5',
               border: '1px solid rgba(239,68,68,0.45)',
             }}
           >
-            APAGAR TORNEIO
+            {busy ? 'A APAGAR…' : 'APAGAR TORNEIO'}
           </button>
         </div>
       </div>

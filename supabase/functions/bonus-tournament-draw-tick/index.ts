@@ -3,10 +3,12 @@
  *
  * Auth: BT_DRAW_TICK_SECRET header only (never in browser / VITE_*).
  * Uses the same DRAW_TIMING as commands (draw-timing.json via bt-draw.ts).
- * Does not hardcode phase durations in SQL.
  *
- * Cron must NOT be activated until approved. Prepared for ≥1 Hz scheduling
- * (shortest phase step is countdownStepMs = 1000).
+ * Body:
+ * - { tournamentId } → tick one presentation
+ * - { scanAll: true } or omit tournamentId → tick every due running presentation
+ *
+ * Cron / Vercel schedule should POST scanAll ≥1 Hz when available.
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
@@ -40,6 +42,42 @@ function timingSafeEqual(a: string, b: string): boolean {
   return out === 0;
 }
 
+async function tickOne(
+  admin: ReturnType<typeof createClient>,
+  tournamentId: string,
+  nowMs: number,
+): Promise<{ tournamentId: string; advanced: boolean; reason?: string }> {
+  const { data: existing, error: loadErr } = await admin
+    .from(PRESENTATIONS_TABLE)
+    .select('*')
+    .eq('tournament_id', tournamentId)
+    .maybeSingle();
+  if (loadErr) return { tournamentId, advanced: false, reason: loadErr.message };
+  if (!existing) return { tournamentId, advanced: false, reason: 'no_row' };
+
+  const row = existing as DrawRow;
+  const advanced = maybeAutoAdvance(row, nowMs);
+  if (!advanced || advanced.version === row.version) {
+    return { tournamentId, advanced: false, reason: 'not_due' };
+  }
+
+  const { error: writeErr } = await admin.rpc('bt_draw_cas_write', {
+    p_tournament_id: tournamentId,
+    p_expected_version: row.version,
+    p_payload: rowToCasPayload(advanced),
+    p_allow_result_replace: false,
+  });
+
+  if (writeErr) {
+    const msg = (writeErr.message ?? '').toLowerCase();
+    if (msg.includes('version conflict')) {
+      return { tournamentId, advanced: false, reason: 'version_conflict' };
+    }
+    return { tournamentId, advanced: false, reason: writeErr.message };
+  }
+  return { tournamentId, advanced: true };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
@@ -51,44 +89,39 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const body = await req.json().catch(() => ({}));
-    const tournamentId = String(body.tournamentId ?? 'demo-bonus-tournament');
-
+    const body = (await req.json().catch(() => ({}))) as {
+      tournamentId?: string;
+      scanAll?: boolean;
+    };
+    const nowMs = Date.now();
     const admin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    const { data: existing, error: loadErr } = await admin
+    const scanAll = body.scanAll === true || !body.tournamentId;
+    if (!scanAll) {
+      const one = await tickOne(admin, String(body.tournamentId), nowMs);
+      return json({ ok: true, ...one });
+    }
+
+    const { data: rows, error: listErr } = await admin
       .from(PRESENTATIONS_TABLE)
-      .select('*')
-      .eq('tournament_id', tournamentId)
-      .maybeSingle();
-    if (loadErr) return json({ error: 'load_failed', detail: loadErr.message }, 500);
-    if (!existing) return json({ ok: true, advanced: false, reason: 'no_row' });
+      .select('tournament_id')
+      .eq('run_status', 'running');
+    if (listErr) return json({ error: 'list_failed', detail: listErr.message }, 500);
 
-    const row = existing as DrawRow;
-    const advanced = maybeAutoAdvance(row);
-    if (!advanced || advanced.version === row.version) {
-      return json({ ok: true, advanced: false, state: existing });
+    const ids = [...new Set((rows ?? []).map((r) => String((r as { tournament_id: string }).tournament_id)))];
+    const results = [];
+    for (const id of ids) {
+      results.push(await tickOne(admin, id, nowMs));
     }
-
-    const { data: written, error: writeErr } = await admin.rpc('bt_draw_cas_write', {
-      p_tournament_id: tournamentId,
-      p_expected_version: row.version,
-      p_payload: rowToCasPayload(advanced),
-      p_allow_result_replace: false,
+    return json({
+      ok: true,
+      scanned: ids.length,
+      advanced: results.filter((r) => r.advanced).length,
+      results,
     });
-
-    if (writeErr) {
-      const msg = (writeErr.message ?? '').toLowerCase();
-      if (msg.includes('version conflict')) {
-        return json({ ok: true, advanced: false, reason: 'version_conflict' }, 200);
-      }
-      return json({ error: 'cas_write_failed', detail: writeErr.message }, 500);
-    }
-
-    return json({ ok: true, advanced: true, state: written });
   } catch (err) {
     return json({ error: 'exception', detail: err instanceof Error ? err.message : String(err) }, 500);
   }

@@ -82,6 +82,7 @@ export type DrawAdminCommand =
   | { type: 'CLOSE_ENTRIES' }
   | { type: 'GENERATE_DRAW'; entries: BonusTournamentEntry[] }
   | { type: 'START_PRESENTATION' }
+  | { type: 'TICK' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'NEXT' }

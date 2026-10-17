@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../../lib/overlay-layout';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { SlotThumb } from './SlotThumb';
+import { resolveCountdownDisplay } from './draw-countdown-display';
 import {
   DRAW_MATCH_COUNT,
   DRAW_SLOT_COUNT,
@@ -164,7 +165,7 @@ export function DrawSidebarOverlay({
           ) : phase === 'intro' ? (
             <IntroBody snapshot={snapshot} progress={progress} />
           ) : phase === 'countdown' ? (
-            <CountdownBody value={snapshot.countdownValue ?? 3} progress={progress} />
+            <LiveCountdownBody snapshot={snapshot} forceProgress={forceProgress} />
           ) : phase === 'reveal_player' || phase === 'awaiting_slot' || phase === 'slot_confirmed' ? (
             <RevealBody snapshot={snapshot} progress={progress} decorPool={decorPool} />
           ) : phase === 'slots_ready' || phase === 'show_selected' ? (
@@ -277,6 +278,31 @@ function IntroBody({ snapshot, progress }: { snapshot: DrawPublicSnapshot; progr
       </p>
     </div>
   );
+}
+
+function LiveCountdownBody({
+  snapshot,
+  forceProgress,
+}: {
+  snapshot: DrawPublicSnapshot;
+  forceProgress?: number;
+}) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (snapshot.runStatus === 'paused') return;
+    let raf = 0;
+    const tick = () => {
+      setNow(Date.now());
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [snapshot.runStatus, snapshot.phaseStartedAt, snapshot.version, snapshot.eventId]);
+
+  const resolved = resolveCountdownDisplay(snapshot, now);
+  const progress =
+    typeof forceProgress === 'number' ? Math.min(1, Math.max(0, forceProgress)) : resolved.progress;
+  return <CountdownBody value={resolved.value} progress={progress} />;
 }
 
 function CountdownBody({ value, progress }: { value: number; progress: number }) {

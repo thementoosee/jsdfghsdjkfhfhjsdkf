@@ -103,6 +103,41 @@ describe('Edge applyCommand START / immutability', () => {
     expect(next.revealed_players).toBe(0);
   });
 
+  it('TICK advances countdown when phase duration elapsed', async () => {
+    const result = sampleResult(false);
+    const started = new Date(Date.now() - 1500).toISOString();
+    const row = {
+      ...lockedIdleRow(result),
+      version: 2,
+      run_status: 'running' as const,
+      phase: 'countdown' as const,
+      countdown_value: 3,
+      phase_started_at: started,
+      phase_duration_ms: 1000,
+    };
+    const { row: next } = await applyCommand(row, { type: 'TICK' }, 't1');
+    expect(next.countdown_value).toBe(2);
+    expect(next.phase).toBe('countdown');
+    expect(next.version).toBe(3);
+    expect(next.result).toBe(result);
+  });
+
+  it('TICK is no-op when not due', async () => {
+    const result = sampleResult(false);
+    const row = {
+      ...lockedIdleRow(result),
+      version: 2,
+      run_status: 'running' as const,
+      phase: 'countdown' as const,
+      countdown_value: 3,
+      phase_started_at: new Date().toISOString(),
+      phase_duration_ms: 1000,
+    };
+    const { row: next } = await applyCommand(row, { type: 'TICK' }, 't1');
+    expect(next.version).toBe(2);
+    expect(next.countdown_value).toBe(3);
+  });
+
   it('CONFIRM_SLOT allows result replace for slot metadata only', async () => {
     const result = sampleResult(false);
     const awaiting = {

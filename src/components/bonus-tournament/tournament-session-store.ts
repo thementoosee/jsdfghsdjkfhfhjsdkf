@@ -253,6 +253,29 @@ export function deleteTournamentSession(id: string): {
   return { deleted: true, wasActive };
 }
 
+/**
+ * After remote list hydrate: drop non-DEMO local sessions whose ids are gone from Supabase.
+ * Keeps explicit DEMO sandboxes that never lived remotely.
+ */
+export function pruneNonDemoSessionsNotInRemote(remoteIds: Iterable<string>): {
+  removed: string[];
+} {
+  const keep = new Set(remoteIds);
+  const store = readRaw();
+  const removed: string[] = [];
+  store.sessions = store.sessions.filter((s) => {
+    if (s.demo.isDemo) return true;
+    if (keep.has(s.id)) return true;
+    removed.push(s.id);
+    return false;
+  });
+  if (store.activeId && removed.includes(store.activeId)) {
+    store.activeId = null;
+  }
+  if (removed.length > 0) writeRaw(store);
+  return { removed };
+}
+
 export function subscribeTournamentSessions(onChange: () => void): () => void {
   if (typeof window === 'undefined') return () => undefined;
   const onStorage = (e: StorageEvent) => {

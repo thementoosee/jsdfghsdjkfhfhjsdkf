@@ -251,6 +251,7 @@ export function DrawManagerPanel({
     };
   }, [syncStatus]);
 
+  // DEMO / offline: advance locally in-browser.
   useEffect(() => {
     if (!localOnly) return;
     if (state.runStatus !== 'running') return;
@@ -262,6 +263,40 @@ export function DrawManagerPanel({
     }, 200);
     return () => clearInterval(id);
   }, [state.runStatus, localOnly]);
+
+  // Live remote: Dashboard is the ceremony controller — nudge Edge TICK (≥1 Hz).
+  // OBS mirrors CAS writes via Realtime/poll; without this, countdown stays at 3 forever.
+  useEffect(() => {
+    if (localOnly) return;
+    if (state.runStatus !== 'running') return;
+    let cancelled = false;
+    const nudge = async () => {
+      if (cancelled || busy) return;
+      const prev = stateRef.current;
+      if (prev.runStatus !== 'running') return;
+      const res = await invokeDrawCommand({
+        tournamentId,
+        expectedVersion: prev.version,
+        command: { type: 'TICK' },
+      });
+      if (cancelled) return;
+      if (res.ok) {
+        setState(res.state);
+        stateRef.current = res.state;
+      } else if (res.remote) {
+        setState(res.remote);
+        stateRef.current = res.remote;
+      }
+    };
+    const id = window.setInterval(() => {
+      void nudge();
+    }, 400);
+    void nudge();
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [state.runStatus, localOnly, tournamentId, busy]);
 
   const obsUrl =
     typeof window !== 'undefined'

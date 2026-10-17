@@ -13,6 +13,12 @@ import {
   rateLimitAllow,
 } from '../_shared/bt-operator-auth.ts';
 import {
+  maybeAutoAdvance,
+  PRESENTATIONS_TABLE,
+  rowToCasPayload,
+  type DrawRow,
+} from '../_shared/bt-draw.ts';
+import {
   fetchTwitchProfileImagesByIds,
   isMissingOrGenericAvatar,
 } from '../_shared/bt-twitch-avatars.ts';
@@ -507,13 +513,69 @@ Deno.serve(async (req) => {
     if (action === 'delete') {
       const id = String(body.tournamentId ?? '');
       if (!id) return json({ error: 'missing_tournament_id' }, 400);
+      const { data: existing, error: lookupErr } = await sb
+        .from(TOURNAMENTS)
+        .select('id')
+        .eq('id', id)
+        .maybeSingle();
+      if (lookupErr) return json({ error: 'delete_failed', detail: lookupErr.message }, 500);
+      if (!existing) return json({ error: 'not_found', detail: 'tournament_not_found' }, 404);
       // Clear ACTIVE first if needed
       await sb.rpc('bt_activate_tournament', { p_tournament_id: id, p_active: false }).catch(() => null);
       await sb.from(ENTRIES).delete().eq('tournament_id', id);
-      await sb.from('bonus_tournament_draw_presentations').delete().eq('tournament_id', id);
-      const { error } = await sb.from(TOURNAMENTS).delete().eq('id', id);
+      await sb.from(PRESENTATIONS_TABLE).delete().eq('tournament_id', id);
+      const { data: deletedRows, error } = await sb.from(TOURNAMENTS).delete().eq('id', id).select('id');
       if (error) return json({ error: 'delete_failed', detail: error.message }, 500);
-      return json({ ok: true, deleted: true });
+      if (!deletedRows?.length) {
+        return json({ error: 'delete_failed', detail: 'no_rows_deleted' }, 500);
+      }
+      return json({ ok: true, deleted: true, id });
+    }
+
+    /**
+     * Advance every due running draw presentation by at most one timed step (CAS).
+     * Used by Vercel Cron /api/bt-draw-tick — single server controller, no browser secret.
+     */
+    if (action === 'tick_due_draws') {
+      const nowMs = Date.now();
+      const { data: rows, error: listErr } = await sb
+        .from(PRESENTATIONS_TABLE)
+        .select('*')
+        .eq('run_status', 'running');
+      if (listErr) return json({ error: 'list_failed', detail: listErr.message }, 500);
+
+      const results: Array<{ tournamentId: string; advanced: boolean; reason?: string }> = [];
+      for (const raw of rows ?? []) {
+        const row = raw as DrawRow;
+        const tournamentId = String(row.tournament_id);
+        const advanced = maybeAutoAdvance(row, nowMs);
+        if (!advanced || advanced.version === row.version) {
+          results.push({ tournamentId, advanced: false, reason: 'not_due' });
+          continue;
+        }
+        const { error: writeErr } = await sb.rpc('bt_draw_cas_write', {
+          p_tournament_id: tournamentId,
+          p_expected_version: row.version,
+          p_payload: rowToCasPayload(advanced),
+          p_allow_result_replace: false,
+        });
+        if (writeErr) {
+          const msg = (writeErr.message ?? '').toLowerCase();
+          results.push({
+            tournamentId,
+            advanced: false,
+            reason: msg.includes('version conflict') ? 'version_conflict' : writeErr.message,
+          });
+          continue;
+        }
+        results.push({ tournamentId, advanced: true });
+      }
+      return json({
+        ok: true,
+        scanned: results.length,
+        advanced: results.filter((r) => r.advanced).length,
+        results,
+      });
     }
 
     return json({ error: 'unknown_action' }, 400);

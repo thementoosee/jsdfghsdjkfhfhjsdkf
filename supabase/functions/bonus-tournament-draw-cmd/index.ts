@@ -48,6 +48,7 @@ const ALLOWED_TYPES = new Set([
   'GENERATE_DRAW',
   'REGENERATE_DRAW',
   'START_PRESENTATION',
+  'TICK',
   'PAUSE',
   'RESUME',
   'NEXT',

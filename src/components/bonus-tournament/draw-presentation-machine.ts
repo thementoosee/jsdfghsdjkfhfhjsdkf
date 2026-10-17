@@ -311,6 +311,11 @@ export async function applyDrawCommand(
       });
     }
 
+    case 'TICK': {
+      const advanced = maybeAutoAdvance(state);
+      return advanced ?? state;
+    }
+
     case 'PAUSE': {
       if (state.runStatus !== 'running') return state;
       return bump(state, { runStatus: 'paused' });

@@ -78,6 +78,7 @@ export type DrawCmd =
   | { type: 'GENERATE_DRAW' }
   | { type: 'REGENERATE_DRAW' }
   | { type: 'START_PRESENTATION' }
+  | { type: 'TICK' }
   | { type: 'PAUSE' }
   | { type: 'RESUME' }
   | { type: 'NEXT' }
@@ -411,6 +412,15 @@ export async function applyCommand(
         }),
         allowResultReplace: false,
       };
+    }
+
+    /** Server/controller nudge: advance at most one timed step when due (CAS +1). */
+    case 'TICK': {
+      const advanced = maybeAutoAdvance(row);
+      if (!advanced || advanced.version === row.version) {
+        return { row, allowResultReplace: false };
+      }
+      return { row: advanced, allowResultReplace: false };
     }
 
     case 'PAUSE':
