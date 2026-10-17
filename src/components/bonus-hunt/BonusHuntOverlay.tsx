@@ -315,11 +315,15 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-1.5">
                 <Gift className="w-4 h-4 text-blue-400" />
-                <div className="flex flex-col">
+                <div className="flex flex-col gap-0">
                   <h1 className="text-[10px] font-black uppercase tracking-wide text-white leading-none">
                     BONUS HUNT
                   </h1>
-                  <span className="text-[9px] font-semibold text-white/80 leading-none">{hunt?.streamer_name || 'fever'}</span>
+                  {hunt?.streamer_name?.trim() ? (
+                    <span className="text-[9px] font-semibold text-white/80 leading-none mt-0.5">
+                      {hunt.streamer_name.trim()}
+                    </span>
+                  ) : null}
                 </div>
               </div>
               <div className="text-[11px] font-black text-white/70">
