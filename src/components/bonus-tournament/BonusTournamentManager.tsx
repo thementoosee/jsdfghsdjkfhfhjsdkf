@@ -63,6 +63,7 @@ import {
 } from './tournament-remote-broadcast';
 import {
   activateRemoteTournament,
+  refreshRemoteAvatars,
   createRemoteTournament,
   deleteRemoteTournament,
   listRemoteTournaments,
@@ -366,10 +367,13 @@ export function BonusTournamentManager() {
         alert('Introduz o Operator Secret na visão geral antes de ACTIVAR.');
         return;
       }
-      void activateRemoteTournament(id).then((res) => {
+      void activateRemoteTournament(id).then(async (res) => {
         if (!res.ok) {
           alert(res.error || 'Falha ao ACTIVAR no Supabase.');
+          return;
         }
+        // Best-effort: refresh generic avatars for already-enrolled viewers.
+        void refreshRemoteAvatars(id);
       });
     }
     const record = listTournamentSessions().find((s) => s.id === id);

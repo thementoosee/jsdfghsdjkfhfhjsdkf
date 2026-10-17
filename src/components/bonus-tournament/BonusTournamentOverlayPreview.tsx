@@ -73,7 +73,12 @@ export function resolveOverlayLivePack(
 }
 
 /** OBS / preview overlay — ACTIVE tournament only (local or remote broadcast). */
-export function BonusTournamentOverlayPreview() {
+export function BonusTournamentOverlayPreview({
+  embedded = false,
+}: {
+  /** Main-stream sidebar: no chrome / DEMO controls — slide transitions own the frame. */
+  embedded?: boolean;
+} = {}) {
   const [remote, setRemote] = useState<TournamentRemoteMirrorPayload | null>(null);
   const [dbActive, setDbActive] = useState<BonusTournamentDemo | null>(null);
   const [demo, setDemo] = useState<BonusTournamentDemo>(() => {
@@ -279,6 +284,14 @@ export function BonusTournamentOverlayPreview() {
 
   const isEntries = demo.overlayView === 'entries' || demo.status === 'entries';
   const showLocalControls = !liveSynced && previewMode;
+
+  if (embedded) {
+    return (
+      <div className="h-full w-full" style={{ background: 'transparent' }}>
+        <BonusTournamentOverlay demo={demo} drawSnapshot={drawSnapshot} />
+      </div>
+    );
+  }
 
   return (
     <div

@@ -24,6 +24,10 @@ import {
   operatorSecretHeaderName,
   rateLimitAllow,
 } from '../_shared/bt-operator-auth.ts';
+import {
+  fetchTwitchProfileImagesByIds,
+  isMissingOrGenericAvatar,
+} from '../_shared/bt-twitch-avatars.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -170,11 +174,43 @@ Deno.serve(async (req) => {
             'Nenhum inscrito em bonus_tournament_entries para este torneio. Não se aceita lista do browser.',
         }, 503);
       }
-      trustedEntries = entryRows.map((r) => ({
-        twitchUserId: String(r.twitch_user_id),
-        displayName: String(r.display_name ?? ''),
-        avatarUrl: String(r.avatar_url ?? ''),
-      }));
+
+      // Backfill missing/generic avatars once before locking the draw result.
+      const needAvatar = entryRows.filter((r) => isMissingOrGenericAvatar(String(r.avatar_url ?? '')));
+      let avatarMap = new Map<string, string>();
+      if (needAvatar.length > 0) {
+        try {
+          avatarMap = await fetchTwitchProfileImagesByIds(
+            needAvatar.map((r) => String(r.twitch_user_id)),
+          );
+          for (const r of needAvatar) {
+            const tid = String(r.twitch_user_id);
+            const url = avatarMap.get(tid);
+            if (!url || isMissingOrGenericAvatar(url)) continue;
+            await admin
+              .from(ENTRIES_TABLE)
+              .update({ avatar_url: url })
+              .eq('tournament_id', tournamentId)
+              .eq('twitch_user_id', tid);
+          }
+        } catch (avatarErr) {
+          console.warn(
+            '[bt-draw-cmd] avatar backfill failed',
+            avatarErr instanceof Error ? avatarErr.message : String(avatarErr),
+          );
+        }
+      }
+
+      trustedEntries = entryRows.map((r) => {
+        const tid = String(r.twitch_user_id);
+        const stored = String(r.avatar_url ?? '');
+        const resolved = avatarMap.get(tid);
+        return {
+          twitchUserId: tid,
+          displayName: String(r.display_name ?? ''),
+          avatarUrl: resolved && !isMissingOrGenericAvatar(resolved) ? resolved : stored,
+        };
+      });
     }
 
     // Prefer is_demo from bonus_tournaments (live core); fall back to presentation row / false.

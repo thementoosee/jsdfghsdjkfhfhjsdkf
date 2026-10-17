@@ -19,6 +19,7 @@ import {
   pickSpotlightSatellites,
   spotlightIndexAtProgress,
 } from './spotlight-draw';
+import { TwitchAvatar } from './TwitchAvatar';
 
 const W = MAIN_OVERLAY_SIDEBAR_WIDTH_PX;
 const H = 720;
@@ -456,18 +457,12 @@ function RevealBody({
                   transition: 'none',
                 }}
               >
-                <img
-                  src={sat.avatarUrl}
-                  alt=""
-                  width={SAT_AVATAR}
-                  height={SAT_AVATAR}
-                  className="rounded-full object-cover"
-                  style={{
-                    width: SAT_AVATAR,
-                    height: SAT_AVATAR,
-                    border: '2px solid rgba(148,163,184,0.45)',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.35)',
-                  }}
+                <TwitchAvatar
+                  url={sat.avatarUrl}
+                  name={sat.displayName}
+                  size={SAT_AVATAR}
+                  border="2px solid rgba(148,163,184,0.45)"
+                  boxShadow="0 4px 12px rgba(0,0,0,0.35)"
                   draggable={false}
                 />
               </div>
@@ -493,18 +488,13 @@ function RevealBody({
                 background: `radial-gradient(circle, rgba(251,191,36,${0.18 + goldBoost * 0.55}) 0%, transparent 70%)`,
               }}
             />
-            <img
-              src={centerFace.avatarUrl}
-              alt=""
-              width={avatarSize}
-              height={avatarSize}
-              className="relative rounded-full object-cover"
-              style={{
-                width: avatarSize,
-                height: avatarSize,
-                border: `3px solid ${GOLD}`,
-                boxShadow: `0 0 0 5px rgba(251,191,36,${goldBoost}), 0 14px 32px rgba(0,0,0,0.45)`,
-              }}
+            <TwitchAvatar
+              url={centerFace.avatarUrl}
+              name={centerFace.displayName}
+              size={avatarSize}
+              className="relative"
+              border={`3px solid ${GOLD}`}
+              boxShadow={`0 0 0 5px rgba(251,191,36,${goldBoost}), 0 14px 32px rgba(0,0,0,0.45)`}
               draggable={false}
             />
           </div>
@@ -637,14 +627,12 @@ function SlotsReadyBody({
           const cellIn = easeOutCubic(Math.min(1, Math.max(0, (Math.max(progress, 0.5) - i * 0.02) / 0.25)));
           return (
             <div key={p.twitchUserId} className="flex flex-col items-center gap-0.5" style={{ opacity: cellIn }}>
-              <img
-                src={p.avatarUrl}
-                alt=""
-                className="w-[52px] h-[52px] rounded-full object-cover"
-                style={{
-                  border: `2px solid ${GOLD}`,
-                  boxShadow: '0 0 10px rgba(251,191,36,0.2)',
-                }}
+              <TwitchAvatar
+                url={p.avatarUrl}
+                name={p.displayName}
+                size={52}
+                border={`2px solid ${GOLD}`}
+                boxShadow="0 0 10px rgba(251,191,36,0.2)"
                 draggable={false}
               />
               <div
@@ -778,18 +766,12 @@ function DiagonalDuelSide({
   return (
     <div className={`flex flex-col ${align} gap-2`} style={{ maxWidth: 268 }}>
       <div className={`flex ${row} items-center gap-1.5`}>
-        <img
-          src={player.avatarUrl}
-          alt=""
-          width={DUEL_AVATAR}
-          height={DUEL_AVATAR}
-          className="rounded-full object-cover flex-shrink-0"
-          style={{
-            width: DUEL_AVATAR,
-            height: DUEL_AVATAR,
-            border: `2.5px solid ${GOLD}`,
-            boxShadow: '0 8px 18px rgba(0,0,0,0.4)',
-          }}
+        <TwitchAvatar
+          url={player.avatarUrl}
+          name={player.displayName}
+          size={DUEL_AVATAR}
+          border={`2.5px solid ${GOLD}`}
+          boxShadow="0 8px 18px rgba(0,0,0,0.4)"
           draggable={false}
         />
         <FitName

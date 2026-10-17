@@ -266,6 +266,15 @@ export async function activateRemoteTournament(
   return res.ok ? { ok: true } : { ok: false, error: res.error };
 }
 
+/** Operator: Helix backfill for entries (and players jsonb) missing real Twitch avatars. */
+export async function refreshRemoteAvatars(
+  tournamentId: string,
+): Promise<{ ok: boolean; updated?: number; error?: string }> {
+  const res = await invokeAdmin('refresh_avatars', { tournamentId });
+  if (!res.ok) return { ok: false, error: res.error };
+  return { ok: true, updated: Number(res.data?.updated ?? 0) };
+}
+
 export async function persistRemoteTournamentState(
   demo: BonusTournamentDemo,
   expectedVersion: number,

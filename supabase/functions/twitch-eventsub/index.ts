@@ -1,4 +1,8 @@
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import {
+  resolveTwitchProfileImage,
+  TWITCH_DEFAULT_AVATAR_URL,
+} from '../_shared/bt-twitch-avatars.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -541,8 +545,7 @@ async function insertChatMessageFromNotification(
   if (commandToken.startsWith('!')) {
     const chatterId = String(event.chatter_user_id ?? row.username);
     const displayName = row.display_name || row.username;
-    const defaultAvatar =
-      'https://static-cdn.jtvnw.net/user-default-pictures-uv/13e5fa74-defa-11e9-809c-784f43822e80-profile_image-70x70.png';
+    const defaultAvatar = TWITCH_DEFAULT_AVATAR_URL;
 
     try {
       const { data: giveaways, error: giveawayError } = await supabase
@@ -616,11 +619,22 @@ async function insertChatMessageFromNotification(
           .trim()
           .toLowerCase() === commandToken
       ) {
+        // EventSub chat.message has no profile_image_url — resolve via Helix by twitch_user_id.
+        let avatarUrl = defaultAvatar;
+        try {
+          avatarUrl = await resolveTwitchProfileImage(chatterId);
+        } catch (avatarErr) {
+          console.warn(
+            '[twitch-eventsub] avatar helix failed, using default',
+            avatarErr instanceof Error ? avatarErr.message : String(avatarErr),
+          );
+        }
+
         const { error: entryError } = await supabase.from('bonus_tournament_entries').insert({
           tournament_id: String(activeBt.id),
           twitch_user_id: chatterId,
           display_name: displayName,
-          avatar_url: defaultAvatar,
+          avatar_url: avatarUrl,
         });
 
         if (entryError) {
@@ -637,6 +651,7 @@ async function insertChatMessageFromNotification(
             tournament: activeBt.name,
             username: row.username,
             command: commandToken,
+            avatar_resolved: avatarUrl !== defaultAvatar,
           });
         }
       }

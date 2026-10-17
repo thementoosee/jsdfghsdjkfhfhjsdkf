@@ -12,6 +12,7 @@ import { calcTournamentHudStats } from './tournament-stats';
 import type { DrawPublicSnapshot } from './draw-types';
 import type { BonusTournamentDemo, BonusTournamentMatch, BonusTournamentPlayer, BonusTournamentRound } from './types';
 import { ROUND_LABEL } from './types';
+import { TwitchAvatar } from './TwitchAvatar';
 
 const W = MAIN_OVERLAY_SIDEBAR_WIDTH_PX;
 const H = 720;
@@ -579,11 +580,11 @@ function Overview({
 function MiniPlayer({ p, winner }: { p: BonusTournamentPlayer; winner?: boolean }) {
   return (
     <div className="flex items-center gap-1.5 flex-1 min-w-0">
-      <img
-        src={p.avatarUrl}
-        alt=""
-        className="w-7 h-7 rounded-full object-cover flex-shrink-0"
-        style={{ boxShadow: winner ? '0 0 0 1.5px #fbbf24' : 'none' }}
+      <TwitchAvatar
+        url={p.avatarUrl}
+        name={p.displayName}
+        size={28}
+        boxShadow={winner ? '0 0 0 1.5px #fbbf24' : undefined}
       />
       <span className="text-[10px] font-bold truncate" style={{ color: winner ? '#fde68a' : '#e2e8f0' }}>
         {p.displayName}
@@ -766,21 +767,17 @@ function PlayerCard({
         className="flex-shrink-0 inline-flex"
         style={{ padding: AVATAR_RING_PAD, lineHeight: 0 }}
       >
-        <img
-          src={p.avatarUrl}
-          alt=""
-          width={AVATAR_PX}
-          height={AVATAR_PX}
-          className="rounded-full object-cover flex-shrink-0"
-          style={{
-            width: AVATAR_PX,
-            height: AVATAR_PX,
-            boxShadow: winnerRing
+        <TwitchAvatar
+          url={p.avatarUrl}
+          name={p.displayName}
+          size={AVATAR_PX}
+          boxShadow={
+            winnerRing
               ? '0 0 0 1.5px #fbbf24'
               : suggestRing
-              ? '0 0 0 1px rgba(251,191,36,0.45)'
-              : '0 0 0 1px rgba(255,255,255,0.2)',
-          }}
+                ? '0 0 0 1px rgba(251,191,36,0.45)'
+                : '0 0 0 1px rgba(255,255,255,0.2)'
+          }
         />
       </span>
       <div className={`min-w-0 flex-1 overflow-hidden ${mirrored ? 'text-right' : ''}`}>

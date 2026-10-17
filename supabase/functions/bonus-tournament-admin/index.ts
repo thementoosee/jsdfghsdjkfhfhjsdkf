@@ -11,9 +11,103 @@ import {
   operatorSecretHeaderName,
   rateLimitAllow,
 } from '../_shared/bt-operator-auth.ts';
+import {
+  fetchTwitchProfileImagesByIds,
+  isMissingOrGenericAvatar,
+} from '../_shared/bt-twitch-avatars.ts';
 
 const TOURNAMENTS = 'bonus_tournaments';
 const ENTRIES = 'bonus_tournament_entries';
+
+type AdminClient = ReturnType<typeof createClient>;
+
+async function refreshTournamentAvatars(
+  sb: AdminClient,
+  tournamentId: string,
+): Promise<
+  | { ok: true; updated: number; skipped: number; failed: number }
+  | { ok: false; error: string; detail?: string; status: number }
+> {
+  const { data: rows, error } = await sb
+    .from(ENTRIES)
+    .select('id, twitch_user_id, avatar_url')
+    .eq('tournament_id', tournamentId);
+  if (error) return { ok: false, error: 'entries_failed', detail: error.message, status: 500 };
+
+  const need = (rows ?? []).filter((r) => isMissingOrGenericAvatar(r.avatar_url as string));
+  if (need.length === 0) {
+    return { ok: true, updated: 0, skipped: (rows ?? []).length, failed: 0 };
+  }
+
+  let images: Map<string, string>;
+  try {
+    images = await fetchTwitchProfileImagesByIds(
+      need.map((r) => String(r.twitch_user_id)),
+    );
+  } catch (err) {
+    return {
+      ok: false,
+      error: 'helix_failed',
+      detail: err instanceof Error ? err.message : String(err),
+      status: 502,
+    };
+  }
+
+  let updated = 0;
+  let failed = 0;
+  for (const row of need) {
+    const id = String(row.twitch_user_id);
+    const url = images.get(id);
+    if (!url || isMissingOrGenericAvatar(url)) {
+      failed += 1;
+      continue;
+    }
+    const { error: upErr } = await sb
+      .from(ENTRIES)
+      .update({ avatar_url: url })
+      .eq('id', row.id)
+      .eq('tournament_id', tournamentId);
+    if (upErr) {
+      failed += 1;
+      continue;
+    }
+    updated += 1;
+  }
+
+  // Patch players jsonb avatars for the same twitch ids (draw/bracket persistence).
+  if (updated > 0) {
+    const { data: tournament } = await sb
+      .from(TOURNAMENTS)
+      .select('players')
+      .eq('id', tournamentId)
+      .maybeSingle();
+    const players = Array.isArray(tournament?.players) ? [...(tournament!.players as unknown[])] : [];
+    let playersChanged = false;
+    const patched = players.map((raw) => {
+      const p = raw as Record<string, unknown>;
+      const twitchId = String(p.twitchUserId ?? p.twitch_user_id ?? '');
+      const nextUrl = images.get(twitchId);
+      if (!nextUrl) return p;
+      const current = String(p.avatarUrl ?? '');
+      if (current === nextUrl) return p;
+      if (isMissingOrGenericAvatar(current) || current !== nextUrl) {
+        playersChanged = true;
+        return { ...p, avatarUrl: nextUrl };
+      }
+      return p;
+    });
+    if (playersChanged) {
+      await sb.from(TOURNAMENTS).update({ players: patched }).eq('id', tournamentId);
+    }
+  }
+
+  return {
+    ok: true,
+    updated,
+    skipped: (rows ?? []).length - need.length,
+    failed,
+  };
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -44,7 +138,8 @@ type Action =
   | 'deactivate'
   | 'upsert_state'
   | 'delete'
-  | 'list_entries';
+  | 'list_entries'
+  | 'refresh_avatars';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
@@ -158,7 +253,57 @@ Deno.serve(async (req) => {
         p_active: true,
       });
       if (error) return json({ error: 'activate_failed', detail: error.message }, 400);
+
+      // Claim main-stream sidebar: clear show_on_main on competing modes so
+      // MainStreamOverlay transitions CHILL/HUNT/OPENING → TOURNAMENT with existing slides.
+      // Tournament stays ACTIVE even if the operator later reclaims CHILL on main.
+      const clearedAt = new Date().toISOString();
+      const clearMain = async (label: string, run: () => PromiseLike<{ error: { message: string } | null }>) => {
+        try {
+          const { error: clearErr } = await run();
+          if (clearErr) console.warn(`[bt-admin] clear ${label}:`, clearErr.message);
+        } catch (e) {
+          console.warn(`[bt-admin] clear ${label}:`, e instanceof Error ? e.message : String(e));
+        }
+      };
+      await Promise.all([
+        clearMain('chill', () =>
+          sb
+            .from('chill_sessions')
+            .update({ show_on_main_overlay: false, updated_at: clearedAt })
+            .eq('show_on_main_overlay', true),
+        ),
+        clearMain('hunt', () =>
+          sb
+            .from('bonus_hunts')
+            .update({ show_on_main_overlay: false, updated_at: clearedAt })
+            .eq('show_on_main_overlay', true),
+        ),
+        clearMain('opening', () =>
+          sb
+            .from('bonus_openings')
+            .update({ show_on_main_overlay: false, updated_at: clearedAt })
+            .eq('show_on_main_overlay', true),
+        ),
+        clearMain('fever', () =>
+          sb.from('fever_tournaments').update({ show_on_main_overlay: false }).eq('show_on_main_overlay', true),
+        ),
+      ]);
+
       return json({ ok: true, row: data });
+    }
+
+    if (action === 'refresh_avatars') {
+      const id = String(body.tournamentId ?? '');
+      if (!id) return json({ error: 'missing_tournament_id' }, 400);
+      const result = await refreshTournamentAvatars(sb, id);
+      if (!result.ok) return json({ error: result.error, detail: result.detail }, result.status);
+      return json({
+        ok: true,
+        updated: result.updated,
+        skipped: result.skipped,
+        failed: result.failed,
+      });
     }
 
     if (action === 'deactivate') {

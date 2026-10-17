@@ -6,17 +6,64 @@ import {
   getMainOverlaySecondSlotCutout,
 } from '../lib/overlay-layout';
 import { parseShowSecondSlot } from '../lib/overlay-modules';
+import { pickMainOverlay, type MainOverlayKind } from '../lib/main-overlay-priority';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
 import { FeverChampionsOverlay } from './FeverChampionsOverlay';
+import { BonusTournamentOverlayPreview } from './bonus-tournament/BonusTournamentOverlayPreview';
 import { ShopHighlightsOverlay, SHOP_HIGHLIGHT_CARD_HEIGHT_PX } from './ShopHighlightsOverlay';
 
-type OverlayType = 'chill' | 'hunt' | 'opening' | 'tournament' | null;
+type OverlayType = MainOverlayKind;
 
 interface OverlayState {
   type: OverlayType;
   id: string | null;
+}
+
+async function resolveMainOverlayTarget(): Promise<OverlayState> {
+  const { data: activeOpening } = await supabase
+    .from('bonus_openings')
+    .select('id')
+    .eq('show_on_main_overlay', true)
+    .maybeSingle();
+
+  const { data: activeHunt } = await supabase
+    .from('bonus_hunts')
+    .select('id')
+    .eq('show_on_main_overlay', true)
+    .maybeSingle();
+
+  const { data: activeFever } = await supabase
+    .from('fever_tournaments')
+    .select('id')
+    .eq('show_on_main_overlay', true)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  const { data: activeChill } = await supabase
+    .from('chill_sessions')
+    .select('id')
+    .is('ended_at', null)
+    .eq('show_on_main_overlay', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // Bonus Tournament REAL — exclusive ACTIVE row (source of truth for OBS sync).
+  const { data: activeBt } = await supabase
+    .from('bonus_tournaments')
+    .select('id')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  return pickMainOverlay({
+    openingId: activeOpening?.id ?? null,
+    huntId: activeHunt?.id ?? null,
+    feverId: activeFever?.id ?? null,
+    chillId: activeChill?.id ?? null,
+    bonusTournamentId: activeBt?.id ?? null,
+  });
 }
 
 export function MainStreamOverlay() {
@@ -86,67 +133,10 @@ export function MainStreamOverlay() {
     if (mainError) console.error('[Main Init] Error loading main_stream config:', mainError);
     if (mainRows?.[0]) applyMainStreamConfig(mainRows[0].config as Record<string, unknown>);
 
-    const { data: activeOpening } = await supabase
-      .from('bonus_openings')
-      .select('id')
-      .eq('show_on_main_overlay', true)
-      .maybeSingle();
-
-    console.log('[Main Init] Active Opening:', activeOpening);
-
-    if (activeOpening) {
-      console.log('[Main Init] Setting overlay to opening:', activeOpening.id);
-      const next = { type: 'opening' as const, id: activeOpening.id };
-      overlayStateRef.current = next;
-      setOverlayState(next);
-      return;
-    }
-
-    const { data: activeHunt } = await supabase
-      .from('bonus_hunts')
-      .select('id')
-      .eq('show_on_main_overlay', true)
-      .maybeSingle();
-
-    console.log('[Main Init] Active Hunt:', activeHunt);
-
-    if (activeHunt) {
-      console.log('[Main Init] Setting overlay to hunt:', activeHunt.id);
-      const next = { type: 'hunt' as const, id: activeHunt.id };
-      overlayStateRef.current = next;
-      setOverlayState(next);
-      return;
-    }
-
-    const { data: activeTournament } = await supabase
-      .from('fever_tournaments')
-      .select('id')
-      .eq('show_on_main_overlay', true)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    console.log('[Main Init] Active Tournament:', activeTournament);
-
-    if (activeTournament) {
-      console.log('[Main Init] Setting overlay to tournament:', activeTournament.id);
-      const next = { type: 'tournament' as const, id: activeTournament.id };
-      overlayStateRef.current = next;
-      setOverlayState(next);
-      return;
-    }
-
-    let { data: chillSession } = await supabase
-      .from('chill_sessions')
-      .select('id')
-      .is('ended_at', null)
-      .eq('show_on_main_overlay', true)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    console.log('[Main Init] Active Chill:', chillSession);
-
-    if (!chillSession) {
+    // Chill fallback: if a live chill session exists without show_on_main, claim it
+    // only when nothing else (incl. ACTIVE bonus tournament) would win.
+    const initial = await resolveMainOverlayTarget();
+    if (!initial.type) {
       const { data: anyActiveSession } = await supabase
         .from('chill_sessions')
         .select('id')
@@ -160,16 +150,16 @@ export function MainStreamOverlay() {
           .from('chill_sessions')
           .update({ show_on_main_overlay: true })
           .eq('id', anyActiveSession.id);
-        chillSession = anyActiveSession;
+        const next = { type: 'chill' as const, id: anyActiveSession.id };
+        overlayStateRef.current = next;
+        setOverlayState(next);
+        return;
       }
     }
 
-    if (chillSession) {
-      console.log('[Main Init] Setting overlay to chill:', chillSession.id);
-      const next = { type: 'chill' as const, id: chillSession.id };
-      overlayStateRef.current = next;
-      setOverlayState(next);
-    }
+    console.log('[Main Init] Overlay target:', initial);
+    overlayStateRef.current = initial;
+    setOverlayState(initial);
   };
 
   const subscribeToChanges = () => {
@@ -181,59 +171,9 @@ export function MainStreamOverlay() {
       if (debounceTimer) clearTimeout(debounceTimer);
 
       debounceTimer = setTimeout(async () => {
-        const { data: activeOpening } = await supabase
-          .from('bonus_openings')
-          .select('id, show_on_main_overlay, status')
-          .eq('show_on_main_overlay', true)
-          .maybeSingle();
-
-        if (activeOpening) {
-          console.log('[Main] ✅ → Opening', activeOpening.id);
-          transitionTo('opening', activeOpening.id);
-          return;
-        }
-
-        const { data: activeHunt } = await supabase
-          .from('bonus_hunts')
-          .select('id, show_on_main_overlay, status')
-          .eq('show_on_main_overlay', true)
-          .maybeSingle();
-
-        if (activeHunt) {
-          console.log('[Main] ✅ → Hunt', activeHunt.id);
-          transitionTo('hunt', activeHunt.id);
-          return;
-        }
-
-        const { data: activeTournament } = await supabase
-          .from('fever_tournaments')
-          .select('id, show_on_main_overlay, status')
-          .eq('show_on_main_overlay', true)
-          .eq('status', 'active')
-          .maybeSingle();
-
-        if (activeTournament) {
-          console.log('[Main] ✅ → Tournament', activeTournament.id);
-          transitionTo('tournament', activeTournament.id);
-          return;
-        }
-
-        const { data: activeChill } = await supabase
-          .from('chill_sessions')
-          .select('id, show_on_main_overlay, ended_at')
-          .is('ended_at', null)
-          .eq('show_on_main_overlay', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (activeChill) {
-          console.log('[Main] ✅ → Chill', activeChill.id);
-          transitionTo('chill', activeChill.id);
-        } else {
-          console.log('[Main] ⚪ No overlay');
-          transitionTo(null, null);
-        }
+        const next = await resolveMainOverlayTarget();
+        console.log('[Main] ✅ →', next.type, next.id);
+        transitionTo(next.type, next.id);
       }, 100);
     };
 
@@ -271,11 +211,18 @@ export function MainStreamOverlay() {
         console.log('[Main] Overlays channel status:', status);
       });
 
-    const tournamentChannel = supabase
-      .channel('overlay_changes_tournament')
+    const feverChannel = supabase
+      .channel('overlay_changes_fever')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fever_tournaments' }, handleChange)
       .subscribe((status) => {
-        console.log('[Main] Tournament channel status:', status);
+        console.log('[Main] Fever channel status:', status);
+      });
+
+    const bonusTournamentChannel = supabase
+      .channel('overlay_changes_bonus_tournament')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bonus_tournaments' }, handleChange)
+      .subscribe((status) => {
+        console.log('[Main] Bonus Tournament channel status:', status);
       });
 
     return () => {
@@ -284,7 +231,8 @@ export function MainStreamOverlay() {
       supabase.removeChannel(huntChannel);
       supabase.removeChannel(openingChannel);
       supabase.removeChannel(overlaysChannel);
-      supabase.removeChannel(tournamentChannel);
+      supabase.removeChannel(feverChannel);
+      supabase.removeChannel(bonusTournamentChannel);
     };
   };
 
@@ -351,8 +299,12 @@ export function MainStreamOverlay() {
       return <BonusOpeningOverlay openingId={state.id} />;
     }
 
-    if (state.type === 'tournament') {
+    if (state.type === 'fever') {
       return <FeverChampionsOverlay embedded />;
+    }
+
+    if (state.type === 'tournament') {
+      return <BonusTournamentOverlayPreview embedded />;
     }
 
     return null;
