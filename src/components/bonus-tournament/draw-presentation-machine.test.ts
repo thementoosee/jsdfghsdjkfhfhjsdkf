@@ -197,4 +197,114 @@ describe('draw-presentation-machine', () => {
     expect(mergeRemoteIfNewer(newer, older)).toBe(newer);
     expect(mergeRemoteIfNewer(older, newer).version).toBe(3);
   });
+
+  it('START without generate throws clear error', async () => {
+    const state = idle({
+      tournamentId: 'demo',
+      tournamentName: 'HUNT',
+      uniqueEntryCount: 8,
+      entriesClosed: true,
+    });
+    await expect(applyDrawCommand(state, { type: 'START_PRESENTATION' })).rejects.toThrow(
+      /Generate draw first/,
+    );
+  });
+
+  it('START on locked result keeps identical pairing (no slot:null rewrite)', async () => {
+    let state = idle({
+      tournamentId: 'demo',
+      tournamentName: 'HUNT',
+      uniqueEntryCount: 8,
+      entriesClosed: true,
+    });
+    state = await applyDrawCommand(state, {
+      type: 'GENERATE_DRAW',
+      entries: buildDemoEntries(8),
+    });
+    const before = structuredClone(state.result!);
+    const ids = before.selected.map((p) => p.twitchUserId);
+
+    state = await applyDrawCommand(state, { type: 'START_PRESENTATION' });
+    expect(state.result!.resultHash).toBe(before.resultHash);
+    expect(state.result!.selected.map((p) => p.twitchUserId)).toEqual(ids);
+    expect(state.result).toEqual(before);
+    expect(state.phase).toBe('countdown');
+    expect(state.runStatus).toBe('running');
+  });
+
+  it('repeated START after idle restart does not re-roll participants', async () => {
+    let state = idle({
+      tournamentId: 'demo',
+      tournamentName: 'HUNT',
+      uniqueEntryCount: 8,
+      entriesClosed: true,
+    });
+    state = await applyDrawCommand(state, {
+      type: 'GENERATE_DRAW',
+      entries: buildDemoEntries(8),
+    });
+    const hash = state.result!.resultHash;
+    const selected = state.result!.selected.map((p) => p.twitchUserId);
+
+    state = await applyDrawCommand(state, { type: 'START_PRESENTATION' });
+    // Simulate interrupted ceremony returning to idle via restart path.
+    state = await applyDrawCommand(state, { type: 'RESTART_PRESENTATION' });
+    expect(state.result!.resultHash).toBe(hash);
+
+    const again = await applyDrawCommand(state, { type: 'START_PRESENTATION' });
+    // Already running after restart — second START is idempotent no-op.
+    expect(again.version).toBe(state.version);
+    expect(again.result!.resultHash).toBe(hash);
+    expect(again.result!.selected.map((p) => p.twitchUserId)).toEqual(selected);
+  });
+
+  it('concurrent START commands are idempotent (no duplicate ceremony bump)', async () => {
+    let state = idle({
+      tournamentId: 'demo',
+      tournamentName: 'HUNT',
+      uniqueEntryCount: 8,
+      entriesClosed: true,
+    });
+    state = await applyDrawCommand(state, {
+      type: 'GENERATE_DRAW',
+      entries: buildDemoEntries(8),
+    });
+    const hash = state.result!.resultHash;
+
+    const [a, b] = await Promise.all([
+      applyDrawCommand(state, { type: 'START_PRESENTATION' }),
+      applyDrawCommand(state, { type: 'START_PRESENTATION' }),
+    ]);
+    expect(a.result!.resultHash).toBe(hash);
+    expect(b.result!.resultHash).toBe(hash);
+    expect(a.phase).toBe('countdown');
+    expect(b.phase).toBe('countdown');
+    // Both applied from same base → same next version (CAS would serialize one winner).
+    expect(a.version).toBe(b.version);
+    expect(a.version).toBe(state.version + 1);
+
+    const third = await applyDrawCommand(a, { type: 'START_PRESENTATION' });
+    expect(third.version).toBe(a.version);
+    expect(third.result!.resultHash).toBe(hash);
+  });
+
+  it('RESTART after slots keeps confirmed slots (safe resume)', async () => {
+    let state = await toAwaitingFirstSlot();
+    const player = state.result!.selected[0]!;
+    const slot = picks[0]!;
+    state = await applyDrawCommand(state, {
+      type: 'CONFIRM_SLOT',
+      twitchUserId: player.twitchUserId,
+      ...slot,
+    });
+    const hash = state.result!.resultHash;
+    expect(countConfirmedSlots(state.result)).toBe(1);
+
+    state = await applyDrawCommand(state, { type: 'RESTART_PRESENTATION' });
+    expect(state.phase).toBe('countdown');
+    expect(state.revealedPlayers).toBe(0);
+    expect(state.result!.resultHash).toBe(hash);
+    expect(countConfirmedSlots(state.result)).toBe(1);
+    expect(state.result!.selected[0]!.slot?.slotId).toBe(slot.slotId);
+  });
 });

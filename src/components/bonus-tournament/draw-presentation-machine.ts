@@ -4,7 +4,6 @@ import {
   DRAW_MATCH_COUNT,
   DRAW_SLOT_COUNT,
   assignSlotToResult,
-  clearSlotsFromResult,
   countConfirmedSlots,
   createIdleDrawState,
   type DrawAdminCommand,
@@ -303,14 +302,8 @@ export async function applyDrawCommand(
       if (state.runStatus === 'paused' && state.phase !== 'idle' && state.phase !== 'awaiting_advance') {
         return state;
       }
-      // Preserve confirmed slots if presentation is replayed; only wipe empty shells.
-      const locked =
-        countConfirmedSlots(state.result) > 0
-          ? state.result
-          : clearSlotsFromResult(state.result);
-      // Entries overlay → countdown 3 directly (no intro / prep screens).
+      // Presentation only — keep locked draw result identical (no clearSlots rewrite).
       return enterPhase(state, 'countdown', DRAW_TIMING.countdownStepMs, {
-        result: locked,
         runStatus: 'running',
         revealedPlayers: 0,
         revealedMatches: 0,

@@ -252,17 +252,6 @@ function assignSlotToResult(
   return { ...result, selected, matchups };
 }
 
-function clearSlotsFromResult(result: DrawResult): DrawResult {
-  const selected = result.selected.map((p) => ({ ...p, slot: null }));
-  const byId = new Map(selected.map((p) => [p.twitchUserId, p]));
-  const matchups = result.matchups.map((m) => ({
-    ...m,
-    playerA: byId.get(m.playerA.twitchUserId) ?? { ...m.playerA, slot: null },
-    playerB: byId.get(m.playerB.twitchUserId) ?? { ...m.playerB, slot: null },
-  }));
-  return { ...result, selected, matchups };
-}
-
 /** Advance one presentation step using DRAW_TIMING only (no hardcoded duplicates). */
 export function advancePresentation(row: DrawRow): DrawRow {
   if (!row.result) return row;
@@ -404,15 +393,17 @@ export async function applyCommand(
 
     case 'START_PRESENTATION': {
       if (!row.result) throw new Error('Generate draw first');
+      // Idempotent: ceremony already live — do not rewrite the locked draw.
       if (row.run_status === 'running' && row.phase !== 'idle' && row.phase !== 'awaiting_advance') {
         return { row, allowResultReplace: false };
       }
       if (row.run_status === 'paused' && row.phase !== 'idle' && row.phase !== 'awaiting_advance') {
         return { row, allowResultReplace: false };
       }
+      // Presentation only — never mutate `result` (pairing is immutable once locked).
+      // clearSlotsFromResult would inject slot:null and fail bt_draw_protect_row.
       return {
         row: enterPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, {
-          result: clearSlotsFromResult(row.result),
           run_status: 'running',
           revealed_players: 0,
           revealed_matches: 0,
@@ -456,9 +447,9 @@ export async function applyCommand(
 
     case 'RESTART_PRESENTATION': {
       if (!row.result) throw new Error('No draw to restart');
+      // Replay ceremony only — keep locked participants + any confirmed slots.
       return {
         row: enterPhase(row, 'countdown', DRAW_TIMING.countdownStepMs, {
-          result: clearSlotsFromResult(row.result),
           presentation_id: crypto.randomUUID(),
           run_status: 'running',
           revealed_players: 0,
@@ -486,12 +477,13 @@ export async function applyCommand(
         if (current.slot.slotId === slot.slotId) return { row, allowResultReplace: false };
         throw new Error('Slot already confirmed — use CORRECT_SLOT');
       }
+      // Slot metadata is ceremony state; pairing (selected/matchups) stays intact.
       return {
         row: enterPhase(row, 'slot_confirmed', DRAW_TIMING.slotConfirmMs, {
           result: assignSlotToResult(row.result, cmd.twitchUserId, slot),
           run_status: 'running',
         }),
-        allowResultReplace: false,
+        allowResultReplace: true,
       };
     }
 
@@ -515,7 +507,7 @@ export async function applyCommand(
             slotImage: cmd.slotImage,
           }),
         }),
-        allowResultReplace: false,
+        allowResultReplace: true,
       };
     }
 

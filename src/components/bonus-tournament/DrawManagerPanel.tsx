@@ -290,13 +290,14 @@ export function DrawManagerPanel({
   };
 
   /**
-   * START: close entries → generate if needed (keep locked draw) → countdown 3.
+   * START: present an already-generated locked draw (countdown 3).
+   * Does not generate or rewrite result — use "Gerar sorteio" first.
    * Tournament `entries_open` is SoT; presentation `entries_closed` is synced when stale.
    */
   const startCeremony = async () => {
     if (busy) return;
-    if (unique.length < DRAW_SLOT_COUNT) {
-      setLastError(`Precisa de ${DRAW_SLOT_COUNT} inscritos únicos para iniciar.`);
+    if (!state.result) {
+      setLastError('Gera o sorteio primeiro (botão «Gerar sorteio») antes de iniciar a apresentação.');
       return;
     }
     if (requireEntriesClosed && entriesOpen) {
@@ -350,28 +351,8 @@ export function DrawManagerPanel({
       }
 
       if (!prev.result) {
-        if (localOnly) {
-          prev = await applyDrawCommand(prev, { type: 'GENERATE_DRAW', entries: unique });
-        } else {
-          const admin = await refreshAdmin();
-          if (!admin.ok) {
-            setLastError('Desbloqueie os comandos do sorteio antes de iniciar.');
-            return;
-          }
-          const res = await invokeDrawCommand({
-            tournamentId: tournamentId,
-            expectedVersion: prev.version,
-            command: { type: 'GENERATE_DRAW', entries: unique },
-          });
-          if (!res.ok) {
-            if (res.remote) setState(res.remote);
-            setLastError(res.detail ? `${res.error}: ${res.detail}` : res.error);
-            return;
-          }
-          prev = res.state;
-        }
-        setState(prev);
-        stateRef.current = prev;
+        setLastError('Gera o sorteio primeiro (botão «Gerar sorteio») antes de iniciar a apresentação.');
+        return;
       }
 
       if (localOnly) {
@@ -476,7 +457,7 @@ export function DrawManagerPanel({
           onClick={() => void startCeremony()}
           disabled={
             busy ||
-            unique.length < DRAW_SLOT_COUNT ||
+            !state.result ||
             ((state.runStatus === 'running' || state.runStatus === 'paused') &&
               state.phase !== 'idle' &&
               state.phase !== 'awaiting_advance')
@@ -517,8 +498,8 @@ export function DrawManagerPanel({
         />
       </div>
       <p className="text-[10px]" style={{ color: '#94a3b8' }}>
-        START usa o sorteio bloqueado (ou gera uma vez) e abre a contagem 3 → 2 → 1. Não inicia ao entrar
-        na página.
+        Gera o sorteio uma vez; START apenas inicia a apresentação (contagem 3 → 2 → 1) sem alterar o
+        resultado bloqueado.
       </p>
 
       {state.phase === 'awaiting_slot' && (
