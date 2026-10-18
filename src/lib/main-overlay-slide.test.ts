@@ -2,14 +2,24 @@ import { describe, expect, it } from 'vitest';
 import {
   MAIN_OVERLAY_SLIDE_ENTER_MS,
   MAIN_OVERLAY_SLIDE_EXIT_MS,
+  MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS,
+  MAIN_OVERLAY_SLIDE_EASING,
   planMainOverlaySlide,
   sameMainOverlayIdentity,
 } from './main-overlay-slide';
 
 describe('main-overlay-slide', () => {
-  it('uses the original 450 ms exit/enter durations', () => {
-    expect(MAIN_OVERLAY_SLIDE_EXIT_MS).toBe(450);
-    expect(MAIN_OVERLAY_SLIDE_ENTER_MS).toBe(450);
+  it('uses 900 / 2000 / 900 ms timing (min 3.8s total)', () => {
+    expect(MAIN_OVERLAY_SLIDE_EXIT_MS).toBe(900);
+    expect(MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS).toBe(2000);
+    expect(MAIN_OVERLAY_SLIDE_ENTER_MS).toBe(900);
+    expect(
+      MAIN_OVERLAY_SLIDE_EXIT_MS + MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS + MAIN_OVERLAY_SLIDE_ENTER_MS,
+    ).toBe(3800);
+  });
+
+  it('uses a smooth cubic-bezier easing', () => {
+    expect(MAIN_OVERLAY_SLIDE_EASING).toBe('cubic-bezier(0.4, 0, 0.2, 1)');
   });
 
   it('sameMainOverlayIdentity matches type + id only', () => {

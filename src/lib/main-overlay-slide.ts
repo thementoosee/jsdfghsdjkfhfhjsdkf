@@ -3,12 +3,13 @@
  * Transform lives inside the fixed sidebar frame (never Slot View).
  */
 
-export const MAIN_OVERLAY_SLIDE_EXIT_MS = 450;
-export const MAIN_OVERLAY_SLIDE_ENTER_MS = 450;
+export const MAIN_OVERLAY_SLIDE_EXIT_MS = 900;
+export const MAIN_OVERLAY_SLIDE_ENTER_MS = 900;
+/** Minimum time the sidebar stays fully hidden while the next overlay is prepared. */
+export const MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS = 2000;
 
-/** Smooth ease for slide-out (to the right) and slide-in (from the right). */
-export const MAIN_OVERLAY_SLIDE_EASING_OUT = 'ease-in';
-export const MAIN_OVERLAY_SLIDE_EASING_IN = 'ease-out';
+/** Smooth continuous ease for both slide-out and slide-in. */
+export const MAIN_OVERLAY_SLIDE_EASING = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
 export type MainOverlaySlideIdentity = {
   type: string | null;

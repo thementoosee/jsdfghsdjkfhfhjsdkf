@@ -11,8 +11,8 @@ import { parseShowSecondSlot } from '../lib/overlay-modules';
 import {
   MAIN_OVERLAY_SLIDE_ENTER_MS,
   MAIN_OVERLAY_SLIDE_EXIT_MS,
-  MAIN_OVERLAY_SLIDE_EASING_IN,
-  MAIN_OVERLAY_SLIDE_EASING_OUT,
+  MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS,
+  MAIN_OVERLAY_SLIDE_EASING,
   planMainOverlaySlide,
   sameMainOverlayIdentity,
 } from '../lib/main-overlay-slide';
@@ -331,9 +331,18 @@ export function MainStreamOverlay() {
     if (gen !== slideGenRef.current) return;
 
     setSlidePhase('preparing');
+    const hiddenStartedAt = performance.now();
+
+    const warmSafe = async (state: OverlayState) => {
+      try {
+        await warmOverlayFace(state);
+      } catch (err) {
+        console.error('[Main] Overlay warm failed; continuing with mount fetch:', err);
+      }
+    };
 
     let target = to;
-    await warmOverlayFace(target);
+    await warmSafe(target);
 
     if (gen !== slideGenRef.current) return;
 
@@ -342,7 +351,28 @@ export function MainStreamOverlay() {
       pendingTargetRef.current = null;
       if (!sameMainOverlayIdentity(pending, target)) {
         target = pending;
-        await warmOverlayFace(target);
+        await warmSafe(target);
+        if (gen !== slideGenRef.current) return;
+      }
+    }
+
+    // Minimum hidden dwell (2s); extend if warm already took longer.
+    const remainingHidden =
+      MAIN_OVERLAY_SLIDE_HIDDEN_MIN_MS - (performance.now() - hiddenStartedAt);
+    if (remainingHidden > 0) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, remainingHidden);
+      });
+      if (gen !== slideGenRef.current) return;
+    }
+
+    // Re-check queue after the dwell so rapid mode changes land on the latest target.
+    const pendingAfterWait = pendingTargetRef.current;
+    if (pendingAfterWait) {
+      pendingTargetRef.current = null;
+      if (!sameMainOverlayIdentity(pendingAfterWait, target)) {
+        target = pendingAfterWait;
+        await warmSafe(target);
         if (gen !== slideGenRef.current) return;
       }
     }
@@ -484,7 +514,7 @@ export function MainStreamOverlay() {
         }
 
         .main-overlay-slide-out {
-          animation: mainOverlaySlideOutToRight ${MAIN_OVERLAY_SLIDE_EXIT_MS}ms ${MAIN_OVERLAY_SLIDE_EASING_OUT} forwards;
+          animation: mainOverlaySlideOutToRight ${MAIN_OVERLAY_SLIDE_EXIT_MS}ms ${MAIN_OVERLAY_SLIDE_EASING} forwards;
         }
 
         .main-overlay-slide-hidden {
@@ -492,7 +522,7 @@ export function MainStreamOverlay() {
         }
 
         .main-overlay-slide-in {
-          animation: mainOverlaySlideInFromRight ${MAIN_OVERLAY_SLIDE_ENTER_MS}ms ${MAIN_OVERLAY_SLIDE_EASING_IN} forwards;
+          animation: mainOverlaySlideInFromRight ${MAIN_OVERLAY_SLIDE_ENTER_MS}ms ${MAIN_OVERLAY_SLIDE_EASING} forwards;
         }
 
         .main-overlay-slide-out .no-overlay-effects *,
