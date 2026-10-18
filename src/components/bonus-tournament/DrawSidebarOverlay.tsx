@@ -3,6 +3,7 @@ import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../../lib/overlay-layout';
 import { ArenaAtmosphere } from './ArenaAtmosphere';
 import { SlotThumb } from './SlotThumb';
 import { resolveCountdownDisplay } from './draw-countdown-display';
+import { DRAW_TIMING } from './draw-timing';
 import {
   DRAW_MATCH_COUNT,
   DRAW_SLOT_COUNT,
@@ -354,8 +355,11 @@ function RevealBody({
   const waiting = snapshot.phase === 'awaiting_slot';
   const confirming = snapshot.phase === 'slot_confirmed';
   const spinning = snapshot.phase === 'reveal_player';
+  // Local 0→1 clock for slot confirm — ignores late Realtime/poll phaseStartedAt
+  // which otherwise jumps progress to ~1 and skips the original lift.
+  const confirmLocal = useSlotConfirmLocalProgress(snapshot);
 
-  const p = spinning ? progress : confirming ? progress : 1;
+  const p = spinning ? progress : confirming ? confirmLocal : 1;
 
   const clusterRef = useRef<HTMLDivElement>(null);
   const [clusterH, setClusterH] = useState(0);
@@ -936,6 +940,72 @@ export function initialPhaseProgress(
   return Math.min(1, Math.max(0, (nowMs - started) / snapshot.phaseDurationMs));
 }
 
+/** Stable key for one slot-confirm ceremony beat (ignores poll version bumps). */
+export function slotConfirmAnimKey(snapshot: DrawPublicSnapshot | null): string | null {
+  if (!snapshot || snapshot.phase !== 'slot_confirmed') return null;
+  const idx = Math.max(0, snapshot.revealedPlayers - 1);
+  const slotId = snapshot.result?.selected[idx]?.slot?.slotId ?? '';
+  return `${snapshot.presentationId}:${snapshot.revealedPlayers}:${slotId}:${snapshot.eventId}`;
+}
+
+/**
+ * True when the server confirm window already finished — refresh/late join shows final pose.
+ * Fresh confirms (client sees them in time) always play locally from 0.
+ */
+export function shouldSnapSlotConfirmToEnd(
+  snapshot: Pick<DrawPublicSnapshot, 'phaseStartedAt' | 'phaseDurationMs'> | null,
+  nowMs = Date.now(),
+): boolean {
+  if (!snapshot?.phaseStartedAt) return false;
+  const duration =
+    snapshot.phaseDurationMs && snapshot.phaseDurationMs > 0
+      ? snapshot.phaseDurationMs
+      : DRAW_TIMING.slotConfirmMs;
+  const started = Date.parse(snapshot.phaseStartedAt);
+  if (!Number.isFinite(started)) return false;
+  return nowMs >= started + duration;
+}
+
+/**
+ * Local 0→1 progress for the original avatar-lift + slot reveal.
+ * Decoupled from server phaseStartedAt so Realtime/poll latency cannot skip the motion.
+ * Re-runs only when the confirm identity changes — not on every version tick.
+ */
+function useSlotConfirmLocalProgress(snapshot: DrawPublicSnapshot | null): number {
+  const key = slotConfirmAnimKey(snapshot);
+  const [progress, setProgress] = useState(0);
+
+  useLayoutEffect(() => {
+    if (!key || !snapshot || snapshot.phase !== 'slot_confirmed') {
+      setProgress(0);
+      return;
+    }
+
+    const duration =
+      snapshot.phaseDurationMs && snapshot.phaseDurationMs > 0
+        ? snapshot.phaseDurationMs
+        : DRAW_TIMING.slotConfirmMs;
+
+    if (shouldSnapSlotConfirmToEnd(snapshot)) {
+      setProgress(1);
+      return;
+    }
+
+    const t0 = Date.now();
+    setProgress(0);
+    let raf = 0;
+    const tick = () => {
+      const p = Math.min(1, Math.max(0, (Date.now() - t0) / duration));
+      setProgress(p);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: key only
+
+  return progress;
+}
+
 function usePhaseProgress(snapshot: DrawPublicSnapshot | null): number {
   const [progress, setProgress] = useState(() => initialPhaseProgress(snapshot));
 
@@ -948,7 +1018,6 @@ function usePhaseProgress(snapshot: DrawPublicSnapshot | null): number {
     const duration = snapshot.phaseDurationMs;
     const compute = () => Math.min(1, Math.max(0, (Date.now() - started) / duration));
 
-    // Synchronous reset so slot_confirmed never paints one frame at progress=1.
     setProgress(compute());
 
     if (snapshot.runStatus === 'paused') {

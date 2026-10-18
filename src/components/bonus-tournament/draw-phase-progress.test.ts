@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { initialPhaseProgress } from './DrawSidebarOverlay';
+import { DRAW_TIMING } from './draw-timing';
+import {
+  initialPhaseProgress,
+  shouldSnapSlotConfirmToEnd,
+  slotConfirmAnimKey,
+} from './DrawSidebarOverlay';
+import type { DrawPublicSnapshot } from './draw-types';
 
 describe('initialPhaseProgress (slot lift)', () => {
   it('awaiting_slot stays at 0 so slot_confirmed can animate from the start', () => {
@@ -25,18 +31,77 @@ describe('initialPhaseProgress (slot lift)', () => {
       ),
     ).toBeLessThan(0.05);
   });
+});
 
-  it('slot_confirmed mid-phase drives lift progress', () => {
-    const started = Date.now();
-    const p = initialPhaseProgress(
-      {
-        phase: 'slot_confirmed',
-        phaseStartedAt: new Date(started).toISOString(),
-        phaseDurationMs: 2400,
-      },
-      started + 672, // ~0.28 of 2400ms — end of lift window
+describe('slotConfirmAnimKey / shouldSnapSlotConfirmToEnd', () => {
+  const base = (over: Partial<DrawPublicSnapshot> = {}): DrawPublicSnapshot => ({
+    tournamentId: 't1',
+    presentationId: 'p1',
+    tournamentName: 'HUNT',
+    version: 3,
+    eventId: 'evt-confirm-1',
+    runStatus: 'running',
+    phase: 'slot_confirmed',
+    revealedPlayers: 1,
+    revealedMatches: 0,
+    countdownValue: null,
+    phaseStartedAt: new Date().toISOString(),
+    phaseDurationMs: DRAW_TIMING.slotConfirmMs,
+    result: {
+      selected: [
+        {
+          twitchUserId: 'u0',
+          displayName: 'P0',
+          avatarUrl: '',
+          slot: { slotId: 's1', slotName: 'Slot', slotImage: '' },
+        },
+      ],
+      matchups: [],
+      generatedAt: new Date().toISOString(),
+      resultHash: 'h',
+    },
+    entriesClosed: true,
+    uniqueEntryCount: 8,
+    updatedAt: new Date().toISOString(),
+    ...over,
+  });
+
+  it('anim key ignores version bumps from polling', () => {
+    const a = slotConfirmAnimKey(base({ version: 3 }));
+    const b = slotConfirmAnimKey(base({ version: 9 }));
+    expect(a).toBe(b);
+    expect(a).toContain('s1');
+  });
+
+  it('new confirm event gets a new anim key', () => {
+    expect(slotConfirmAnimKey(base({ eventId: 'a' }))).not.toBe(
+      slotConfirmAnimKey(base({ eventId: 'b' })),
     );
-    expect(p).toBeGreaterThan(0.25);
-    expect(p).toBeLessThan(0.35);
+  });
+
+  it('does not snap while confirm window is still open', () => {
+    const started = Date.now();
+    expect(
+      shouldSnapSlotConfirmToEnd(
+        {
+          phaseStartedAt: new Date(started).toISOString(),
+          phaseDurationMs: 2400,
+        },
+        started + 200,
+      ),
+    ).toBe(false);
+  });
+
+  it('snaps to end after confirm window for refresh/late join', () => {
+    const started = Date.now() - 5000;
+    expect(
+      shouldSnapSlotConfirmToEnd(
+        {
+          phaseStartedAt: new Date(started).toISOString(),
+          phaseDurationMs: 2400,
+        },
+        Date.now(),
+      ),
+    ).toBe(true);
   });
 });
