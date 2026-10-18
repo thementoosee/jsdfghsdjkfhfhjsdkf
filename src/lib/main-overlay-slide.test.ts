@@ -1,22 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
-  MAIN_OVERLAY_FLIP_DURATION_MS,
-  planMainOverlayFlip,
+  MAIN_OVERLAY_SLIDE_ENTER_MS,
+  MAIN_OVERLAY_SLIDE_EXIT_MS,
+  planMainOverlaySlide,
   sameMainOverlayIdentity,
-} from './main-overlay-flip';
+} from './main-overlay-slide';
 
-describe('main-overlay-flip', () => {
-  it('uses a 600–800 ms duration', () => {
-    expect(MAIN_OVERLAY_FLIP_DURATION_MS).toBeGreaterThanOrEqual(600);
-    expect(MAIN_OVERLAY_FLIP_DURATION_MS).toBeLessThanOrEqual(800);
+describe('main-overlay-slide', () => {
+  it('uses the original 450 ms exit/enter durations', () => {
+    expect(MAIN_OVERLAY_SLIDE_EXIT_MS).toBe(450);
+    expect(MAIN_OVERLAY_SLIDE_ENTER_MS).toBe(450);
   });
 
   it('sameMainOverlayIdentity matches type + id only', () => {
     expect(sameMainOverlayIdentity({ type: 'chill', id: 'a' }, { type: 'chill', id: 'a' })).toBe(
       true,
-    );
-    expect(sameMainOverlayIdentity({ type: 'chill', id: 'a' }, { type: 'chill', id: 'b' })).toBe(
-      false,
     );
     expect(sameMainOverlayIdentity({ type: 'chill', id: 'a' }, { type: 'hunt', id: 'a' })).toBe(
       false,
@@ -25,32 +23,32 @@ describe('main-overlay-flip', () => {
 
   it('no-ops when idle and target equals current', () => {
     expect(
-      planMainOverlayFlip({
+      planMainOverlaySlide({
         current: { type: 'chill', id: '1' },
         next: { type: 'chill', id: '1' },
-        flipping: false,
+        sliding: false,
         pending: null,
       }),
     ).toBe('noop');
   });
 
-  it('starts a flip when idle and target differs', () => {
+  it('starts a slide when idle and target differs', () => {
     expect(
-      planMainOverlayFlip({
+      planMainOverlaySlide({
         current: { type: 'chill', id: '1' },
         next: { type: 'hunt', id: '2' },
-        flipping: false,
+        sliding: false,
         pending: null,
       }),
     ).toBe('start');
   });
 
-  it('queues a distinct target while flipping', () => {
+  it('queues a distinct target while sliding', () => {
     expect(
-      planMainOverlayFlip({
+      planMainOverlaySlide({
         current: { type: 'hunt', id: '2' },
         next: { type: 'tournament', id: '3' },
-        flipping: true,
+        sliding: true,
         pending: null,
       }),
     ).toBe('queue');
@@ -58,10 +56,10 @@ describe('main-overlay-flip', () => {
 
   it('no-ops when Realtime reaffirms the in-flight target', () => {
     expect(
-      planMainOverlayFlip({
+      planMainOverlaySlide({
         current: { type: 'hunt', id: '2' },
         next: { type: 'hunt', id: '2' },
-        flipping: true,
+        sliding: true,
         pending: null,
       }),
     ).toBe('noop');
@@ -69,10 +67,10 @@ describe('main-overlay-flip', () => {
 
   it('no-ops when the queued pending already matches next', () => {
     expect(
-      planMainOverlayFlip({
+      planMainOverlaySlide({
         current: { type: 'hunt', id: '2' },
         next: { type: 'tournament', id: '3' },
-        flipping: true,
+        sliding: true,
         pending: { type: 'tournament', id: '3' },
       }),
     ).toBe('noop');

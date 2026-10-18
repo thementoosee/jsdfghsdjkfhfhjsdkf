@@ -9,11 +9,13 @@ import {
 } from '../lib/overlay-layout';
 import { parseShowSecondSlot } from '../lib/overlay-modules';
 import {
-  MAIN_OVERLAY_FLIP_DURATION_MS,
-  MAIN_OVERLAY_FLIP_EASING,
-  planMainOverlayFlip,
+  MAIN_OVERLAY_SLIDE_ENTER_MS,
+  MAIN_OVERLAY_SLIDE_EXIT_MS,
+  MAIN_OVERLAY_SLIDE_EASING_IN,
+  MAIN_OVERLAY_SLIDE_EASING_OUT,
+  planMainOverlaySlide,
   sameMainOverlayIdentity,
-} from '../lib/main-overlay-flip';
+} from '../lib/main-overlay-slide';
 import { pickMainOverlay, type MainOverlayKind } from '../lib/main-overlay-priority';
 import {
   seedChillOverlayFace,
@@ -33,12 +35,8 @@ interface OverlayState {
   id: string | null;
 }
 
-interface FlipTransition {
-  from: OverlayState;
-  to: OverlayState;
-  /** Remount key so a queued flip always restarts the CSS animation cleanly. */
-  key: number;
-}
+/** Visual phase of the sidebar SLIDE — content swaps only while `preparing` (fully hidden). */
+type SlidePhase = 'idle' | 'exiting' | 'preparing' | 'entering';
 
 async function resolveMainOverlayTarget(): Promise<OverlayState> {
   const { data: activeOpening } = await supabase
@@ -112,8 +110,8 @@ async function ensureChillFallback(current: OverlayState): Promise<OverlayState>
 }
 
 /**
- * Prefetch face data before the FLIP remounts overlays, so the destination
- * (and remounted source) never paint «AGUARDANDO SESSÃO...» mid-transition.
+ * Prefetch overlay data before slide-in remounts, so the destination
+ * never paints «AGUARDANDO SESSÃO...» (preserved from 3723995).
  */
 async function warmOverlayFace(state: OverlayState): Promise<void> {
   if (!state.type || !state.id) return;
@@ -144,6 +142,13 @@ async function warmOverlayFace(state: OverlayState): Promise<void> {
   }
 }
 
+function slidePanelClass(phase: SlidePhase): string {
+  if (phase === 'exiting') return 'main-overlay-slide-panel main-overlay-slide-out';
+  if (phase === 'preparing') return 'main-overlay-slide-panel main-overlay-slide-hidden';
+  if (phase === 'entering') return 'main-overlay-slide-panel main-overlay-slide-in';
+  return 'main-overlay-slide-panel';
+}
+
 export function MainStreamOverlay() {
   const [barOverlayId, setBarOverlayId] = useState<string | null>(null);
   const [chatOverlayId, setChatOverlayId] = useState<string | null>(null);
@@ -152,22 +157,26 @@ export function MainStreamOverlay() {
     type: null,
     id: null,
   });
-  const [flip, setFlip] = useState<FlipTransition | null>(null);
-  const flipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flipKeyRef = useRef(0);
-  const flippingRef = useRef(false);
+  const [slidePhase, setSlidePhase] = useState<SlidePhase>('idle');
+  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const slidingRef = useRef(false);
   const pendingTargetRef = useRef<OverlayState | null>(null);
   /** Desired / in-flight target — Realtime dedupe reads this, not only settled UI state. */
   const overlayStateRef = useRef<OverlayState>({ type: null, id: null });
-  /** Settled face shown when not flipping (source for the next front face). */
+  /** Settled content shown when idle (source for the next slide-out). */
   const settledStateRef = useRef<OverlayState>({ type: null, id: null });
+  /** Bumps when a slide sequence is superseded so stale timers/async ignore results. */
+  const slideGenRef = useRef(0);
 
   useEffect(() => {
     initializeOverlays();
     const cleanup = subscribeToChanges();
 
     return () => {
-      if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
+      slideGenRef.current += 1;
+      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+      if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
       cleanup();
     };
   }, []);
@@ -285,55 +294,114 @@ export function MainStreamOverlay() {
     };
   };
 
-  const finishFlipTo = (landed: OverlayState) => {
-    flippingRef.current = false;
+  const clearSlideTimers = () => {
+    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
+    if (enterTimerRef.current) clearTimeout(enterTimerRef.current);
+    exitTimerRef.current = null;
+    enterTimerRef.current = null;
+  };
+
+  const finishSlideTo = (landed: OverlayState, gen: number) => {
+    if (gen !== slideGenRef.current) return;
+
+    slidingRef.current = false;
     settledStateRef.current = landed;
     overlayStateRef.current = landed;
     setOverlayState(landed);
-    setFlip(null);
+    setSlidePhase('idle');
 
     const pending = pendingTargetRef.current;
     pendingTargetRef.current = null;
-    if (pending && (pending.type !== landed.type || pending.id !== landed.id)) {
-      startFlip(landed, pending);
+    if (pending && !sameMainOverlayIdentity(pending, landed)) {
+      startSlide(landed, pending);
     }
   };
 
-  const startFlip = (from: OverlayState, to: OverlayState) => {
-    flippingRef.current = true;
-    overlayStateRef.current = to;
+  const beginEnter = (target: OverlayState, gen: number) => {
+    if (gen !== slideGenRef.current) return;
 
-    void (async () => {
-      // Keep the settled overlay visible while warming — then flip once faces are ready.
-      await Promise.all([warmOverlayFace(from), warmOverlayFace(to)]);
+    // Content already swapped while hidden — animate back to rest without remounting.
+    setSlidePhase('entering');
+    enterTimerRef.current = setTimeout(() => {
+      finishSlideTo(target, gen);
+    }, MAIN_OVERLAY_SLIDE_ENTER_MS);
+  };
 
-      let target = to;
-      const pending = pendingTargetRef.current;
-      if (pending) {
-        pendingTargetRef.current = null;
-        if (!sameMainOverlayIdentity(pending, to)) {
-          target = pending;
-          await warmOverlayFace(target);
-        }
+  const prepareAndEnter = async (to: OverlayState, gen: number) => {
+    if (gen !== slideGenRef.current) return;
+
+    setSlidePhase('preparing');
+
+    let target = to;
+    await warmOverlayFace(target);
+
+    if (gen !== slideGenRef.current) return;
+
+    const pending = pendingTargetRef.current;
+    if (pending) {
+      pendingTargetRef.current = null;
+      if (!sameMainOverlayIdentity(pending, target)) {
+        target = pending;
+        await warmOverlayFace(target);
+        if (gen !== slideGenRef.current) return;
       }
+    }
 
-      overlayStateRef.current = target;
-      flipKeyRef.current += 1;
-      setFlip({ from: settledStateRef.current, to: target, key: flipKeyRef.current });
+    overlayStateRef.current = target;
+    // Swap content only while fully off-screen (translateX 100%).
+    setOverlayState(target);
 
-      if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
-      flipTimerRef.current = setTimeout(() => {
-        finishFlipTo(target);
-      }, MAIN_OVERLAY_FLIP_DURATION_MS);
-    })();
+    // Double rAF so the browser paints the hidden new face before slide-in starts.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        beginEnter(target, gen);
+      });
+    });
+  };
+
+  const startSlide = (from: OverlayState, to: OverlayState) => {
+    slidingRef.current = true;
+    overlayStateRef.current = to;
+    const gen = ++slideGenRef.current;
+    clearSlideTimers();
+
+    const hasFrom = Boolean(from.type && from.id);
+    const hasTo = Boolean(to.type && to.id);
+
+    // Keep settled content on screen for slide-out (single panel — no dual faces).
+    setOverlayState(hasFrom ? from : settledStateRef.current);
+
+    if (!hasFrom && hasTo) {
+      // Cold enter: nothing to slide out.
+      void prepareAndEnter(to, gen);
+      return;
+    }
+
+    if (hasFrom) {
+      setSlidePhase('exiting');
+      exitTimerRef.current = setTimeout(() => {
+        if (!hasTo) {
+          // Real empty — slide out and stay clear.
+          if (gen !== slideGenRef.current) return;
+          setOverlayState({ type: null, id: null });
+          finishSlideTo({ type: null, id: null }, gen);
+          return;
+        }
+        void prepareAndEnter(to, gen);
+      }, MAIN_OVERLAY_SLIDE_EXIT_MS);
+      return;
+    }
+
+    // Neither side has content.
+    finishSlideTo({ type: null, id: null }, gen);
   };
 
   const transitionTo = (type: OverlayType, id: string | null) => {
     const nextOverlay: OverlayState = { type, id };
-    const plan = planMainOverlayFlip({
+    const plan = planMainOverlaySlide({
       current: overlayStateRef.current,
       next: nextOverlay,
-      flipping: flippingRef.current,
+      sliding: slidingRef.current,
       pending: pendingTargetRef.current,
     });
 
@@ -345,7 +413,7 @@ export function MainStreamOverlay() {
       return;
     }
 
-    startFlip(settledStateRef.current, nextOverlay);
+    startSlide(settledStateRef.current, nextOverlay);
   };
 
   const renderLeftOverlay = (state: OverlayState | null) => {
@@ -389,56 +457,47 @@ export function MainStreamOverlay() {
     maskPosition: 'center',
   } as const;
 
+  const sliding = slidePhase !== 'idle';
+
   return (
     <div
       className="w-[1920px] h-[1080px] relative overflow-hidden"
       style={{ margin: 0, padding: 0, background: 'transparent' }}
     >
       <style>{`
-        @keyframes mainOverlayFlipY {
-          from { transform: rotateY(0deg); }
-          to { transform: rotateY(-180deg); }
+        @keyframes mainOverlaySlideOutToRight {
+          from { transform: translateX(0); }
+          to { transform: translateX(100%); }
         }
 
-        .main-overlay-flip-scene {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          overflow: hidden;
-          isolation: isolate;
-          contain: paint;
-          clip-path: inset(0);
-          perspective: ${MAIN_OVERLAY_SIDEBAR_WIDTH_PX * 4}px;
-          perspective-origin: 50% 50%;
+        @keyframes mainOverlaySlideInFromRight {
+          from { transform: translateX(100%); }
+          to { transform: translateX(0); }
         }
 
-        .main-overlay-flip-card {
-          position: relative;
-          width: 100%;
-          height: 100%;
-          transform-style: preserve-3d;
-          animation: mainOverlayFlipY ${MAIN_OVERLAY_FLIP_DURATION_MS}ms ${MAIN_OVERLAY_FLIP_EASING} forwards;
-        }
-
-        .main-overlay-flip-face {
+        .main-overlay-slide-panel {
           position: absolute;
           inset: 0;
           overflow: hidden;
-          backface-visibility: hidden;
-          -webkit-backface-visibility: hidden;
-          transform-style: preserve-3d;
+          transform: translateX(0);
+          will-change: transform;
         }
 
-        .main-overlay-flip-face-front {
-          transform: rotateY(0deg);
+        .main-overlay-slide-out {
+          animation: mainOverlaySlideOutToRight ${MAIN_OVERLAY_SLIDE_EXIT_MS}ms ${MAIN_OVERLAY_SLIDE_EASING_OUT} forwards;
         }
 
-        .main-overlay-flip-face-back {
-          transform: rotateY(180deg);
+        .main-overlay-slide-hidden {
+          transform: translateX(100%);
         }
 
-        .main-overlay-flip-face .no-overlay-effects *,
-        .main-overlay-flip-card .no-overlay-effects * {
+        .main-overlay-slide-in {
+          animation: mainOverlaySlideInFromRight ${MAIN_OVERLAY_SLIDE_ENTER_MS}ms ${MAIN_OVERLAY_SLIDE_EASING_IN} forwards;
+        }
+
+        .main-overlay-slide-out .no-overlay-effects *,
+        .main-overlay-slide-in .no-overlay-effects *,
+        .main-overlay-slide-hidden .no-overlay-effects * {
           animation: none !important;
           transition: none !important;
         }
@@ -492,8 +551,8 @@ export function MainStreamOverlay() {
         >
           <div className="flex gap-[8px] h-[720px] w-full" style={{ background: 'transparent' }}>
             {/*
-              Fixed sidebar frame only — perspective/transform live here.
-              Never applied to Slot View / casino / root chrome.
+              Fixed sidebar frame only — translateX lives here.
+              Slot View / casino stay outside this clip so the sidebar slides behind them.
             */}
             <div
               className="flex-shrink-0 relative overflow-hidden"
@@ -505,26 +564,11 @@ export function MainStreamOverlay() {
                 clipPath: 'inset(0)',
               }}
             >
-              {flip ? (
-                <div className="main-overlay-flip-scene h-full w-full">
-                  <div className="main-overlay-flip-card" key={flip.key}>
-                    <div className="main-overlay-flip-face main-overlay-flip-face-front">
-                      <div className="h-full w-full no-overlay-effects">
-                        {renderLeftOverlay(flip.from)}
-                      </div>
-                    </div>
-                    <div className="main-overlay-flip-face main-overlay-flip-face-back">
-                      <div className="h-full w-full no-overlay-effects">
-                        {renderLeftOverlay(flip.to)}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full w-full overflow-hidden" style={{ contain: 'paint' }}>
+              <div className={slidePanelClass(slidePhase)}>
+                <div className={`h-full w-full${sliding ? ' no-overlay-effects' : ''}`}>
                   {renderLeftOverlay(overlayState)}
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Center column spacer — casino border drawn as sibling guide below. */}

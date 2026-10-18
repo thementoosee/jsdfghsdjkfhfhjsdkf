@@ -1,6 +1,6 @@
 /**
- * Short-lived seeds so main-stream FLIP faces remount with data already ready.
- * MainStreamOverlay warms faces before starting the 3D flip; overlays consume on mount.
+ * Short-lived seeds so main-stream SLIDE faces remount with data already ready.
+ * MainStreamOverlay warms the destination while the sidebar is fully hidden; overlays consume on mount.
  */
 
 type SeedRecord = Record<string, unknown>;
