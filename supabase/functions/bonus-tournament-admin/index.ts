@@ -520,10 +520,26 @@ Deno.serve(async (req) => {
         .maybeSingle();
       if (lookupErr) return json({ error: 'delete_failed', detail: lookupErr.message }, 500);
       if (!existing) return json({ error: 'not_found', detail: 'tournament_not_found' }, 404);
-      // Clear ACTIVE first if needed
-      await sb.rpc('bt_activate_tournament', { p_tournament_id: id, p_active: false }).catch(() => null);
-      await sb.from(ENTRIES).delete().eq('tournament_id', id);
-      await sb.from(PRESENTATIONS_TABLE).delete().eq('tournament_id', id);
+
+      // Deactivate first (best-effort). supabase-js rpc returns { data, error } — not a Promise with .catch.
+      const { error: deactivateErr } = await sb.rpc('bt_activate_tournament', {
+        p_tournament_id: id,
+        p_active: false,
+      });
+      if (deactivateErr) {
+        console.warn('[bt-admin] deactivate before delete:', deactivateErr.message);
+      }
+
+      const { error: entriesErr } = await sb.from(ENTRIES).delete().eq('tournament_id', id);
+      if (entriesErr) {
+        return json({ error: 'delete_failed', detail: `entries: ${entriesErr.message}` }, 500);
+      }
+
+      const { error: drawErr } = await sb.from(PRESENTATIONS_TABLE).delete().eq('tournament_id', id);
+      if (drawErr) {
+        return json({ error: 'delete_failed', detail: `draw: ${drawErr.message}` }, 500);
+      }
+
       const { data: deletedRows, error } = await sb.from(TOURNAMENTS).delete().eq('id', id).select('id');
       if (error) return json({ error: 'delete_failed', detail: error.message }, 500);
       if (!deletedRows?.length) {

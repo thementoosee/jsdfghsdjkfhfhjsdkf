@@ -334,7 +334,12 @@ export async function persistRemoteTournamentState(
 
 export async function deleteRemoteTournament(id: string): Promise<{ ok: boolean; error?: string }> {
   const res = await invokeAdmin('delete', { tournamentId: id });
-  return res.ok ? { ok: true } : { ok: false, error: res.error };
+  if (!res.ok) return { ok: false, error: res.error };
+  // Require explicit backend confirmation before pruning local cache.
+  if (res.data?.deleted !== true && res.data?.ok !== true) {
+    return { ok: false, error: 'delete_not_confirmed' };
+  }
+  return { ok: true };
 }
 
 export async function pingOperatorAdmin(): Promise<{ ok: boolean; error?: string }> {
