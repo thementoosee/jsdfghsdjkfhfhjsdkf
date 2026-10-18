@@ -13,7 +13,16 @@ import {
   type TournamentRemoteMirrorPayload,
 } from './tournament-remote-broadcast';
 import { subscribeActiveRemoteTournament } from './tournament-remote-api';
-import type { DrawPublicSnapshot } from './draw-types';
+import {
+  fetchDrawState,
+  subscribeDrawState,
+} from './draw-sync';
+import {
+  toPublicSnapshot,
+  type DrawPresentationState,
+  type DrawPublicSnapshot,
+} from './draw-types';
+import { useDrawReconcile } from './use-draw-reconcile';
 
 /** Neutral idle frame when nothing is ACTIVE — never stale DEMO fixtures. */
 export function buildNeutralOverlayDemo(): BonusTournamentDemo {
@@ -39,24 +48,39 @@ export function buildNeutralOverlayDemo(): BonusTournamentDemo {
   };
 }
 
+/** Prefer newer draw snapshot (Realtime / reconcile) over stale broadcast. */
+export function mergeDrawSnapshots(
+  primary: DrawPublicSnapshot | null | undefined,
+  secondary: DrawPublicSnapshot | null | undefined,
+): DrawPublicSnapshot | null {
+  if (!primary) return secondary ?? null;
+  if (!secondary) return primary;
+  if (secondary.version > primary.version) return secondary;
+  if (secondary.version < primary.version) return primary;
+  if (secondary.eventId !== primary.eventId) return secondary;
+  return primary;
+}
+
 /**
- * Resolve overlay live data: ACTIVE (same-origin) → remote broadcast (OBS) →
- * local mirror only if it still matches ACTIVE → otherwise null (neutral).
+ * Resolve overlay live data: ACTIVE tournament from Supabase is SoT for demo.
+ * Draw ceremony snapshot comes from draw presentations (passed in) and/or broadcast.
  */
 export function resolveOverlayLivePack(
   remote: TournamentRemoteMirrorPayload | null,
   dbActive: BonusTournamentDemo | null = null,
+  persistedDraw: DrawPublicSnapshot | null = null,
 ): {
   demo: BonusTournamentDemo | null;
   drawSnapshot: DrawPublicSnapshot | null;
   liveSynced: boolean;
 } {
-  // REAL: Supabase ACTIVE only (no localStorage / BroadcastChannel).
+  // REAL: Supabase ACTIVE only (no localStorage / BroadcastChannel for demo SoT).
   if (dbActive) {
+    const fromRemote =
+      remote?.sessionId === dbActive.id ? remote.drawSnapshot : null;
     return {
       demo: dbActive,
-      drawSnapshot:
-        remote?.sessionId === dbActive.id ? remote.drawSnapshot : null,
+      drawSnapshot: mergeDrawSnapshots(persistedDraw, fromRemote),
       liveSynced: true,
     };
   }
@@ -64,7 +88,7 @@ export function resolveOverlayLivePack(
   if (remote?.sessionId && remote.demo && remote.demo.id === remote.sessionId) {
     return {
       demo: remote.demo,
-      drawSnapshot: remote.drawSnapshot,
+      drawSnapshot: mergeDrawSnapshots(persistedDraw, remote.drawSnapshot),
       liveSynced: true,
     };
   }
@@ -81,6 +105,8 @@ export function BonusTournamentOverlayPreview({
 } = {}) {
   const [remote, setRemote] = useState<TournamentRemoteMirrorPayload | null>(null);
   const [dbActive, setDbActive] = useState<BonusTournamentDemo | null>(null);
+  /** Persisted draw row from Supabase — independent of Dashboard broadcast. */
+  const [persistedDraw, setPersistedDraw] = useState<DrawPublicSnapshot | null>(null);
   const [demo, setDemo] = useState<BonusTournamentDemo>(() => {
     if (typeof window === 'undefined') return buildNeutralOverlayDemo();
     return resolveOverlayLivePack(null).demo ?? buildNeutralOverlayDemo();
@@ -98,7 +124,7 @@ export function BonusTournamentOverlayPreview({
 
   useEffect(() => {
     const sync = () => {
-      const pack = resolveOverlayLivePack(remote, dbActive);
+      const pack = resolveOverlayLivePack(remote, dbActive, persistedDraw);
       if (pack.liveSynced && pack.demo) {
         setDemo(pack.demo);
         setDrawSnapshot(pack.drawSnapshot);
@@ -113,7 +139,7 @@ export function BonusTournamentOverlayPreview({
       }
     };
     sync();
-  }, [remote, dbActive, previewMode]);
+  }, [remote, dbActive, persistedDraw, previewMode]);
 
   useEffect(() => {
     return subscribeRemoteLiveMirror((payload) => {
@@ -124,6 +150,46 @@ export function BonusTournamentOverlayPreview({
   useEffect(() => {
     return subscribeActiveRemoteTournament((t) => setDbActive(t));
   }, []);
+
+  // Main OBS sidebar: follow draw presentations for ACTIVE id (no Dashboard required).
+  useEffect(() => {
+    const tournamentId = dbActive?.id ?? null;
+    if (!tournamentId) {
+      setPersistedDraw(null);
+      return;
+    }
+    let cancelled = false;
+    let unsub: (() => void) | undefined;
+    let poll: ReturnType<typeof setInterval> | undefined;
+
+    const apply = (snap: DrawPublicSnapshot) => {
+      if (cancelled) return;
+      setPersistedDraw((prev) => mergeDrawSnapshots(prev, snap));
+    };
+
+    void (async () => {
+      const remote = await fetchDrawState(tournamentId);
+      if (cancelled) return;
+      if (remote.state) apply(toPublicSnapshot(remote.state));
+      const sub = subscribeDrawState(tournamentId, apply);
+      unsub = sub.unsubscribe;
+      poll = setInterval(() => {
+        void fetchDrawState(tournamentId).then((r) => {
+          if (r.state) apply(toPublicSnapshot(r.state));
+        });
+      }, 4000);
+    })();
+
+    return () => {
+      cancelled = true;
+      unsub?.();
+      if (poll) clearInterval(poll);
+    };
+  }, [dbActive?.id]);
+
+  useDrawReconcile(dbActive?.id ?? null, drawSnapshot, (state: DrawPresentationState) => {
+    setPersistedDraw((prev) => mergeDrawSnapshots(prev, toPublicSnapshot(state)));
+  });
 
   const revealNextPay = (side: 'A' | 'B', amount: number) => {
     setDemo((prev) => {

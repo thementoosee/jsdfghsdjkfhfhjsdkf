@@ -504,6 +504,7 @@ function RevealBody({
             top: 0,
             width: 260,
             transform: `translate(-50%, ${stackTop - CONFIRM_LIFT_PX * liftT}px)`,
+            // No CSS transition — lift is driven by phase progress RAF (original behaviour).
             willChange: gliding || confirming ? 'transform' : undefined,
           }}
         >
@@ -917,20 +918,40 @@ function easeOutCubic(t: number): number {
   return 1 - Math.pow(1 - x, 3);
 }
 
-function usePhaseProgress(snapshot: DrawPublicSnapshot | null): number {
-  const [progress, setProgress] = useState(0);
+/**
+ * Phase-local 0→1 clock for timed ceremony steps.
+ * IMPORTANT: `awaiting_slot` must stay at 0 — if it were 1, the first paint of
+ * `slot_confirmed` would inherit progress=1 and skip the avatar lift / slot reveal.
+ */
+export function initialPhaseProgress(
+  snapshot: Pick<DrawPublicSnapshot, 'phase' | 'phaseStartedAt' | 'phaseDurationMs'> | null,
+  nowMs = Date.now(),
+): number {
+  if (!snapshot) return 0;
+  if (!snapshot.phaseStartedAt || !snapshot.phaseDurationMs || snapshot.phaseDurationMs <= 0) {
+    return snapshot.phase === 'awaiting_slot' || snapshot.phase === 'idle' ? 0 : 1;
+  }
+  const started = new Date(snapshot.phaseStartedAt).getTime();
+  if (!Number.isFinite(started)) return 0;
+  return Math.min(1, Math.max(0, (nowMs - started) / snapshot.phaseDurationMs));
+}
 
-  useEffect(() => {
+function usePhaseProgress(snapshot: DrawPublicSnapshot | null): number {
+  const [progress, setProgress] = useState(() => initialPhaseProgress(snapshot));
+
+  useLayoutEffect(() => {
     if (!snapshot?.phaseStartedAt || !snapshot.phaseDurationMs || snapshot.phaseDurationMs <= 0) {
-      setProgress(snapshot?.phase === 'idle' ? 0 : 1);
+      setProgress(initialPhaseProgress(snapshot));
       return;
     }
     const started = new Date(snapshot.phaseStartedAt).getTime();
     const duration = snapshot.phaseDurationMs;
     const compute = () => Math.min(1, Math.max(0, (Date.now() - started) / duration));
 
+    // Synchronous reset so slot_confirmed never paints one frame at progress=1.
+    setProgress(compute());
+
     if (snapshot.runStatus === 'paused') {
-      setProgress(compute());
       return;
     }
 

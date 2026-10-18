@@ -248,7 +248,33 @@ describe('overlaySceneKey / shouldOverlaySceneFade', () => {
 
   it('draw scene key while ceremony snapshot is live', () => {
     const demo = { ...createDemoTournament('draw'), overlayView: 'draw' as const, status: 'draw' as const };
-    expect(overlaySceneKey(demo, 'draw', drawSnap('matchups'))).toBe('draw');
+    expect(overlaySceneKey(demo, 'draw', drawSnap('reveal_match'))).toBe('draw');
+  });
+
+  it('START switches main sidebar to ceremony even if overlayView is still entries', () => {
+    const demo = {
+      ...createDemoTournament('entries'),
+      status: 'entries' as const,
+      overlayView: 'entries' as const,
+    };
+    const live: DrawPublicSnapshot = {
+      ...drawSnap('countdown'),
+      runStatus: 'running',
+      phase: 'countdown',
+      countdownValue: 3,
+      phaseStartedAt: new Date().toISOString(),
+      phaseDurationMs: 1000,
+    };
+    expect(overlaySceneKey(demo, 'entries', live)).toBe('draw');
+  });
+
+  it('before START keeps circulating entries while draw row is idle', () => {
+    const demo = {
+      ...createDemoTournament('draw'),
+      status: 'draw' as const,
+      overlayView: 'draw' as const,
+    };
+    expect(overlaySceneKey(demo, 'draw', drawSnap('idle'))).toBe('entries');
   });
 
   it('buildElimHoldDemo freezes outgoing duel with winner before champion', () => {

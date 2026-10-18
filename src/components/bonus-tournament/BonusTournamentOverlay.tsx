@@ -67,6 +67,8 @@ export function overlaySceneKey(
   if (champion) return `champ:${champion.id}`;
 
   const activeView = view ?? demo.overlayView;
+  // Ceremony is driven by persisted draw presentation — not overlayView alone.
+  // After START, OBS must switch even if tournament.overlay_view is still "entries".
   const drawCeremonyLive =
     drawSnapshot != null &&
     drawSnapshot.phase !== 'idle' &&
@@ -75,22 +77,16 @@ export function overlaySceneKey(
       drawSnapshot.runStatus === 'paused' ||
       drawSnapshot.runStatus === 'completed');
   const isDrawPhase =
-    drawCeremonyLive &&
-    (activeView === 'draw' ||
-      (demo.status === 'draw' &&
-        activeView !== 'overview' &&
-        activeView !== 'duel' &&
-        activeView !== 'entries'));
+    drawCeremonyLive && activeView !== 'overview' && activeView !== 'duel';
   if (isDrawPhase) return 'draw';
 
-  const isEntriesPhase =
-    demo.status === 'entries' || demo.status === 'preparation' || demo.overlayView === 'entries';
   const viewName = String(activeView ?? '');
+  // Before START: status may already be "draw" while ceremony is idle → keep circulating entries.
   const showEntries =
     viewName === 'entries' ||
     demo.status === 'entries' ||
     demo.status === 'preparation' ||
-    (demo.status === 'draw' && (viewName === 'draw' || viewName === 'entries' || isEntriesPhase));
+    (demo.status === 'draw' && !drawCeremonyLive);
   if (showEntries) return 'entries';
 
   const selected = demo.matches.find((m) => m.id === demo.selectedMatchId) ?? null;
@@ -308,8 +304,6 @@ function OverlaySceneBody({
 }) {
   const players = playerMap(demo);
   const champion = resolveTournamentChampion(demo, players);
-  const isEntriesPhase =
-    demo.status === 'entries' || demo.status === 'preparation' || demo.overlayView === 'entries';
   const activeView = view ?? demo.overlayView;
   const drawCeremonyLive =
     drawSnapshot != null &&
@@ -319,13 +313,7 @@ function OverlaySceneBody({
       drawSnapshot.runStatus === 'paused' ||
       drawSnapshot.runStatus === 'completed');
   const isDrawPhase =
-    !champion &&
-    drawCeremonyLive &&
-    (activeView === 'draw' ||
-      (demo.status === 'draw' &&
-        activeView !== 'overview' &&
-        activeView !== 'duel' &&
-        activeView !== 'entries'));
+    !champion && drawCeremonyLive && activeView !== 'overview' && activeView !== 'duel';
   const selected = demo.matches.find((m) => m.id === demo.selectedMatchId) ?? null;
   const roundKey: BonusTournamentRound =
     selected?.round ??
@@ -341,7 +329,7 @@ function OverlaySceneBody({
     (viewName === 'entries' ||
       demo.status === 'entries' ||
       demo.status === 'preparation' ||
-      (demo.status === 'draw' && (viewName === 'draw' || viewName === 'entries' || isEntriesPhase)));
+      (demo.status === 'draw' && !drawCeremonyLive));
 
   const duelChrome = !champion && !isDrawPhase && !showEntries;
 
