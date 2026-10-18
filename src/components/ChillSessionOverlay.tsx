@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Trophy, TrendingUp, Zap, Target, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { resolveSlotImageUrl, SLOT_FALLBACK_IMAGE } from '../lib/slot-image';
 import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../lib/overlay-layout';
+import { takeChillOverlayFace } from '../lib/main-overlay-face-seed';
 
 interface ChillSession {
   id: string;
@@ -48,7 +49,17 @@ interface ChillSessionOverlayProps {
 }
 
 export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, frozen = false }: ChillSessionOverlayProps = {}) {
-  const [session, setSession] = useState<ChillSession | null>(null);
+  const seedRef = useRef<ChillSession | null | undefined>(undefined);
+  if (seedRef.current === undefined) {
+    seedRef.current = sessionId ? takeChillOverlayFace<ChillSession>(sessionId) : null;
+  }
+  const [session, setSession] = useState<ChillSession | null>(() => seedRef.current ?? null);
+  /**
+   * Distinguishes cold load from true empty session.
+   * Seeded mounts (FLIP prepare) start ready. Unseeded mounts may show waiting until fetch.
+   * Parent-driven reloads must not clear the frame when show_on_main_overlay flips false.
+   */
+  const [awaitingSession, setAwaitingSession] = useState(() => !seedRef.current);
   const [brandLogo, setBrandLogo] = useState<BrandLogo | null>(null);
   const [slotInfo, setSlotInfo] = useState<SlotInfo | null>(null);
   const [personalBest, setPersonalBest] = useState<PersonalBest | null>(null);
@@ -57,6 +68,7 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
     if (sessionId) {
       loadSessionById(sessionId);
     } else {
+      setAwaitingSession(true);
       loadActiveSession();
     }
 
@@ -114,15 +126,19 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
 
       if (error) throw error;
 
-      if (data && !data.show_on_main_overlay) {
-        console.log('[ChillSessionOverlay] Session is not active on main overlay, clearing...');
+      if (!data) {
         setSession(null);
+        setAwaitingSession(true);
         return;
       }
 
+      // Parent (MainStreamOverlay) owns mount/unmount. Keep last good frame when the
+      // claim flag is cleared during a mode switch — do not flash the waiting panel.
       setSession(data);
+      setAwaitingSession(false);
     } catch (error) {
       console.error('Error loading session by ID:', error);
+      setAwaitingSession(true);
     }
   };
 
@@ -139,8 +155,10 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
 
       if (error) throw error;
       setSession(data);
+      setAwaitingSession(!data);
     } catch (error) {
       console.error('Error loading session:', error);
+      setAwaitingSession(true);
     }
   };
 
@@ -237,6 +255,8 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
   };
 
   const hasSession = !!session;
+  /** Waiting copy only for true empty standalone / failed load — never mid-transition. */
+  const showAwaitingSession = !hasSession && awaitingSession;
 
   const slotImageUrl = slotInfo ? resolveSlotImageUrl(slotInfo) : '';
   const maxWin = slotInfo?.max_win ? `${slotInfo.max_win.toFixed(0)}x` : '10000x';
@@ -298,7 +318,7 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
                 </div>
               </div>
             )
-          ) : (
+          ) : showAwaitingSession ? (
             <div
               className="relative w-full aspect-square flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' }}
@@ -312,7 +332,7 @@ export function ChillSessionOverlay({ sessionId, embedded: _embedded = false, fr
                 </h1>
               </div>
             </div>
-          )}
+          ) : null}
 
           {brandLogo && hasSession && (
             <div className="absolute bottom-4 left-4">

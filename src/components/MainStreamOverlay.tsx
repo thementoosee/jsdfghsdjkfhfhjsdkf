@@ -12,8 +12,13 @@ import {
   MAIN_OVERLAY_FLIP_DURATION_MS,
   MAIN_OVERLAY_FLIP_EASING,
   planMainOverlayFlip,
+  sameMainOverlayIdentity,
 } from '../lib/main-overlay-flip';
 import { pickMainOverlay, type MainOverlayKind } from '../lib/main-overlay-priority';
+import {
+  seedChillOverlayFace,
+  seedHuntOverlayFace,
+} from '../lib/main-overlay-face-seed';
 import { ChillSessionOverlay } from './ChillSessionOverlay';
 import { BonusHuntOverlay } from './bonus-hunt/BonusHuntOverlay';
 import { BonusOpeningOverlay } from './bonus-hunt/BonusOpeningOverlay';
@@ -104,6 +109,39 @@ async function ensureChillFallback(current: OverlayState): Promise<OverlayState>
     .eq('id', anyActiveSession.id);
 
   return { type: 'chill', id: anyActiveSession.id };
+}
+
+/**
+ * Prefetch face data before the FLIP remounts overlays, so the destination
+ * (and remounted source) never paint «AGUARDANDO SESSÃO...» mid-transition.
+ */
+async function warmOverlayFace(state: OverlayState): Promise<void> {
+  if (!state.type || !state.id) return;
+
+  if (state.type === 'chill') {
+    const { data } = await supabase
+      .from('chill_sessions')
+      .select('*')
+      .eq('id', state.id)
+      .maybeSingle();
+    if (data) seedChillOverlayFace(state.id, data);
+    return;
+  }
+
+  if (state.type === 'hunt') {
+    const { data: hunt } = await supabase
+      .from('bonus_hunts')
+      .select('*')
+      .eq('id', state.id)
+      .maybeSingle();
+    if (!hunt) return;
+    const { data: items } = await supabase
+      .from('bonus_hunt_items')
+      .select('*, slots:slot_id(image_storage_path, image_url)')
+      .eq('hunt_id', state.id)
+      .order('order_index', { ascending: true });
+    seedHuntOverlayFace(state.id, hunt, items ?? []);
+  }
 }
 
 export function MainStreamOverlay() {
@@ -264,13 +302,30 @@ export function MainStreamOverlay() {
   const startFlip = (from: OverlayState, to: OverlayState) => {
     flippingRef.current = true;
     overlayStateRef.current = to;
-    flipKeyRef.current += 1;
-    setFlip({ from, to, key: flipKeyRef.current });
 
-    if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
-    flipTimerRef.current = setTimeout(() => {
-      finishFlipTo(to);
-    }, MAIN_OVERLAY_FLIP_DURATION_MS);
+    void (async () => {
+      // Keep the settled overlay visible while warming — then flip once faces are ready.
+      await Promise.all([warmOverlayFace(from), warmOverlayFace(to)]);
+
+      let target = to;
+      const pending = pendingTargetRef.current;
+      if (pending) {
+        pendingTargetRef.current = null;
+        if (!sameMainOverlayIdentity(pending, to)) {
+          target = pending;
+          await warmOverlayFace(target);
+        }
+      }
+
+      overlayStateRef.current = target;
+      flipKeyRef.current += 1;
+      setFlip({ from: settledStateRef.current, to: target, key: flipKeyRef.current });
+
+      if (flipTimerRef.current) clearTimeout(flipTimerRef.current);
+      flipTimerRef.current = setTimeout(() => {
+        finishFlipTo(target);
+      }, MAIN_OVERLAY_FLIP_DURATION_MS);
+    })();
   };
 
   const transitionTo = (type: OverlayType, id: string | null) => {

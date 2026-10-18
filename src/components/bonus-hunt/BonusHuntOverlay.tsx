@@ -3,6 +3,7 @@ import { Gift, TrendingUp, DollarSign, Zap, Flame } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { resolveHistoricalSlotImage, SLOT_FALLBACK_IMAGE } from '../../lib/slot-image';
 import { MAIN_OVERLAY_SIDEBAR_WIDTH_PX } from '../../lib/overlay-layout';
+import { takeHuntOverlayFace } from '../../lib/main-overlay-face-seed';
 import { BonusOpeningOverlay } from './BonusOpeningOverlay';
 import { Carousel3D, type Carousel3DItem } from './Carousel3D';
 
@@ -59,13 +60,23 @@ interface BonusHuntOverlayProps {
 }
 
 export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayProps = {}) {
-  const [hunt, setHunt] = useState<BonusHunt | null>(null);
-  const [items, setItems] = useState<BonusHuntItem[]>([]);
+  const initialSeedRef = useRef<{ hunt: BonusHunt; items: BonusHuntItem[] } | null | undefined>(
+    undefined,
+  );
+  if (initialSeedRef.current === undefined) {
+    initialSeedRef.current = huntId
+      ? takeHuntOverlayFace<BonusHunt, BonusHuntItem>(huntId)
+      : null;
+  }
+  const [hunt, setHunt] = useState<BonusHunt | null>(() => initialSeedRef.current?.hunt ?? null);
+  const [items, setItems] = useState<BonusHuntItem[]>(() => initialSeedRef.current?.items ?? []);
   const [newItemIds, setNewItemIds] = useState<Set<string>>(new Set());
   const [removedItemIds, setRemovedItemIds] = useState<Set<string>>(new Set());
   const [listOverflows, setListOverflows] = useState(false);
-  const previousItemIdsRef = useRef<Set<string>>(new Set());
-  const currentHuntIdRef = useRef<string | null>(null);
+  const previousItemIdsRef = useRef<Set<string>>(
+    new Set((initialSeedRef.current?.items ?? []).map((item) => item.id)),
+  );
+  const currentHuntIdRef = useRef<string | null>(initialSeedRef.current?.hunt.id ?? null);
   const listViewportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -168,19 +179,12 @@ export function BonusHuntOverlay({ huntId, embedded = false }: BonusHuntOverlayP
       console.log('[BonusHuntOverlay] Hunt loaded:', data);
 
       if (data) {
-        if (huntId && !data.show_on_main_overlay) {
-          console.log('[BonusHuntOverlay] Hunt is not active on main overlay, clearing...');
-          currentHuntIdRef.current = null;
-          setHunt(null);
-          setItems([]);
-          previousItemIdsRef.current = new Set();
-          return;
-        }
-
+        // Parent owns mount/unmount. Keep last good frame when the claim flag is
+        // cleared during a mode switch so the FLIP front face does not blank out.
         currentHuntIdRef.current = data.id;
         setHunt(data);
         loadHuntItems(data.id);
-      } else {
+      } else if (!huntId) {
         currentHuntIdRef.current = null;
         setHunt(null);
         setItems([]);
