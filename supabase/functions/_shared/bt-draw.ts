@@ -3,7 +3,7 @@
 export const DRAW_TIMING = {
   introMs: 2800,
   countdownStepMs: 1000,
-  revealPlayerMs: 3600,
+  revealPlayerMs: 5400,
   slotConfirmMs: 2400,
   showSelectedMs: 3200,
   revealMatchMs: 7000,

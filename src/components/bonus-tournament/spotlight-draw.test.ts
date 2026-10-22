@@ -56,7 +56,7 @@ describe('spotlight-draw', () => {
     expect(SPOTLIGHT_SPIN_END).toBeLessThan(SPOTLIGHT_FADE_END);
     expect(SPOTLIGHT_FADE_END).toBeLessThan(SPOTLIGHT_LAND_END);
     expect(SPOTLIGHT_LAND_END).toBeLessThan(1);
-    // ~300ms fade and ~1100ms glide at revealPlayerMs=3600
+    // ~450ms fade and ~1650ms glide at revealPlayerMs=5400
     expect(SPOTLIGHT_FADE_END - SPOTLIGHT_SPIN_END).toBeGreaterThan(0.07);
     expect(SPOTLIGHT_FADE_END - SPOTLIGHT_SPIN_END).toBeLessThan(0.12);
     expect(SPOTLIGHT_LAND_END - SPOTLIGHT_FADE_END).toBeGreaterThan(0.28);

@@ -400,7 +400,7 @@ function RevealBody({
 
   if (!winner || !centerFace) return null;
 
-  // Phase 2 — fade remaining orbit faces (~300ms at revealPlayerMs=3600).
+  // Phase 2 — fade remaining orbit faces (~450ms at revealPlayerMs=5400).
   const fadeT =
     spinning && p >= SPOTLIGHT_SPIN_END
       ? Math.min(1, (p - SPOTLIGHT_SPIN_END) / (SPOTLIGHT_FADE_END - SPOTLIGHT_SPIN_END))

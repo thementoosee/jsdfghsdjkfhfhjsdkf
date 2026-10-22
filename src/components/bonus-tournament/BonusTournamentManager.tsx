@@ -1467,6 +1467,7 @@ export function BonusTournamentManager() {
                 requireEntriesClosed
                 forceLocal={demo.isDemo}
                 enableRemoteReconcile={demo.isDemo}
+                remoteSnapshot={demo.isDemo ? null : drawSnapshot}
                 onSnapshotChange={onDrawSnapshotChange}
                 onDrawPhaseActive={onDrawPhaseActive}
                 onLaunchMatchups={handleLaunchMatchups}

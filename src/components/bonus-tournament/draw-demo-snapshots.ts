@@ -177,7 +177,7 @@ export function buildDemoDrawSnapshot(scene: DrawPreviewScene): DrawPublicSnapsh
         phase: 'reveal_player',
         revealedPlayers: 1,
         phaseStartedAt: now,
-        phaseDurationMs: 3600,
+        phaseDurationMs: 5400,
         result: clearAll(DEMO_RESULT),
       });
     case 'awaiting_slot':

@@ -9,8 +9,8 @@
 export const DRAW_TIMING = {
   introMs: 2800,
   countdownStepMs: 1000,
-  /** Spotlight draw: fast→slow face cycle + soft fade/glide land on winner. */
-  revealPlayerMs: 3600,
+  /** Spotlight draw: fast→slow face cycle + soft fade/glide land on winner (+~1.8s hold for audience). */
+  revealPlayerMs: 5400,
   /** Player lifts up + slot thumbnail gold entrance after CONFIRMAR SLOT. */
   slotConfirmMs: 2400,
   showSelectedMs: 3200,

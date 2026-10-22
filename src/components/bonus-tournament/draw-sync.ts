@@ -125,3 +125,29 @@ export function subscribeDrawState(
 export function asObsSnapshot(state: DrawPresentationState): DrawPublicSnapshot {
   return toPublicSnapshot(state);
 }
+
+/** Merge a public OBS/Manager snapshot into full presentation state (keeps local-only fields). */
+export function applyPublicSnapshot(
+  local: DrawPresentationState,
+  snap: DrawPublicSnapshot,
+): DrawPresentationState {
+  return {
+    ...local,
+    tournamentId: snap.tournamentId,
+    presentationId: snap.presentationId,
+    tournamentName: snap.tournamentName || local.tournamentName,
+    version: snap.version,
+    eventId: snap.eventId,
+    runStatus: snap.runStatus,
+    phase: snap.phase,
+    revealedPlayers: snap.revealedPlayers,
+    revealedMatches: snap.revealedMatches,
+    countdownValue: snap.countdownValue,
+    phaseStartedAt: snap.phaseStartedAt,
+    phaseDurationMs: snap.phaseDurationMs,
+    result: snap.result ?? local.result,
+    entriesClosed: snap.entriesClosed,
+    uniqueEntryCount: snap.uniqueEntryCount,
+    updatedAt: snap.updatedAt,
+  };
+}

@@ -32,6 +32,7 @@ import { areEntriesClosedForDraw } from './entries-closed';
 import { useDrawReconcile } from './use-draw-reconcile';
 import { pingOperatorAdmin } from './tournament-remote-api';
 import {
+  applyPublicSnapshot,
   asObsSnapshot,
   fetchDrawState,
   probeDrawSync,
@@ -73,6 +74,8 @@ export function DrawManagerPanel({
   forceLocal = false,
   /** When false, parent (BonusTournamentManager) owns remote reconcile — avoids dual callers. */
   enableRemoteReconcile = true,
+  /** Manager-held snapshot (reconcile/Realtime) — keeps slot picker in sync when panel lags. */
+  remoteSnapshot = null,
 }: {
   /** Live tournament UUID — used for draw presentations + Edge GENERATE. */
   tournamentId: string;
@@ -96,6 +99,8 @@ export function DrawManagerPanel({
   forceLocal?: boolean;
   /** Parent Manager reconciles REAL draws across tabs — disable panel duplicate. */
   enableRemoteReconcile?: boolean;
+  /** Authoritative snapshot from Manager (after reconcile) for UI gates like DrawSlotPicker. */
+  remoteSnapshot?: DrawPublicSnapshot | null;
 }) {
   const unique = uniqueEntriesByTwitchId(entries);
   const [state, setState] = useState<DrawPresentationState>(() =>
@@ -237,24 +242,36 @@ export function DrawManagerPanel({
   useEffect(() => {
     if (syncStatus !== 'ready') return;
     const sub = subscribeDrawState(tournamentId, (snap) => {
-      setState((local) =>
-        mergeRemoteIfNewer(local, {
-          ...local,
-          ...snap,
-          result: snap.result,
-        }),
-      );
+      setState((local) => mergeRemoteIfNewer(local, applyPublicSnapshot(local, snap)));
     });
     const poll = setInterval(() => {
       void fetchDrawState(tournamentId).then((remote) => {
         if (remote.state) setState((local) => mergeRemoteIfNewer(local, remote.state!));
       });
-    }, 4000);
+    }, 1500);
     return () => {
       sub.unsubscribe();
       clearInterval(poll);
     };
-  }, [syncStatus]);
+  }, [syncStatus, tournamentId]);
+
+  // Manager reconcile updates drawSnapshot before Realtime may reach this panel —
+  // apply immediately so DrawSlotPicker opens when OBS already shows awaiting_slot.
+  useEffect(() => {
+    if (!remoteSnapshot || forceLocal) return;
+    setState((local) => {
+      const merged = mergeRemoteIfNewer(local, applyPublicSnapshot(local, remoteSnapshot));
+      stateRef.current = merged;
+      return merged;
+    });
+  }, [
+    remoteSnapshot?.version,
+    remoteSnapshot?.eventId,
+    remoteSnapshot?.phase,
+    remoteSnapshot?.phaseStartedAt,
+    remoteSnapshot?.revealedPlayers,
+    forceLocal,
+  ]);
 
   // DEMO / offline: advance locally in-browser.
   useEffect(() => {

@@ -2,7 +2,7 @@ import type { DrawParticipant } from './draw-types';
 
 /**
  * Progress fractions of reveal_player (duration = DRAW_TIMING.revealPlayerMs).
- * At 3600ms: spin ~1800 · fade sats ~300 · glide ~1100 · name settle ~400.
+ * At 5400ms: spin ~2700 · fade sats ~450 · glide ~1650 · name settle ~600 (same ratios).
  */
 export const SPOTLIGHT_SPIN_END = 0.5;
 /** Satellites fully faded; selected hero still at spin anchor. */
