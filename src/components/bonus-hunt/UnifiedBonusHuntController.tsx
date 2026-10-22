@@ -1,4 +1,5 @@
-  import { useState, useEffect, useRef, type CSSProperties } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, ArrowUpDown, Monitor, Plus, Trash2, BarChart3 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { calculateBE, calculateLiveBE, calculateTotalBetAll, formatMultiplier } from '../../lib/breakEvenCalculations';
@@ -90,6 +91,12 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [startValue, setStartValue] = useState<number>(0);
   const selectedHuntIdRef = useRef<string | null>(null);
+  const slotSearchAnchorRef = useRef<HTMLDivElement>(null);
+  const [slotDropdownBox, setSlotDropdownBox] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const [newItem, setNewItem] = useState({
     slot_name: '',
@@ -125,6 +132,34 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
     }, SLOT_SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(debounce);
   }, [slotSearchQuery]);
+
+  /** Keep portal dropdown anchored to the search field (avoids sticky header covering results). */
+  useLayoutEffect(() => {
+    if (!showSlotDropdown || slots.length === 0) {
+      setSlotDropdownBox(null);
+      return;
+    }
+
+    const updateBox = () => {
+      const el = slotSearchAnchorRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      setSlotDropdownBox({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    };
+
+    updateBox();
+    window.addEventListener('resize', updateBox);
+    // Capture scrolls from any ancestor (dashboard page / overflow containers).
+    document.addEventListener('scroll', updateBox, true);
+    return () => {
+      window.removeEventListener('resize', updateBox);
+      document.removeEventListener('scroll', updateBox, true);
+    };
+  }, [showSlotDropdown, slots.length, slotSearchQuery]);
 
   const loadHunts = async () => {
     try {
@@ -812,7 +847,11 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                     </div>
                   )}
 
-                  <div className="relative flex-1" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    ref={slotSearchAnchorRef}
+                    className="relative flex-1"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <input
                       type="text"
                       value={slotSearchQuery}
@@ -839,41 +878,60 @@ export function UnifiedBonusHuntController({ initialHuntId, onBackToList }: Unif
                         }
                       }}
                     />
-                    {showSlotDropdown && slots.length > 0 && (
-                      <div
-                        className="absolute z-10 w-full mt-1 rounded-xl shadow-lg max-h-60 overflow-y-auto"
-                        style={{ background: bh.panel, border: `1px solid ${bh.cardBorder}` }}
-                      >
-                        {slots.map(slot => (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            onClick={async () => {
-                              const { data: slotData } = await supabase
-                                .from('slots')
-                                .select('*')
-                                .eq('id', slot.id)
-                                .maybeSingle();
+                    {showSlotDropdown &&
+                      slots.length > 0 &&
+                      slotDropdownBox &&
+                      createPortal(
+                        <div
+                          className="rounded-xl shadow-lg max-h-60 overflow-y-auto"
+                          style={{
+                            position: 'fixed',
+                            top: slotDropdownBox.top,
+                            left: slotDropdownBox.left,
+                            width: slotDropdownBox.width,
+                            zIndex: 10000,
+                            background: bh.panel,
+                            border: `1px solid ${bh.cardBorder}`,
+                          }}
+                          onMouseDown={(e) => e.preventDefault()}
+                        >
+                          {slots.map((slot) => (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              onClick={async () => {
+                                const { data: slotData } = await supabase
+                                  .from('slots')
+                                  .select('*')
+                                  .eq('id', slot.id)
+                                  .maybeSingle();
 
-                              if (slotData) {
-                                setSelectedSlot(slotData);
-                                setNewItem((current) => ({ ...current, slot_name: slotData.name }));
-                                setSlotSearchQuery(slotData.name);
-                              }
-                              setShowSlotDropdown(false);
-                              setSlots([]);
-                            }}
-                            className="w-full text-left px-3 py-2 text-sm border-b last:border-b-0 transition-colors"
-                            style={{ borderBottomColor: bh.cardBorder, color: bh.text }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = bh.card; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-                          >
-                            <div className="font-semibold">{slot.name}</div>
-                            <div className="text-xs" style={{ color: bh.muted }}>{slot.provider}</div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
+                                if (slotData) {
+                                  setSelectedSlot(slotData);
+                                  setNewItem((current) => ({ ...current, slot_name: slotData.name }));
+                                  setSlotSearchQuery(slotData.name);
+                                }
+                                setShowSlotDropdown(false);
+                                setSlots([]);
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm border-b last:border-b-0 transition-colors"
+                              style={{ borderBottomColor: bh.cardBorder, color: bh.text }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = bh.card;
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = 'transparent';
+                              }}
+                            >
+                              <div className="font-semibold">{slot.name}</div>
+                              <div className="text-xs" style={{ color: bh.muted }}>
+                                {slot.provider}
+                              </div>
+                            </button>
+                          ))}
+                        </div>,
+                        document.body,
+                      )}
                   </div>
 
                   <input
