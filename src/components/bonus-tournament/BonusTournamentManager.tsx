@@ -36,7 +36,10 @@ import {
   suggestWinner,
 } from './scoring';
 import { SlotThumb } from './SlotThumb';
-import type { DrawPublicSnapshot } from './draw-types';
+import type { DrawPresentationState, DrawPublicSnapshot } from './draw-types';
+import { toPublicSnapshot } from './draw-types';
+import { fetchDrawState, subscribeDrawState } from './draw-sync';
+import { useDrawReconcile } from './use-draw-reconcile';
 import type { BonusTournamentDemo, BonusTournamentMatch } from './types';
 import { ROUND_LABEL, STATUS_LABEL } from './types';
 import {
@@ -212,6 +215,7 @@ export function BonusTournamentManager() {
   const [sessions, setSessions] = useState<TournamentSessionRecord[]>([]);
   const [demo, setDemo] = useState<BonusTournamentDemo | null>(null);
   const [drawSnapshot, setDrawSnapshot] = useState<DrawPublicSnapshot | null>(null);
+  const [drawReconcileError, setDrawReconcileError] = useState<string | null>(null);
   const [tab, setTab] = useState<ManagerTab>('overview');
   const [copiedUrl, setCopiedUrl] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
@@ -429,6 +433,75 @@ export function BonusTournamentManager() {
   const onDrawSnapshotChange = useCallback((snap: DrawPublicSnapshot | null) => {
     setDrawSnapshot(snap);
   }, []);
+
+  /**
+   * REAL draws: keep presentation sync + reconcile alive for the whole workspace,
+   * independent of `tab === 'draw'` (DrawManagerPanel unmount must not stop countdown).
+   */
+  useEffect(() => {
+    if (!demo || demo.isDemo) {
+      setDrawReconcileError(null);
+      return;
+    }
+    const tournamentId = demo.id;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+    let poll: ReturnType<typeof setInterval> | undefined;
+
+    const applyRemote = (state: DrawPresentationState) => {
+      setDrawSnapshot((prev) => {
+        const next = toPublicSnapshot(state);
+        if (prev && next.version < prev.version) return prev;
+        if (prev && next.version === prev.version && next.eventId === prev.eventId) return prev;
+        return next;
+      });
+    };
+
+    void (async () => {
+      const remote = await fetchDrawState(tournamentId);
+      if (cancelled) return;
+      if (remote.state) applyRemote(remote.state);
+      const sub = subscribeDrawState(tournamentId, (snap) => {
+        setDrawSnapshot((prev) => {
+          if (prev && snap.version < prev.version) return prev;
+          if (prev && snap.version === prev.version && snap.eventId === prev.eventId) return prev;
+          return snap;
+        });
+      });
+      unsubscribe = sub.unsubscribe;
+      poll = setInterval(() => {
+        void fetchDrawState(tournamentId).then((r) => {
+          if (!cancelled && r.state) applyRemote(r.state);
+        });
+      }, 4000);
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+      if (poll) clearInterval(poll);
+    };
+  }, [demo?.id, demo?.isDemo]);
+
+  const onManagerReconciled = useCallback((state: DrawPresentationState) => {
+    setDrawReconcileError(null);
+    setDrawSnapshot((prev) => {
+      const next = toPublicSnapshot(state);
+      if (prev && next.version < prev.version) return prev;
+      return next;
+    });
+  }, []);
+
+  const onManagerReconcileError = useCallback((error: string | null) => {
+    setDrawReconcileError(error);
+  }, []);
+
+  useDrawReconcile(
+    demo && !demo.isDemo ? demo.id : null,
+    demo && !demo.isDemo ? drawSnapshot : null,
+    onManagerReconciled,
+    onManagerReconcileError,
+  );
 
   const onDrawPhaseActive = useCallback((active: boolean) => {
     setDemo((p) => {
@@ -929,6 +1002,35 @@ export function BonusTournamentManager() {
                 ? 'Sandbox DEMO local · não grava no Supabase'
                 : 'Torneio REAL · overlays só seguem ACTIVE · inscritos via Twitch'}
             </p>
+            {!demo.isDemo &&
+              drawSnapshot?.runStatus === 'running' &&
+              !isWorkspaceActive && (
+                <p
+                  className="text-[11px] mt-2 font-semibold rounded-xl px-3 py-2"
+                  style={{
+                    background: 'rgba(251,191,36,0.12)',
+                    border: '1px solid rgba(251,191,36,0.35)',
+                    color: '#fbbf24',
+                  }}
+                >
+                  Cerimónia em curso, mas este torneio não está ACTIVE — a overlay OBS principal
+                  não o segue. Usa «Activar nas overlays» para o Browser Source acompanhar o
+                  sorteio. A dashboard continua a reconciliar as fases temporizadas.
+                </p>
+              )}
+            {drawReconcileError && (
+              <p
+                className="text-[11px] mt-2 font-semibold rounded-xl px-3 py-2"
+                style={{
+                  background: 'rgba(239,68,68,0.12)',
+                  border: '1px solid rgba(239,68,68,0.35)',
+                  color: '#f87171',
+                }}
+              >
+                Reconcile do sorteio falhou: {drawReconcileError}. O botão PRÓXIMO continua
+                disponível; verifica rede /api/bt-draw-reconcile.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {isWorkspaceActive ? (
@@ -1364,6 +1466,7 @@ export function BonusTournamentManager() {
                 entriesOpen={demo.entriesConfig.entriesOpen}
                 requireEntriesClosed
                 forceLocal={demo.isDemo}
+                enableRemoteReconcile={demo.isDemo}
                 onSnapshotChange={onDrawSnapshotChange}
                 onDrawPhaseActive={onDrawPhaseActive}
                 onLaunchMatchups={handleLaunchMatchups}

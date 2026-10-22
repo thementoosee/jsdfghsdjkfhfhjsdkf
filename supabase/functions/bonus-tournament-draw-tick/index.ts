@@ -12,7 +12,7 @@
  */
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
-  maybeAutoAdvance,
+  catchUpPresentation,
   PRESENTATIONS_TABLE,
   rowToCasPayload,
   type DrawRow,
@@ -56,15 +56,15 @@ async function tickOne(
   if (!existing) return { tournamentId, advanced: false, reason: 'no_row' };
 
   const row = existing as DrawRow;
-  const advanced = maybeAutoAdvance(row, nowMs);
-  if (!advanced || advanced.version === row.version) {
+  const { row: next, steps } = catchUpPresentation(row, nowMs);
+  if (steps === 0) {
     return { tournamentId, advanced: false, reason: 'not_due' };
   }
 
   const { error: writeErr } = await admin.rpc('bt_draw_cas_write', {
     p_tournament_id: tournamentId,
     p_expected_version: row.version,
-    p_payload: rowToCasPayload(advanced),
+    p_payload: rowToCasPayload(next),
     p_allow_result_replace: false,
   });
 

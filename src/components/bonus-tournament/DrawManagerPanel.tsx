@@ -71,6 +71,8 @@ export function DrawManagerPanel({
   showInlinePreview = true,
   showObsLinks = true,
   forceLocal = false,
+  /** When false, parent (BonusTournamentManager) owns remote reconcile — avoids dual callers. */
+  enableRemoteReconcile = true,
 }: {
   /** Live tournament UUID — used for draw presentations + Edge GENERATE. */
   tournamentId: string;
@@ -92,6 +94,8 @@ export function DrawManagerPanel({
   showObsLinks?: boolean;
   /** DEMO / offline sandbox — never hit Edge GENERATE. */
   forceLocal?: boolean;
+  /** Parent Manager reconciles REAL draws across tabs — disable panel duplicate. */
+  enableRemoteReconcile?: boolean;
 }) {
   const unique = uniqueEntriesByTwitchId(entries);
   const [state, setState] = useState<DrawPresentationState>(() =>
@@ -265,7 +269,7 @@ export function DrawManagerPanel({
     return () => clearInterval(id);
   }, [state.runStatus, localOnly]);
 
-  // Live remote: overdue reconcile (same path as OBS) — Dashboard optional after START.
+  // Live remote reconcile — skipped when Manager owns it (survives tab switches).
   const onReconciled = useCallback(
     (remote: DrawPresentationState) => {
       setState((local) => mergeRemoteIfNewer(local, remote));
@@ -273,7 +277,8 @@ export function DrawManagerPanel({
     },
     [],
   );
-  useDrawReconcile(localOnly ? null : tournamentId, localOnly ? null : state, onReconciled);
+  const reconcileId = !localOnly && enableRemoteReconcile ? tournamentId : null;
+  useDrawReconcile(reconcileId, reconcileId ? state : null, onReconciled);
 
   const obsUrl =
     typeof window !== 'undefined'

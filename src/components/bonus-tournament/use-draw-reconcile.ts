@@ -13,15 +13,29 @@ export function useDrawReconcile(
   tournamentId: string | null | undefined,
   snapshot: DrawPublicSnapshot | DrawPresentationState | null,
   onState?: (state: DrawPresentationState) => void,
+  onError?: (error: string | null) => void,
 ): void {
   const inFlight = useRef(false);
   const lastAt = useRef(0);
+  const onStateRef = useRef(onState);
+  const onErrorRef = useRef(onError);
+  onStateRef.current = onState;
+  onErrorRef.current = onError;
 
   useEffect(() => {
-    if (!tournamentId || !snapshot) return;
+    if (!tournamentId || !snapshot) {
+      onErrorRef.current?.(null);
+      return;
+    }
     const runStatus = snapshot.runStatus;
-    if (runStatus !== 'running') return;
-    if (!snapshot.phaseStartedAt || snapshot.phaseDurationMs == null) return;
+    if (runStatus !== 'running') {
+      onErrorRef.current?.(null);
+      return;
+    }
+    if (!snapshot.phaseStartedAt || snapshot.phaseDurationMs == null) {
+      onErrorRef.current?.(null);
+      return;
+    }
 
     let cancelled = false;
     let timeoutId = 0;
@@ -37,7 +51,12 @@ export function useDrawReconcile(
       try {
         const res = await reconcileDrawPresentation(tournamentId);
         if (cancelled) return;
-        if (res.ok && res.state) onState?.(res.state);
+        if (res.ok && res.state) {
+          onErrorRef.current?.(null);
+          onStateRef.current?.(res.state);
+        } else if (!res.ok) {
+          onErrorRef.current?.(res.error || `reconcile_http_${res.status}`);
+        }
       } finally {
         inFlight.current = false;
       }
@@ -68,6 +87,5 @@ export function useDrawReconcile(
     snapshot?.phaseDurationMs,
     snapshot?.version,
     snapshot?.eventId,
-    onState,
   ]);
 }
